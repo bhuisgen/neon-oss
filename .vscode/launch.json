@@ -1,0 +1,14 @@
+{
+  "configurations": [
+    {
+      "name": "Debug",
+      "type": "go",
+      "request": "launch",
+      "mode": "exec",
+      "port": 12345,
+      "host": "debug",
+      "program": "/src/serve",
+      "substitutePath": [{ "from": "${workspaceFolder}", "to": "/src" }]
+    }
+  ]
+}

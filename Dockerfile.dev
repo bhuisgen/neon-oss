@@ -1,0 +1,12 @@
+FROM golang:1.17-bullseye as build
+
+ARG BUILD_OS
+ARG BUILD_ARCH
+
+RUN go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest
+
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=1 GOOS=${BUILD_OS} GOARCH=${BUILD_ARCH} go build -gcflags "all=-N -l" -o ./serve cmd/serve/*.go
+
+ENTRYPOINT ["/go/bin/dlv"]
