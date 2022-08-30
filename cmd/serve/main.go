@@ -45,6 +45,11 @@ func main() {
 			log.Fatal(err)
 		}
 
+		header, err := app.CreateHeaderRenderer(&configServer.Header)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		static, err := app.CreateStaticRenderer(&configServer.Static)
 		if err != nil {
 			log.Fatal(err)
@@ -70,7 +75,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		server, err := app.CreateServer(configServer, rewrite, static, robots, sitemap, index, e)
+		server, err := app.CreateServer(configServer, rewrite, header, static, robots, sitemap, index, e)
 		if err != nil {
 			log.Fatal(err)
 		}

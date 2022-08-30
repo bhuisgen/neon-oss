@@ -22,6 +22,7 @@ const (
 	CONFIG_DEFAULT_SERVER_ACCESSLOGFILE    string = ""
 	CONFIG_DEFAULT_SERVER_ERRORCODE        int    = 500
 	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE   bool   = false
+	CONFIG_DEFAULT_SERVER_HEADER_ENABLE    bool   = false
 	CONFIG_DEFAULT_SERVER_STATIC_ENABLE    bool   = false
 	CONFIG_DEFAULT_SERVER_INDEX_ENABLE     bool   = false
 	CONFIG_DEFAULT_SERVER_INDEX_ENV        string = "production"
@@ -66,11 +67,19 @@ type yamlConfigServer struct {
 	Rewrite struct {
 		Enable *bool `yaml:"enable"`
 		Rules  []struct {
-			Regex       string `yaml:"regex"`
+			Path        string `yaml:"path"`
 			Replacement string `yaml:"replacement"`
 			Flag        string `yaml:"flag"`
 		} `yaml:"rules"`
-	}
+	} `yaml:"rewrite"`
+
+	Header struct {
+		Enable *bool `yaml:"enable"`
+		Rules  []struct {
+			Path string            `yaml:"path"`
+			Add  map[string]string `yaml:"add"`
+		} `yaml:"rules"`
+	} `yaml:"header"`
 
 	Static struct {
 		Enable *bool  `yaml:"enable"`
@@ -289,9 +298,21 @@ func parse(y *yamlConfig) (*Config, error) {
 		}
 		for _, rewriteRule := range yamlConfigServer.Rewrite.Rules {
 			serverConfig.Rewrite.Rules = append(serverConfig.Rewrite.Rules, RewriteRule{
-				Regex:       rewriteRule.Regex,
+				Path:        rewriteRule.Path,
 				Replacement: rewriteRule.Replacement,
 				Flag:        rewriteRule.Flag,
+			})
+		}
+
+		if yamlConfigServer.Header.Enable != nil {
+			serverConfig.Header.Enable = *yamlConfigServer.Header.Enable
+		} else {
+			serverConfig.Header.Enable = CONFIG_DEFAULT_SERVER_HEADER_ENABLE
+		}
+		for _, headerRule := range yamlConfigServer.Header.Rules {
+			serverConfig.Header.Rules = append(serverConfig.Header.Rules, HeaderRule{
+				Path: headerRule.Path,
+				Add:  headerRule.Add,
 			})
 		}
 

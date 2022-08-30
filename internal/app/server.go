@@ -39,6 +39,7 @@ type ServerConfig struct {
 	AccessLogFile string
 	ErrorCode     int
 	Rewrite       RewriteRendererConfig
+	Header        HeaderRendererConfig
 	Static        StaticRendererConfig
 	Index         IndexRendererConfig
 	Robots        RobotsRendererConfig
