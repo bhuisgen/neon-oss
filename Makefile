@@ -16,6 +16,6 @@ clean:
 
 init:
 
-dev: clean init
+dev:
 	docker build --build-arg BUILD_OS=linux --build-arg BUILD_ARCH=amd64 -t neon:dev -f Dockerfile.dev .
-	docker run -it --rm $(OPTIONS) neon:dev dap --listen=:12345
+	docker run -it --rm  --name debug $(OPTIONS) neon:dev dap --listen=:12345
