@@ -24,7 +24,7 @@ func Logging(config *LoggingConfig, next http.Handler) http.Handler {
 
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 
-  if config.LogFile != "" {
+	if config.LogFile != "" {
 		f, err := os.OpenFile(config.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatal(err)

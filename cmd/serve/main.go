@@ -34,6 +34,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	var servers []*app.Server
 
 	fetcher := app.NewFetcher(config.Fetcher)
@@ -87,6 +88,10 @@ func main() {
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	log.Println("Starting instance")
+
+	if _, ok := os.LookupEnv("DEBUG"); ok {
+		app.NewMonitor(300)
+	}
 
 	loader.Start()
 	for _, server := range servers {

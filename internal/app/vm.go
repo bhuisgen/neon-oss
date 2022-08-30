@@ -11,7 +11,7 @@ import (
 	"rogchap.com/v8go"
 )
 
-// vm implements a Javascript VM
+// vm implements a VM
 type vm struct {
 	isolate                  *v8go.Isolate
 	processObject            *v8go.ObjectTemplate
