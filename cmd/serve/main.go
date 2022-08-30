@@ -65,7 +65,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		e, err := app.CreateErrorRenderer(&app.ErrorRendererConfig{StatusCode: 404})
+		e, err := app.CreateErrorRenderer(&app.ErrorRendererConfig{StatusCode: configServer.ErrorCode})
 		if err != nil {
 			log.Fatal(err)
 		}

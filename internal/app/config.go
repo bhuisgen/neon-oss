@@ -20,6 +20,7 @@ const (
 	CONFIG_DEFAULT_SERVER_WRITETIMEOUT     int    = 60
 	CONFIG_DEFAULT_SERVER_ACCESSLOG        bool   = false
 	CONFIG_DEFAULT_SERVER_ACCESSLOGFILE    string = ""
+	CONFIG_DEFAULT_SERVER_ERRORCODE        int    = 500
 	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE   bool   = false
 	CONFIG_DEFAULT_SERVER_STATIC_ENABLE    bool   = false
 	CONFIG_DEFAULT_SERVER_INDEX_ENABLE     bool   = false
@@ -60,6 +61,7 @@ type yamlConfigServer struct {
 	WriteTimeout  *int    `yaml:"write_timeout"`
 	AccessLog     *bool   `yaml:"access_log"`
 	AccessLogFile *string `yaml:"access_log_file"`
+	ErrorCode     *int    `yaml:"error_code"`
 
 	Rewrite struct {
 		Enable *bool `yaml:"enable"`
@@ -273,6 +275,11 @@ func parse(y *yamlConfig) (*Config, error) {
 			serverConfig.AccessLogFile = *yamlConfigServer.AccessLogFile
 		} else {
 			serverConfig.AccessLogFile = CONFIG_DEFAULT_SERVER_ACCESSLOGFILE
+		}
+		if yamlConfigServer.ErrorCode != nil {
+			serverConfig.ErrorCode = *yamlConfigServer.ErrorCode
+		} else {
+			serverConfig.ErrorCode = CONFIG_DEFAULT_SERVER_ERRORCODE
 		}
 
 		if yamlConfigServer.Rewrite.Enable != nil {

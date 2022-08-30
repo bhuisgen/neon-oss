@@ -37,6 +37,7 @@ type ServerConfig struct {
 	WriteTimeout  int
 	AccessLog     bool
 	AccessLogFile string
+	ErrorCode     int
 	Rewrite       RewriteRendererConfig
 	Static        StaticRendererConfig
 	Index         IndexRendererConfig
