@@ -7,18 +7,38 @@ package middlewares
 import (
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
+type LoggingConfig struct {
+	Log     bool
+	LogFile string
+}
+
 // Logging is a middleware who log all incoming requests
-func Logging(next http.Handler) http.Handler {
+func Logging(config *LoggingConfig, next http.Handler) http.Handler {
+	if !config.Log {
+		return next
+	}
+
+	logger := log.New(os.Stdout, "", log.LstdFlags)
+
+  if config.LogFile != "" {
+		f, err := os.OpenFile(config.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		logger.SetOutput(f)
+	}
+
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
 		wrapped := loggingResponseWriter(w)
 		next.ServeHTTP(wrapped, r)
 
-		log.Println(r.Method, r.URL.EscapedPath(), wrapped.status, time.Since(start))
+		logger.Println(r.Method, r.URL.EscapedPath(), wrapped.status, time.Since(start))
 	}
 
 	return http.HandlerFunc(fn)

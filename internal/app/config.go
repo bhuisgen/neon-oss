@@ -18,6 +18,8 @@ const (
 	CONFIG_DEFAULT_SERVER_TLS              bool   = false
 	CONFIG_DEFAULT_SERVER_READTIMEOUT      int    = 60
 	CONFIG_DEFAULT_SERVER_WRITETIMEOUT     int    = 60
+	CONFIG_DEFAULT_SERVER_ACCESSLOG        bool   = false
+	CONFIG_DEFAULT_SERVER_ACCESSLOGFILE    string = ""
 	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE   bool   = false
 	CONFIG_DEFAULT_SERVER_STATIC_ENABLE    bool   = false
 	CONFIG_DEFAULT_SERVER_INDEX_ENABLE     bool   = false
@@ -48,14 +50,16 @@ type Config struct {
 }
 
 type yamlConfigServer struct {
-	ListenAddr   *string `yaml:"listen_addr"`
-	ListenPort   *int    `yaml:"listen_port"`
-	TLS          *bool   `yaml:"tls"`
-	TLSCAFile    string  `yaml:"tls_ca_file"`
-	TLSCertFile  string  `yaml:"tls_cert_file"`
-	TLSKeyFile   string  `yaml:"tls_key_file"`
-	ReadTimeout  *int    `yaml:"read_timeout"`
-	WriteTimeout *int    `yaml:"write_timeout"`
+	ListenAddr    *string `yaml:"listen_addr"`
+	ListenPort    *int    `yaml:"listen_port"`
+	TLS           *bool   `yaml:"tls"`
+	TLSCAFile     string  `yaml:"tls_ca_file"`
+	TLSCertFile   string  `yaml:"tls_cert_file"`
+	TLSKeyFile    string  `yaml:"tls_key_file"`
+	ReadTimeout   *int    `yaml:"read_timeout"`
+	WriteTimeout  *int    `yaml:"write_timeout"`
+	AccessLog     *bool   `yaml:"access_log"`
+	AccessLogFile *string `yaml:"access_log_file"`
 
 	Rewrite struct {
 		Enable *bool `yaml:"enable"`
@@ -259,6 +263,16 @@ func parse(y *yamlConfig) (*Config, error) {
 			serverConfig.WriteTimeout = *yamlConfigServer.WriteTimeout
 		} else {
 			serverConfig.WriteTimeout = CONFIG_DEFAULT_SERVER_WRITETIMEOUT
+		}
+		if yamlConfigServer.AccessLog != nil {
+			serverConfig.AccessLog = *yamlConfigServer.AccessLog
+		} else {
+			serverConfig.AccessLog = CONFIG_DEFAULT_SERVER_ACCESSLOG
+		}
+		if yamlConfigServer.AccessLogFile != nil {
+			serverConfig.AccessLogFile = *yamlConfigServer.AccessLogFile
+		} else {
+			serverConfig.AccessLogFile = CONFIG_DEFAULT_SERVER_ACCESSLOGFILE
 		}
 
 		if yamlConfigServer.Rewrite.Enable != nil {

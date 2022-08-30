@@ -27,19 +27,21 @@ type Server struct {
 
 // ServerConfig implements the server configuration
 type ServerConfig struct {
-	ListenAddr   string
-	ListenPort   int
-	TLS          bool
-	TLSCAFile    string
-	TLSCertFile  string
-	TLSKeyFile   string
-	ReadTimeout  int
-	WriteTimeout int
-	Rewrite      RewriteRendererConfig
-	Static       StaticRendererConfig
-	Index        IndexRendererConfig
-	Robots       RobotsRendererConfig
-	Sitemap      SitemapRendererConfig
+	ListenAddr    string
+	ListenPort    int
+	TLS           bool
+	TLSCAFile     string
+	TLSCertFile   string
+	TLSKeyFile    string
+	ReadTimeout   int
+	WriteTimeout  int
+	AccessLog     bool
+	AccessLogFile string
+	Rewrite       RewriteRendererConfig
+	Static        StaticRendererConfig
+	Index         IndexRendererConfig
+	Robots        RobotsRendererConfig
+	Sitemap       SitemapRendererConfig
 }
 
 // CreateServer creates a new instance
@@ -63,7 +65,10 @@ func CreateServer(config *ServerConfig, renderers ...Renderer) (*Server, error) 
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/", middlewares.Recover(middlewares.Logging(NewServerHandler(&server))))
+	mux.Handle("/", middlewares.Recover(middlewares.Logging(&middlewares.LoggingConfig{
+		Log:     server.config.AccessLog,
+		LogFile: server.config.AccessLogFile,
+	}, NewServerHandler(&server))))
 
 	server.httpServer = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", config.ListenAddr, config.ListenPort),
