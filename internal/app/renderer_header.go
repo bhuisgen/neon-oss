@@ -54,19 +54,11 @@ func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error)
 
 // handle implements the header handler
 func (r *headerRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	if !r.config.Enable {
-		r.next.handle(w, req)
-
-		return
-	}
-
 	for index, regexp := range r.regexes {
 		if regexp.MatchString(req.URL.Path) {
 			for k, v := range r.config.Rules[index].Add {
 				w.Header().Add(k, v)
 			}
-
-			r.logger.Printf("Header processed (url=%s)", req.URL.Path)
 
 			break
 		}

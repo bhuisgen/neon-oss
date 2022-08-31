@@ -40,12 +40,6 @@ func CreateRobotsRenderer(config *RobotsRendererConfig, loader *loader) (*robots
 
 // handle implements the renderer handler
 func (r *robotsRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	if !r.config.Enable {
-		r.next.handle(w, req)
-
-		return
-	}
-
 	if req.URL.Path != r.config.Path {
 		r.next.handle(w, req)
 

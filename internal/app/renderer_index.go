@@ -101,12 +101,6 @@ func CreateIndexRenderer(config *IndexRendererConfig, fetcher *fetcher) (*indexR
 
 // handle implements the renderer handler
 func (r *indexRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	if !r.config.Enable {
-		r.next.handle(w, req)
-
-		return
-	}
-
 	result, err := r.render(req)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

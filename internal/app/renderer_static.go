@@ -52,12 +52,6 @@ func CreateStaticRenderer(config *StaticRendererConfig) (*staticRenderer, error)
 
 // handle implements the renderer handler
 func (r *staticRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	if !r.config.Enable {
-		r.next.handle(w, req)
-
-		return
-	}
-
 	if !r.staticFS.exists(req.URL.Path) {
 		r.next.handle(w, req)
 

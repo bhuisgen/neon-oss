@@ -41,42 +41,63 @@ func main() {
 	loader := app.NewLoader(config.Loader, fetcher)
 
 	for _, configServer := range config.Server {
-		rewrite, err := app.CreateRewriteRenderer(&configServer.Rewrite)
-		if err != nil {
-			log.Fatal(err)
+		var renderers []app.Renderer
+
+		if configServer.Rewrite.Enable {
+			rewrite, err := app.CreateRewriteRenderer(&configServer.Rewrite)
+			if err != nil {
+				log.Fatal(err)
+			}
+			renderers = append(renderers, rewrite)
 		}
 
-		header, err := app.CreateHeaderRenderer(&configServer.Header)
-		if err != nil {
-			log.Fatal(err)
+		if configServer.Static.Enable {
+			header, err := app.CreateHeaderRenderer(&configServer.Header)
+			if err != nil {
+				log.Fatal(err)
+			}
+			renderers = append(renderers, header)
 		}
 
-		static, err := app.CreateStaticRenderer(&configServer.Static)
-		if err != nil {
-			log.Fatal(err)
+		if configServer.Static.Enable {
+			static, err := app.CreateStaticRenderer(&configServer.Static)
+			if err != nil {
+				log.Fatal(err)
+			}
+			renderers = append(renderers, static)
 		}
 
-		robots, err := app.CreateRobotsRenderer(&configServer.Robots, loader)
-		if err != nil {
-			log.Fatal(err)
+		if configServer.Robots.Enable {
+			robots, err := app.CreateRobotsRenderer(&configServer.Robots, loader)
+			if err != nil {
+				log.Fatal(err)
+			}
+			renderers = append(renderers, robots)
 		}
 
-		sitemap, err := app.CreateSitemapRenderer(&configServer.Sitemap, fetcher)
-		if err != nil {
-			log.Fatal(err)
+		if configServer.Sitemap.Enable {
+			sitemap, err := app.CreateSitemapRenderer(&configServer.Sitemap, fetcher)
+			if err != nil {
+				log.Fatal(err)
+			}
+			renderers = append(renderers, sitemap)
 		}
 
-		index, err := app.CreateIndexRenderer(&configServer.Index, fetcher)
-		if err != nil {
-			log.Fatal(err)
+		if configServer.Index.Enable {
+			index, err := app.CreateIndexRenderer(&configServer.Index, fetcher)
+			if err != nil {
+				log.Fatal(err)
+			}
+			renderers = append(renderers, index)
 		}
 
 		e, err := app.CreateErrorRenderer(&app.ErrorRendererConfig{StatusCode: configServer.ErrorCode})
 		if err != nil {
 			log.Fatal(err)
 		}
+		renderers = append(renderers, e)
 
-		server, err := app.CreateServer(configServer, rewrite, header, static, robots, sitemap, index, e)
+		server, err := app.CreateServer(configServer, renderers...)
 		if err != nil {
 			log.Fatal(err)
 		}

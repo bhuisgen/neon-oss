@@ -100,12 +100,6 @@ func CreateSitemapRenderer(config *SitemapRendererConfig, fetcher *fetcher) (*si
 
 // handle implements the renderer handler
 func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	if !r.config.Enable {
-		r.next.handle(w, req)
-
-		return
-	}
-
 	var routeIndex int = -1
 	for index, route := range r.config.Routes {
 		if route.Path != req.URL.Path {

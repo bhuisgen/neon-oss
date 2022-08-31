@@ -61,12 +61,6 @@ func CreateRewriteRenderer(config *RewriteRendererConfig) (*rewriteRenderer, err
 
 // handle implements the rewrite handler
 func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	if !r.config.Enable {
-		r.next.handle(w, req)
-
-		return
-	}
-
 	for index, regexp := range r.regexes {
 		if regexp.MatchString(req.URL.Path) {
 			stop := false
