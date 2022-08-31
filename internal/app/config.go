@@ -83,7 +83,7 @@ type yamlConfigServer struct {
 
 	Static struct {
 		Enable *bool  `yaml:"enable"`
-		Path   string `yaml:"path"`
+		Dir    string `yaml:"dir"`
 	} `yaml:"static"`
 
 	Index struct {
@@ -321,7 +321,7 @@ func parse(y *yamlConfig) (*Config, error) {
 		} else {
 			serverConfig.Static.Enable = CONFIG_DEFAULT_SERVER_STATIC_ENABLE
 		}
-		serverConfig.Static.Path = yamlConfigServer.Static.Path
+		serverConfig.Static.Dir = yamlConfigServer.Static.Dir
 
 		if yamlConfigServer.Index.Enable != nil {
 			serverConfig.Index.Enable = *yamlConfigServer.Index.Enable

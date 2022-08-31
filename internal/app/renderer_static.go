@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -27,20 +26,19 @@ type staticRenderer struct {
 // StaticRendererConfig implements the static renderer configuration
 type StaticRendererConfig struct {
 	Enable bool
-	Path   string
+	Dir    string
 }
 
 // CreateStaticRenderer creates a new static renderer
 func CreateStaticRenderer(config *StaticRendererConfig) (*staticRenderer, error) {
-	static, err := filepath.Abs(config.Path)
+	dir, err := filepath.Abs(config.Dir)
 	if err != nil {
 		return nil, err
 	}
 
 	staticFS := &staticFileSystem{
-		FileSystem: http.Dir(static),
-		root:       static,
-		index:      "index.html",
+		FileSystem: http.Dir(dir),
+		prefix:     dir,
 	}
 	staticHandler := http.FileServer(staticFS)
 
@@ -60,7 +58,7 @@ func (r *staticRenderer) handle(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !r.staticFS.exists("/", req.URL.Path) {
+	if !r.staticFS.exists(req.URL.Path) {
 		r.next.handle(w, req)
 
 		return
@@ -77,32 +75,25 @@ func (r *staticRenderer) setNext(renderer Renderer) {
 // staticFileSystem implements a static filesystem
 type staticFileSystem struct {
 	http.FileSystem
-	root  string
-	index string
+
+	prefix string
 }
 
 // exists checks if a file exists into the fileystem
-func (f *staticFileSystem) exists(prefix string, urlpath string) bool {
-	filepath := strings.TrimPrefix(urlpath, prefix)
-	if filepath == urlpath {
-		return false
+func (fs *staticFileSystem) exists(name string) bool {
+	if !strings.HasPrefix(name, "/") {
+		name = "/" + name
 	}
 
-	realpath := path.Join(f.root, filepath)
+	name = filepath.Join(fs.prefix, name)
 
-	stat, err := os.Stat(realpath)
+	s, err := os.Stat(name)
 	if err != nil {
 		return false
 	}
 
-	if stat.IsDir() {
-		if f.index == "" {
-			return false
-		}
-
-		indexpath := path.Join(realpath, f.index)
-
-		_, err = os.Stat(indexpath)
+	if s.IsDir() {
+		return false
 	}
 
 	return err == nil
