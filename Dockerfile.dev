@@ -7,6 +7,6 @@ RUN go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/
 
 WORKDIR /src
 COPY . .
-RUN CGO_ENABLED=1 GOOS=${BUILD_OS} GOARCH=${BUILD_ARCH} go build -gcflags "all=-N -l" -o ./serve cmd/serve/*.go
+RUN GOOS=${BUILD_OS} GOARCH=${BUILD_ARCH} CGO_ENABLED=1 go build -gcflags "all=-N -l" -o ./neon cmd/exec/*.go
 
 ENTRYPOINT ["/go/bin/dlv"]

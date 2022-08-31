@@ -17,24 +17,45 @@ import (
 	"github.com/bhuisgen/neon/internal/app"
 )
 
-// main is the entrypoint
-func main() {
-	var showVersion bool
-	flag.BoolVar(&showVersion, "version", false, "show version information")
+type serveCommand struct {
+	flagset *flag.FlagSet
+	verbose bool
+}
 
-	flag.Parse()
+// NewCheckCommand creates the command
+func NewServeCommand() *serveCommand {
+	c := serveCommand{}
 
-	if showVersion {
-		fmt.Printf("%s version %s, commit %s\n", name, version, commit)
-
-		os.Exit(0)
+	c.flagset = flag.NewFlagSet("serve", flag.ExitOnError)
+	c.flagset.BoolVar(&c.verbose, "verbose", false, "Use verbose output")
+	c.flagset.Usage = func() {
+		fmt.Println("Usage: serve [OPTIONS]")
+		fmt.Println()
+		fmt.Println("Options:")
+		c.flagset.PrintDefaults()
+		os.Exit(2)
 	}
 
-	config, err := app.LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	return &c
+}
 
+// Name returns the command name
+func (c *serveCommand) Name() string {
+	return c.flagset.Name()
+}
+
+// Description returns the command description
+func (c *serveCommand) Description() string {
+	return "Execute the server instance"
+}
+
+// Init initializes the command
+func (c *serveCommand) Init(args []string) error {
+	return c.flagset.Parse(args)
+}
+
+// Execute executes the command
+func (c *serveCommand) Execute(config *app.Config) error {
 	var servers []*app.Server
 
 	fetcher := app.NewFetcher(config.Fetcher)
@@ -46,7 +67,7 @@ func main() {
 		if configServer.Rewrite.Enable {
 			rewrite, err := app.CreateRewriteRenderer(&configServer.Rewrite)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			renderers = append(renderers, rewrite)
 		}
@@ -54,7 +75,7 @@ func main() {
 		if configServer.Static.Enable {
 			header, err := app.CreateHeaderRenderer(&configServer.Header)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			renderers = append(renderers, header)
 		}
@@ -62,7 +83,7 @@ func main() {
 		if configServer.Static.Enable {
 			static, err := app.CreateStaticRenderer(&configServer.Static)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			renderers = append(renderers, static)
 		}
@@ -70,7 +91,7 @@ func main() {
 		if configServer.Robots.Enable {
 			robots, err := app.CreateRobotsRenderer(&configServer.Robots, loader)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			renderers = append(renderers, robots)
 		}
@@ -78,7 +99,7 @@ func main() {
 		if configServer.Sitemap.Enable {
 			sitemap, err := app.CreateSitemapRenderer(&configServer.Sitemap, fetcher)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			renderers = append(renderers, sitemap)
 		}
@@ -86,20 +107,20 @@ func main() {
 		if configServer.Index.Enable {
 			index, err := app.CreateIndexRenderer(&configServer.Index, fetcher)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			renderers = append(renderers, index)
 		}
 
 		e, err := app.CreateErrorRenderer(&app.ErrorRendererConfig{StatusCode: configServer.ErrorCode})
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		renderers = append(renderers, e)
 
 		server, err := app.CreateServer(configServer, renderers...)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		servers = append(servers, server)
@@ -132,4 +153,6 @@ func main() {
 	for _, server := range servers {
 		server.Stop(ctx)
 	}
+
+	return nil
 }

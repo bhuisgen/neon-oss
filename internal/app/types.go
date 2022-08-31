@@ -6,11 +6,6 @@ package app
 
 import "net/http"
 
-// LoaderListener
-type LoaderListener interface {
-	onLoadRender(url string)
-}
-
 // Renderer
 type Renderer interface {
 	handle(http.ResponseWriter, *http.Request)

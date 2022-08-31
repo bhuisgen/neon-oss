@@ -4,6 +4,8 @@
 
 package main
 
-const name string = "Neon"
-const version string = "dev"
-const commit string = "HEAD"
+const (
+	name    string = "Neon"
+	version string = "dev"
+	commit  string = "HEAD"
+)

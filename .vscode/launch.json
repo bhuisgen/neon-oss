@@ -7,7 +7,8 @@
       "mode": "exec",
       "port": 12345,
       "host": "debug",
-      "program": "/src/serve",
+      "program": "/src/neon",
+      "args": ["serve"],
       "substitutePath": [{ "from": "${workspaceFolder}", "to": "/src" }]
     }
   ]
