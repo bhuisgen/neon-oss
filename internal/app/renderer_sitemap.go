@@ -121,6 +121,8 @@ func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
 
+		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, result.Status)
+
 		return
 	}
 

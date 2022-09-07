@@ -12,36 +12,40 @@ import (
 )
 
 const (
-	CONFIG_FILE                            string = "config.yaml"
-	CONFIG_DEFAULT_SERVER_LISTENADDR       string = "localhost"
-	CONFIG_DEFAULT_SERVER_LISTENPORT       int    = 8080
-	CONFIG_DEFAULT_SERVER_TLS              bool   = false
-	CONFIG_DEFAULT_SERVER_READTIMEOUT      int    = 60
-	CONFIG_DEFAULT_SERVER_WRITETIMEOUT     int    = 60
-	CONFIG_DEFAULT_SERVER_ACCESSLOG        bool   = false
-	CONFIG_DEFAULT_SERVER_ACCESSLOGFILE    string = ""
-	CONFIG_DEFAULT_SERVER_ERRORCODE        int    = 500
-	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE   bool   = false
-	CONFIG_DEFAULT_SERVER_HEADER_ENABLE    bool   = false
-	CONFIG_DEFAULT_SERVER_STATIC_ENABLE    bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_ENABLE     bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_ENV        string = "production"
-	CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT    int    = 4
-	CONFIG_DEFAULT_SERVER_INDEX_CACHE      bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_CACHETTL   int    = 60
-	CONFIG_DEFAULT_SERVER_ROBOTS_ENABLE    bool   = false
-	CONFIG_DEFAULT_SERVER_ROBOTS_PATH      string = "/robots.txt"
-	CONFIG_DEFAULT_SERVER_ROBOTS_CACHE     bool   = false
-	CONFIG_DEFAULT_SERVER_ROBOTS_CACHETTL  int    = 60
-	CONFIG_DEFAULT_SERVER_SITEMAP_ENABLE   bool   = false
-	CONFIG_DEFAULT_SERVER_SITEMAP_CACHE    bool   = false
-	CONFIG_DEFAULT_SERVER_SITEMAP_CACHETTL int    = 60
-	CONFIG_DEFAULT_FETCHER_REQUESTTIMEOUT  int    = 60
-	CONFIG_DEFAULT_FETCHER_REQUESTRETRY    int    = 3
-	CONFIG_DEFAULT_FETCHER_REQUESTDELAY    int    = 1
-	CONFIG_DEFAULT_LOADER_EXECSTARTUP      int    = 15
-	CONFIG_DEFAULT_LOADER_EXECINTERVAL     int    = 60
-	CONFIG_DEFAULT_LOADER_EXECWORKERS      int    = 1
+	CONFIG_FILE                              string = "config.yaml"
+	CONFIG_DEFAULT_SERVER_LISTENADDR         string = "localhost"
+	CONFIG_DEFAULT_SERVER_LISTENPORT         int    = 8080
+	CONFIG_DEFAULT_SERVER_TLS                bool   = false
+	CONFIG_DEFAULT_SERVER_READTIMEOUT        int    = 60
+	CONFIG_DEFAULT_SERVER_WRITETIMEOUT       int    = 60
+	CONFIG_DEFAULT_SERVER_ACCESSLOG          bool   = false
+	CONFIG_DEFAULT_SERVER_ACCESSLOGFILE      string = ""
+	CONFIG_DEFAULT_SERVER_ERRORCODE          int    = 500
+	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE     bool   = false
+	CONFIG_DEFAULT_SERVER_HEADER_ENABLE      bool   = false
+	CONFIG_DEFAULT_SERVER_STATIC_ENABLE      bool   = false
+	CONFIG_DEFAULT_SERVER_INDEX_ENABLE       bool   = false
+	CONFIG_DEFAULT_SERVER_INDEX_ENV          string = "production"
+	CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT      int    = 4
+	CONFIG_DEFAULT_SERVER_INDEX_CACHE        bool   = false
+	CONFIG_DEFAULT_SERVER_INDEX_CACHETTL     int    = 60
+	CONFIG_DEFAULT_SERVER_ROBOTS_ENABLE      bool   = false
+	CONFIG_DEFAULT_SERVER_ROBOTS_PATH        string = "/robots.txt"
+	CONFIG_DEFAULT_SERVER_ROBOTS_CACHE       bool   = false
+	CONFIG_DEFAULT_SERVER_ROBOTS_CACHETTL    int    = 60
+	CONFIG_DEFAULT_SERVER_SITEMAP_ENABLE     bool   = false
+	CONFIG_DEFAULT_SERVER_SITEMAP_CACHE      bool   = false
+	CONFIG_DEFAULT_SERVER_SITEMAP_CACHETTL   int    = 60
+	CONFIG_DEFAULT_SERVER_DEFAULT_ENABLE     bool   = false
+	CONFIG_DEFAULT_SERVER_DEFAULT_STATUSCODE int    = 200
+	CONFIG_DEFAULT_SERVER_DEFAULT_CACHE      bool   = false
+	CONFIG_DEFAULT_SERVER_DEFAULT_CACHETTL   int    = 60
+	CONFIG_DEFAULT_FETCHER_REQUESTTIMEOUT    int    = 60
+	CONFIG_DEFAULT_FETCHER_REQUESTRETRY      int    = 3
+	CONFIG_DEFAULT_FETCHER_REQUESTDELAY      int    = 1
+	CONFIG_DEFAULT_LOADER_EXECSTARTUP        int    = 15
+	CONFIG_DEFAULT_LOADER_EXECINTERVAL       int    = 60
+	CONFIG_DEFAULT_LOADER_EXECWORKERS        int    = 1
 )
 
 // Config implements the configuration
@@ -146,6 +150,14 @@ type yamlConfigServer struct {
 			} `yaml:"sitemap"`
 		} `yaml:"routes"`
 	} `yaml:"sitemap"`
+
+	Default struct {
+		Enable     *bool  `yaml:"enable"`
+		File       string `yaml:"file"`
+		StatusCode *int   `yaml:"status_code"`
+		Cache      *bool  `yaml:"cache"`
+		CacheTTL   *int   `yaml:"cache_ttl"`
+	} `yaml:"default"`
 }
 
 type yamlConfigFetcher struct {
@@ -422,6 +434,28 @@ func parse(y *yamlConfig) (*Config, error) {
 				})
 			}
 			serverConfig.Sitemap.Routes = append(serverConfig.Sitemap.Routes, route)
+		}
+
+		if yamlConfigServer.Default.Enable != nil {
+			serverConfig.Default.Enable = *yamlConfigServer.Default.Enable
+		} else {
+			serverConfig.Default.Enable = CONFIG_DEFAULT_SERVER_DEFAULT_ENABLE
+		}
+		serverConfig.Default.File = yamlConfigServer.Default.File
+		if yamlConfigServer.Default.StatusCode != nil {
+			serverConfig.Default.StatusCode = *yamlConfigServer.Default.StatusCode
+		} else {
+			serverConfig.Default.StatusCode = CONFIG_DEFAULT_SERVER_DEFAULT_STATUSCODE
+		}
+		if yamlConfigServer.Default.Cache != nil {
+			serverConfig.Default.Cache = *yamlConfigServer.Default.Cache
+		} else {
+			serverConfig.Default.Cache = CONFIG_DEFAULT_SERVER_DEFAULT_CACHE
+		}
+		if yamlConfigServer.Default.CacheTTL != nil {
+			serverConfig.Default.CacheTTL = *yamlConfigServer.Default.CacheTTL
+		} else {
+			serverConfig.Default.CacheTTL = CONFIG_DEFAULT_SERVER_DEFAULT_CACHETTL
 		}
 
 		c.Server = append(c.Server, &serverConfig)

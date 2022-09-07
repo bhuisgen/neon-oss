@@ -112,6 +112,14 @@ func (c *serveCommand) Execute(config *app.Config) error {
 			renderers = append(renderers, index)
 		}
 
+		if configServer.Default.Enable {
+			d, err := app.CreateDefaultRenderer(&configServer.Default)
+			if err != nil {
+				return err
+			}
+			renderers = append(renderers, d)
+		}
+
 		e, err := app.CreateErrorRenderer(&app.ErrorRendererConfig{StatusCode: configServer.ErrorCode})
 		if err != nil {
 			return err

@@ -44,6 +44,7 @@ type ServerConfig struct {
 	Index         IndexRendererConfig
 	Robots        RobotsRendererConfig
 	Sitemap       SitemapRendererConfig
+	Default       DefaultRendererConfig
 }
 
 // CreateServer creates a new instance
