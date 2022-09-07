@@ -72,7 +72,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 			renderers = append(renderers, rewrite)
 		}
 
-		if configServer.Static.Enable {
+		if configServer.Header.Enable {
 			header, err := app.CreateHeaderRenderer(&configServer.Header)
 			if err != nil {
 				return err
@@ -134,14 +134,14 @@ func (c *serveCommand) Execute(config *app.Config) error {
 		servers = append(servers, server)
 	}
 
-	exit := make(chan os.Signal, 1)
-	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
-	log.Println("Starting instance")
-
 	if _, ok := os.LookupEnv("DEBUG"); ok {
 		app.NewMonitor(300)
 	}
+
+	log.Println("Starting instance")
+
+	exit := make(chan os.Signal, 1)
+	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	loader.Start()
 	for _, server := range servers {
