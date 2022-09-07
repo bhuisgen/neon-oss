@@ -22,7 +22,10 @@ const (
 	CONFIG_DEFAULT_SERVER_ACCESSLOGFILE      string = ""
 	CONFIG_DEFAULT_SERVER_ERRORCODE          int    = 500
 	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE     bool   = false
+	CONFIG_DEFAULT_SERVER_REWRITE_RULE_FLAG  string = ""
+	CONFIG_DEFAULT_SERVER_REWRITE_RULE_LAST  bool   = false
 	CONFIG_DEFAULT_SERVER_HEADER_ENABLE      bool   = false
+	CONFIG_DEFAULT_SERVER_HEADER_RULE_LAST   bool   = false
 	CONFIG_DEFAULT_SERVER_STATIC_ENABLE      bool   = false
 	CONFIG_DEFAULT_SERVER_STATIC_INDEX       bool   = false
 	CONFIG_DEFAULT_SERVER_INDEX_ENABLE       bool   = false
@@ -72,9 +75,10 @@ type yamlConfigServer struct {
 	Rewrite struct {
 		Enable *bool `yaml:"enable"`
 		Rules  []struct {
-			Path        string `yaml:"path"`
-			Replacement string `yaml:"replacement"`
-			Flag        string `yaml:"flag"`
+			Path        string  `yaml:"path"`
+			Replacement string  `yaml:"replacement"`
+			Flag        *string `yaml:"flag"`
+			Last        *bool   `yaml:"last"`
 		} `yaml:"rules"`
 	} `yaml:"rewrite"`
 
@@ -83,6 +87,7 @@ type yamlConfigServer struct {
 		Rules  []struct {
 			Path string            `yaml:"path"`
 			Add  map[string]string `yaml:"add"`
+			Last *bool             `yaml:"last"`
 		} `yaml:"rules"`
 	} `yaml:"header"`
 
@@ -311,11 +316,21 @@ func parse(y *yamlConfig) (*Config, error) {
 			serverConfig.Rewrite.Enable = CONFIG_DEFAULT_SERVER_REWRITE_ENABLE
 		}
 		for _, rewriteRule := range yamlConfigServer.Rewrite.Rules {
-			serverConfig.Rewrite.Rules = append(serverConfig.Rewrite.Rules, RewriteRule{
+			rule := RewriteRule{
 				Path:        rewriteRule.Path,
 				Replacement: rewriteRule.Replacement,
-				Flag:        rewriteRule.Flag,
-			})
+			}
+			if rewriteRule.Flag != nil {
+				rule.Flag = *rewriteRule.Flag
+			} else {
+				rule.Flag = CONFIG_DEFAULT_SERVER_REWRITE_RULE_FLAG
+			}
+			if rewriteRule.Last != nil {
+				rule.Last = *rewriteRule.Last
+			} else {
+				rule.Last = CONFIG_DEFAULT_SERVER_REWRITE_RULE_LAST
+			}
+			serverConfig.Rewrite.Rules = append(serverConfig.Rewrite.Rules, rule)
 		}
 
 		if yamlConfigServer.Header.Enable != nil {
@@ -324,10 +339,16 @@ func parse(y *yamlConfig) (*Config, error) {
 			serverConfig.Header.Enable = CONFIG_DEFAULT_SERVER_HEADER_ENABLE
 		}
 		for _, headerRule := range yamlConfigServer.Header.Rules {
-			serverConfig.Header.Rules = append(serverConfig.Header.Rules, HeaderRule{
+			rule := HeaderRule{
 				Path: headerRule.Path,
 				Add:  headerRule.Add,
-			})
+			}
+			if headerRule.Last != nil {
+				rule.Last = *headerRule.Last
+			} else {
+				rule.Last = CONFIG_DEFAULT_SERVER_HEADER_RULE_LAST
+			}
+			serverConfig.Header.Rules = append(serverConfig.Header.Rules, rule)
 		}
 
 		if yamlConfigServer.Static.Enable != nil {

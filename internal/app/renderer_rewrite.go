@@ -37,6 +37,7 @@ type RewriteRule struct {
 	Path        string
 	Replacement string
 	Flag        string
+	Last        bool
 }
 
 // CreateRewriteRenderer creates a new rewrite renderer
@@ -93,7 +94,9 @@ func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request) {
 
 			r.logger.Printf("Rewrite processed (url=%s, status=%d, target=%s)", url, status, req.URL.Path)
 
-			break
+			if r.config.Rules[index].Last {
+				break
+			}
 		}
 	}
 

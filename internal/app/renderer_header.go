@@ -17,7 +17,7 @@ type headerRenderer struct {
 
 	config  *HeaderRendererConfig
 	logger  *log.Logger
-	regexes []*regexp.Regexp
+	regexps []*regexp.Regexp
 }
 
 // HeaderRendererConfig implements the header renderer configuration
@@ -30,6 +30,7 @@ type HeaderRendererConfig struct {
 type HeaderRule struct {
 	Path string
 	Add  map[string]string
+	Last bool
 }
 
 // CreateHeaderRenderer creates a new header renderer
@@ -48,19 +49,23 @@ func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error)
 	return &headerRenderer{
 		config:  config,
 		logger:  log.Default(),
-		regexes: regexps,
+		regexps: regexps,
 	}, nil
 }
 
 // handle implements the header handler
 func (r *headerRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	for index, regexp := range r.regexes {
+	for index, regexp := range r.regexps {
 		if regexp.MatchString(req.URL.Path) {
 			for k, v := range r.config.Rules[index].Add {
-				w.Header().Add(k, v)
+				if w.Header().Get(k) == "" {
+					w.Header().Add(k, v)
+				}
 			}
 
-			break
+			if r.config.Rules[index].Last {
+				break
+			}
 		}
 	}
 
