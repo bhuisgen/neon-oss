@@ -27,6 +27,7 @@ type staticRenderer struct {
 type StaticRendererConfig struct {
 	Enable bool
 	Dir    string
+	Index  bool
 }
 
 // CreateStaticRenderer creates a new static renderer
@@ -39,6 +40,7 @@ func CreateStaticRenderer(config *StaticRendererConfig) (*staticRenderer, error)
 	staticFS := &staticFileSystem{
 		FileSystem: http.Dir(dir),
 		prefix:     dir,
+		index:      config.Index,
 	}
 	staticHandler := http.FileServer(staticFS)
 
@@ -71,6 +73,7 @@ type staticFileSystem struct {
 	http.FileSystem
 
 	prefix string
+	index  bool
 }
 
 // exists checks if a file exists into the fileystem
@@ -87,7 +90,13 @@ func (fs *staticFileSystem) exists(name string) bool {
 	}
 
 	if s.IsDir() {
-		return false
+		if !fs.index {
+			return false
+		}
+
+		name = filepath.Join(name, "index.html")
+
+		_, err = os.Stat(name)
 	}
 
 	return err == nil

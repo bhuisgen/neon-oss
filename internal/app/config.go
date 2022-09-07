@@ -24,6 +24,7 @@ const (
 	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE     bool   = false
 	CONFIG_DEFAULT_SERVER_HEADER_ENABLE      bool   = false
 	CONFIG_DEFAULT_SERVER_STATIC_ENABLE      bool   = false
+	CONFIG_DEFAULT_SERVER_STATIC_INDEX       bool   = false
 	CONFIG_DEFAULT_SERVER_INDEX_ENABLE       bool   = false
 	CONFIG_DEFAULT_SERVER_INDEX_ENV          string = "production"
 	CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT      int    = 4
@@ -88,6 +89,7 @@ type yamlConfigServer struct {
 	Static struct {
 		Enable *bool  `yaml:"enable"`
 		Dir    string `yaml:"dir"`
+		Index  *bool  `yaml:"index"`
 	} `yaml:"static"`
 
 	Index struct {
@@ -334,6 +336,11 @@ func parse(y *yamlConfig) (*Config, error) {
 			serverConfig.Static.Enable = CONFIG_DEFAULT_SERVER_STATIC_ENABLE
 		}
 		serverConfig.Static.Dir = yamlConfigServer.Static.Dir
+		if yamlConfigServer.Static.Index != nil {
+			serverConfig.Static.Index = *yamlConfigServer.Static.Index
+		} else {
+			serverConfig.Static.Index = CONFIG_DEFAULT_SERVER_STATIC_INDEX
+		}
 
 		if yamlConfigServer.Index.Enable != nil {
 			serverConfig.Index.Enable = *yamlConfigServer.Index.Enable

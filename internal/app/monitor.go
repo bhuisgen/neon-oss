@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
-	"os"
 	"runtime"
 	"time"
 )
@@ -30,18 +29,16 @@ type monitorStats struct {
 
 // NewMonitor creates a new resources monitor
 func NewMonitor(delay int64) {
-	if _, ok := os.LookupEnv("PPROF"); ok {
-		go func() {
-			mux := http.NewServeMux()
-			mux.Handle("/debug/vars", expvar.Handler())
-			mux.HandleFunc("/debug/pprof", pprof.Index)
-			mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-			log.Println(http.ListenAndServe("0.0.0.0:6060", mux))
-		}()
-	}
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/debug/vars", expvar.Handler())
+		mux.HandleFunc("/debug/pprof", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		log.Println(http.ListenAndServe("0.0.0.0:6060", mux))
+	}()
 
 	var interval = time.Duration(delay) * time.Second
 	var memstats runtime.MemStats
