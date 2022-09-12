@@ -28,11 +28,6 @@ const (
 	CONFIG_DEFAULT_SERVER_HEADER_RULE_LAST   bool   = false
 	CONFIG_DEFAULT_SERVER_STATIC_ENABLE      bool   = false
 	CONFIG_DEFAULT_SERVER_STATIC_INDEX       bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_ENABLE       bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_ENV          string = "production"
-	CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT      int    = 4
-	CONFIG_DEFAULT_SERVER_INDEX_CACHE        bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_CACHETTL     int    = 60
 	CONFIG_DEFAULT_SERVER_ROBOTS_ENABLE      bool   = false
 	CONFIG_DEFAULT_SERVER_ROBOTS_PATH        string = "/robots.txt"
 	CONFIG_DEFAULT_SERVER_ROBOTS_CACHE       bool   = false
@@ -40,6 +35,13 @@ const (
 	CONFIG_DEFAULT_SERVER_SITEMAP_ENABLE     bool   = false
 	CONFIG_DEFAULT_SERVER_SITEMAP_CACHE      bool   = false
 	CONFIG_DEFAULT_SERVER_SITEMAP_CACHETTL   int    = 60
+	CONFIG_DEFAULT_SERVER_INDEX_ENABLE       bool   = false
+	CONFIG_DEFAULT_SERVER_INDEX_ENV          string = "production"
+	CONFIG_DEFAULT_SERVER_INDEX_CONTAINER    string = "root"
+	CONFIG_DEFAULT_SERVER_INDEX_STATE        string = "state"
+	CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT      int    = 4
+	CONFIG_DEFAULT_SERVER_INDEX_CACHE        bool   = false
+	CONFIG_DEFAULT_SERVER_INDEX_CACHETTL     int    = 60
 	CONFIG_DEFAULT_SERVER_DEFAULT_ENABLE     bool   = false
 	CONFIG_DEFAULT_SERVER_DEFAULT_STATUSCODE int    = 200
 	CONFIG_DEFAULT_SERVER_DEFAULT_CACHE      bool   = false
@@ -97,23 +99,6 @@ type yamlConfigServer struct {
 		Index  *bool  `yaml:"index"`
 	} `yaml:"static"`
 
-	Index struct {
-		Enable   *bool   `yaml:"enable"`
-		HTML     string  `yaml:"html"`
-		Bundle   string  `yaml:"bundle"`
-		Env      *string `yaml:"env"`
-		Timeout  *int    `yaml:"timeout"`
-		Cache    *bool   `yaml:"cache"`
-		CacheTTL *int    `yaml:"cache_ttl"`
-		Routes   []struct {
-			Path string `yaml:"path"`
-			Data []struct {
-				Name     string `yaml:"name"`
-				Resource string `yaml:"resource"`
-			} `yaml:"data"`
-		} `yaml:"routes"`
-	} `yaml:"index"`
-
 	Robots struct {
 		Enable   *bool    `yaml:"enable"`
 		Path     *string  `yaml:"path"`
@@ -157,6 +142,26 @@ type yamlConfigServer struct {
 			} `yaml:"sitemap"`
 		} `yaml:"routes"`
 	} `yaml:"sitemap"`
+
+	Index struct {
+		Enable    *bool   `yaml:"enable"`
+		HTML      string  `yaml:"html"`
+		Bundle    string  `yaml:"bundle"`
+		Env       *string `yaml:"env"`
+		Container *string `yaml:"container"`
+		State     *string `yaml:"state"`
+		Timeout   *int    `yaml:"timeout"`
+		Cache     *bool   `yaml:"cache"`
+		CacheTTL  *int    `yaml:"cache_ttl"`
+		Routes    []struct {
+			Path  string `yaml:"path"`
+			State []struct {
+				Key      string `yaml:"key"`
+				Resource string `yaml:"resource"`
+				Export   bool   `yaml:"export"`
+			} `yaml:"state"`
+		} `yaml:"routes"`
+	} `yaml:"index"`
 
 	Default struct {
 		Enable     *bool  `yaml:"enable"`
@@ -363,46 +368,6 @@ func parse(y *yamlConfig) (*Config, error) {
 			serverConfig.Static.Index = CONFIG_DEFAULT_SERVER_STATIC_INDEX
 		}
 
-		if yamlConfigServer.Index.Enable != nil {
-			serverConfig.Index.Enable = *yamlConfigServer.Index.Enable
-		} else {
-			serverConfig.Index.Enable = CONFIG_DEFAULT_SERVER_INDEX_ENABLE
-		}
-		serverConfig.Index.HTML = yamlConfigServer.Index.HTML
-		serverConfig.Index.Bundle = yamlConfigServer.Index.Bundle
-		if yamlConfigServer.Index.Env != nil {
-			serverConfig.Index.Env = *yamlConfigServer.Index.Env
-		} else {
-			serverConfig.Index.Env = CONFIG_DEFAULT_SERVER_INDEX_ENV
-		}
-		if yamlConfigServer.Index.Timeout != nil {
-			serverConfig.Index.Timeout = *yamlConfigServer.Index.Timeout
-		} else {
-			serverConfig.Index.Timeout = CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT
-		}
-		if yamlConfigServer.Index.Cache != nil {
-			serverConfig.Index.Cache = *yamlConfigServer.Index.Cache
-		} else {
-			serverConfig.Index.Cache = CONFIG_DEFAULT_SERVER_INDEX_CACHE
-		}
-		if yamlConfigServer.Index.CacheTTL != nil {
-			serverConfig.Index.CacheTTL = *yamlConfigServer.Index.CacheTTL
-		} else {
-			serverConfig.Index.CacheTTL = CONFIG_DEFAULT_SERVER_INDEX_CACHETTL
-		}
-		for _, indexRoute := range yamlConfigServer.Index.Routes {
-			route := IndexRoute{
-				Path: indexRoute.Path,
-			}
-			for _, indexRouteData := range indexRoute.Data {
-				route.Data = append(route.Data, IndexRouteData{
-					Name:     indexRouteData.Name,
-					Resource: indexRouteData.Resource,
-				})
-			}
-			serverConfig.Index.Routes = append(serverConfig.Index.Routes, route)
-		}
-
 		if yamlConfigServer.Robots.Enable != nil {
 			serverConfig.Robots.Enable = *yamlConfigServer.Robots.Enable
 		} else {
@@ -462,6 +427,57 @@ func parse(y *yamlConfig) (*Config, error) {
 				})
 			}
 			serverConfig.Sitemap.Routes = append(serverConfig.Sitemap.Routes, route)
+		}
+
+		if yamlConfigServer.Index.Enable != nil {
+			serverConfig.Index.Enable = *yamlConfigServer.Index.Enable
+		} else {
+			serverConfig.Index.Enable = CONFIG_DEFAULT_SERVER_INDEX_ENABLE
+		}
+		serverConfig.Index.HTML = yamlConfigServer.Index.HTML
+		serverConfig.Index.Bundle = yamlConfigServer.Index.Bundle
+		if yamlConfigServer.Index.Env != nil {
+			serverConfig.Index.Env = *yamlConfigServer.Index.Env
+		} else {
+			serverConfig.Index.Env = CONFIG_DEFAULT_SERVER_INDEX_ENV
+		}
+		if yamlConfigServer.Index.Container != nil {
+			serverConfig.Index.Container = *yamlConfigServer.Index.Container
+		} else {
+			serverConfig.Index.Container = CONFIG_DEFAULT_SERVER_INDEX_CONTAINER
+		}
+		if yamlConfigServer.Index.State != nil {
+			serverConfig.Index.State = *yamlConfigServer.Index.State
+		} else {
+			serverConfig.Index.State = CONFIG_DEFAULT_SERVER_INDEX_STATE
+		}
+		if yamlConfigServer.Index.Timeout != nil {
+			serverConfig.Index.Timeout = *yamlConfigServer.Index.Timeout
+		} else {
+			serverConfig.Index.Timeout = CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT
+		}
+		if yamlConfigServer.Index.Cache != nil {
+			serverConfig.Index.Cache = *yamlConfigServer.Index.Cache
+		} else {
+			serverConfig.Index.Cache = CONFIG_DEFAULT_SERVER_INDEX_CACHE
+		}
+		if yamlConfigServer.Index.CacheTTL != nil {
+			serverConfig.Index.CacheTTL = *yamlConfigServer.Index.CacheTTL
+		} else {
+			serverConfig.Index.CacheTTL = CONFIG_DEFAULT_SERVER_INDEX_CACHETTL
+		}
+		for _, indexRoute := range yamlConfigServer.Index.Routes {
+			route := IndexRoute{
+				Path: indexRoute.Path,
+			}
+			for _, indexRouteStateEntry := range indexRoute.State {
+				route.State = append(route.State, IndexRouteStateEntry{
+					Key:      indexRouteStateEntry.Key,
+					Resource: indexRouteStateEntry.Resource,
+					Export:   indexRouteStateEntry.Export,
+				})
+			}
+			serverConfig.Index.Routes = append(serverConfig.Index.Routes, route)
 		}
 
 		if yamlConfigServer.Default.Enable != nil {

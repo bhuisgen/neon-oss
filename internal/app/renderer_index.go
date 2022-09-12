@@ -6,6 +6,7 @@ package app
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -34,26 +35,29 @@ type indexRenderer struct {
 
 // IndexRendererConfig implements the index renderer configuration
 type IndexRendererConfig struct {
-	Enable   bool
-	HTML     string
-	Bundle   string
-	Env      string
-	Timeout  int
-	Cache    bool
-	CacheTTL int
-	Routes   []IndexRoute
+	Enable    bool
+	HTML      string
+	Bundle    string
+	Env       string
+	Container string
+	State     string
+	Timeout   int
+	Cache     bool
+	CacheTTL  int
+	Routes    []IndexRoute
 }
 
 // IndexRoute implements a route
 type IndexRoute struct {
-	Path string
-	Data []IndexRouteData
+	Path  string
+	State []IndexRouteStateEntry
 }
 
-// IndexRouteData implements a route data
-type IndexRouteData struct {
-	Name     string
+// IndexRouteStateEntry implements a route state entry
+type IndexRouteStateEntry struct {
+	Key      string
 	Resource string
+	Export   bool
 }
 
 var (
@@ -181,45 +185,57 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 
 	server.Set("url", req.URL.Path)
 
-	serverData, err := vm.serverDataObject.NewInstance(ctx)
+	serverState, err := vm.serverStateObject.NewInstance(ctx)
 	if err != nil {
-		r.logger.Printf("Failed to create server data instance: %s", err)
+		r.logger.Printf("Failed to create server state instance: %s", err)
 
 		return nil, err
 	}
 
 	var valid bool = true
+	var clientState map[string]interface{} = make(map[string]interface{})
 
 	for index, route := range r.config.Routes {
 		params := r.routes[index].matcher.FindStringSubmatch(req.URL.Path)
 		if params == nil {
 			continue
 		}
-		for _, data := range route.Data {
-			key := ReplaceParameters(data.Resource, r.routes[index].params, params[1:])
+		for _, entry := range route.State {
+			key := ReplaceParameters(entry.Resource, r.routes[index].params, params[1:])
 
-			serverDataResource, err := vm.serverDataResourceObject.NewInstance(ctx)
+			serverStateResource, err := vm.serverStateResourceObject.NewInstance(ctx)
 			if err != nil {
-				r.logger.Printf("Failed to create server data resource instance: %s", err)
+				r.logger.Printf("Failed to create server state resource instance: %s", err)
 
 				return nil, err
 			}
 
 			response, err := r.fetcher.Get(key)
 			if err != nil {
-				serverDataResource.Set("loading", true)
-				serverDataResource.Set("response", "{}")
-				serverData.Set(data.Name, serverDataResource)
-			} else {
-				serverDataResource.Set("loading", false)
-				serverDataResource.Set("response", string(response))
-				serverData.Set(data.Name, serverDataResource)
+				if r.fetcher.Exists(key) {
+					serverStateResource.Set("loading", true)
+				} else {
+					serverStateResource.Set("error", "unknown resource")
+				}
+				serverState.Set(entry.Key, serverStateResource)
+
+				valid = false
+
+				continue
+			}
+
+			serverStateResource.Set("response", string(response))
+			serverState.Set(entry.Key, serverStateResource)
+
+			if entry.Export {
+				clientState[entry.Key] = string(response)
 			}
 		}
+
 		break
 	}
 
-	server.Set("data", serverData)
+	server.Set("state", serverState)
 	global.Set("server", server)
 
 	buf, err := os.ReadFile(r.config.Bundle)
@@ -270,7 +286,7 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		}, nil
 	}
 
-	body, err := r.generateBody(*vm.render, *vm.title, vm.metas, vm.links, vm.scripts)
+	body, err := r.generateBody(*vm.render, *vm.title, vm.metas, vm.links, vm.scripts, clientState)
 	if err != nil {
 		r.logger.Printf("Failed to generate body: %s", err)
 
@@ -298,7 +314,7 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 
 // generateBody generates the final HTML body
 func (r *indexRenderer) generateBody(render []byte, title string, metas map[string]map[string]string,
-	links map[string]map[string]string, scripts map[string]map[string]string) ([]byte, error) {
+	links map[string]map[string]string, scripts map[string]map[string]string, state map[string]interface{}) ([]byte, error) {
 	var body []byte
 	html, err := os.ReadFile(r.config.HTML)
 	if err != nil {
@@ -308,8 +324,8 @@ func (r *indexRenderer) generateBody(render []byte, title string, metas map[stri
 
 	if title != "" {
 		body = bytes.Replace(body,
-			[]byte("</head>\n"),
-			[]byte(fmt.Sprintf("<title>%s</title>\n</head>\n", title)),
+			[]byte("</head>"),
+			[]byte(fmt.Sprintf("<title>%s</title></head>", title)),
 			1)
 	}
 
@@ -322,8 +338,8 @@ func (r *indexRenderer) generateBody(render []byte, title string, metas map[stri
 			buf.Write([]byte(fmt.Sprintf(" %s=\"%s\"", k, v)))
 		}
 		body = bytes.Replace(body,
-			[]byte("</head>\n"),
-			[]byte(fmt.Sprintf("<meta name=\"%s\"%s/>\n</head>\n", id, buf.String())),
+			[]byte("</head>"),
+			[]byte(fmt.Sprintf("<meta id=\"%s\" name=\"%s\"%s/></head>", id, id, buf.String())),
 			1)
 	}
 
@@ -336,8 +352,8 @@ func (r *indexRenderer) generateBody(render []byte, title string, metas map[stri
 			buf.Write([]byte(fmt.Sprintf(" %s=\"%s\"", k, v)))
 		}
 		body = bytes.Replace(body,
-			[]byte("</head>\n"),
-			[]byte(fmt.Sprintf("<link id=\"%s\"%s/>\n</head>\n", id, buf.String())),
+			[]byte("</head>"),
+			[]byte(fmt.Sprintf("<link id=\"%s\"%s/></head>", id, buf.String())),
 			1)
 	}
 
@@ -354,12 +370,26 @@ func (r *indexRenderer) generateBody(render []byte, title string, metas map[stri
 			buf.Write([]byte(fmt.Sprintf(" %s=\"%s\"", k, v)))
 		}
 		body = bytes.Replace(body,
-			[]byte("</head>\n"),
-			[]byte(fmt.Sprintf("<script id=\"%s\"%s>%s</script>\n</head>\n", id, buf.String(), content)),
+			[]byte("</head>"),
+			[]byte(fmt.Sprintf("<script id=\"%s\"%s>%s</script></head>", id, buf.String(), content)),
 			1)
 	}
 
-	body = bytes.Replace(body, []byte("<div id=\"root\"></div>"), render, 1)
+	body = bytes.Replace(body,
+		[]byte(fmt.Sprintf("<div id=\"%s\"></div>", r.config.Container)),
+		[]byte(fmt.Sprintf("<div id=\"%s\">%s</div>", r.config.Container, render)),
+		1)
+
+	if len(state) > 0 {
+		buf, err := json.Marshal(state)
+		if err != nil {
+			return nil, err
+		}
+		body = bytes.Replace(body,
+			[]byte("</body>"),
+			[]byte(fmt.Sprintf("<script id=\"%s\" type=\"application/json\">%s</script></body>", r.config.State, buf)),
+			1)
+	}
 
 	return body, nil
 }

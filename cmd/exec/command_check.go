@@ -48,7 +48,7 @@ func (c *checkCommand) Name() string {
 
 // Description returns the command description
 func (c *checkCommand) Description() string {
-	return "Check instance health status"
+	return "Check the instance health"
 }
 
 // Init initializes the command
@@ -109,7 +109,7 @@ func (c *checkCommand) Execute(config *app.Config) error {
 		}
 		addr := fmt.Sprintf("%s:%d", serverConfig.ListenAddr, serverConfig.ListenPort)
 
-		_, err := client.Head(scheme + "://" + addr + "/status")
+		_, err := client.Head(scheme + "://" + addr)
 		if err != nil {
 			return err
 		}

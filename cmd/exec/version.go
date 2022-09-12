@@ -4,7 +4,7 @@
 
 package main
 
-const (
+var (
 	name    string = "Neon"
 	version string = "dev"
 	commit  string = "HEAD"

@@ -9,7 +9,6 @@ import "net/http"
 // Renderer
 type Renderer interface {
 	handle(http.ResponseWriter, *http.Request)
-
 	setNext(Renderer)
 }
 

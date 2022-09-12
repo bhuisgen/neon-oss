@@ -46,7 +46,7 @@ func (c *serveCommand) Name() string {
 
 // Description returns the command description
 func (c *serveCommand) Description() string {
-	return "Execute the server instance"
+	return "Run the server instance"
 }
 
 // Init initializes the command
@@ -138,6 +138,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 		app.NewMonitor(300)
 	}
 
+	log.Printf("%s version %s, commit %s\n", name, version, commit)
 	log.Println("Starting instance")
 
 	exit := make(chan os.Signal, 1)

@@ -17,7 +17,7 @@ type loader struct {
 	config       *LoaderConfig
 	logger       *log.Logger
 	dataFailsafe bool
-	stopData     chan struct{}
+	stop         chan struct{}
 	fetcher      *fetcher
 }
 
@@ -73,7 +73,7 @@ func NewLoader(config *LoaderConfig, fetcher *fetcher) *loader {
 		config:       config,
 		logger:       log.Default(),
 		dataFailsafe: false,
-		stopData:     make(chan struct{}),
+		stop:         make(chan struct{}),
 		fetcher:      fetcher,
 	}
 }
@@ -88,7 +88,7 @@ func (l *loader) Start() {
 // Start stops the loader
 func (l *loader) Stop() {
 	if l.config.ExecInterval > 0 {
-		l.stopData <- struct{}{}
+		l.stop <- struct{}{}
 	}
 }
 
@@ -159,10 +159,9 @@ func (l *loader) execute() {
 					}
 				}
 
-				l.logger.Printf("Loader data results: success=%d, failure=%d, total=%d", success, failure,
-					jobsCount)
+				l.logger.Printf("Loader results: success=%d, failure=%d, total=%d", success, failure, jobsCount)
 
-			case <-l.stopData:
+			case <-l.stop:
 				ticker.Stop()
 
 				return

@@ -41,9 +41,9 @@ type ServerConfig struct {
 	Rewrite       RewriteRendererConfig
 	Header        HeaderRendererConfig
 	Static        StaticRendererConfig
-	Index         IndexRendererConfig
 	Robots        RobotsRendererConfig
 	Sitemap       SitemapRendererConfig
+	Index         IndexRendererConfig
 	Default       DefaultRendererConfig
 }
 
