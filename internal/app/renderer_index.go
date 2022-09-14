@@ -201,7 +201,8 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 			continue
 		}
 		for _, entry := range route.State {
-			key := ReplaceParameters(entry.Resource, r.routes[index].params, params[1:])
+			resourceKey := ReplaceParameters(entry.Resource, r.routes[index].params, params[1:])
+			stateKey := ReplaceParameters(entry.Key, r.routes[index].params, params[1:])
 
 			serverStateResource, err := vm.serverStateResourceObject.NewInstance(ctx)
 			if err != nil {
@@ -210,14 +211,14 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 				return nil, err
 			}
 
-			response, err := r.fetcher.Get(key)
+			response, err := r.fetcher.Get(resourceKey)
 			if err != nil {
-				if r.fetcher.Exists(key) {
+				if r.fetcher.Exists(resourceKey) {
 					serverStateResource.Set("loading", true)
 				} else {
 					serverStateResource.Set("error", "unknown resource")
 				}
-				serverState.Set(entry.Key, serverStateResource)
+				serverState.Set(stateKey, serverStateResource)
 
 				valid = false
 
@@ -225,10 +226,10 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 			}
 
 			serverStateResource.Set("response", string(response))
-			serverState.Set(entry.Key, serverStateResource)
+			serverState.Set(stateKey, serverStateResource)
 
 			if entry.Export {
-				clientState[entry.Key] = string(response)
+				clientState[stateKey] = string(response)
 			}
 		}
 
