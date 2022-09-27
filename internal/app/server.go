@@ -14,6 +14,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/bhuisgen/neon/internal/app/middlewares"
 )
 
@@ -37,7 +39,6 @@ type ServerConfig struct {
 	WriteTimeout  int
 	AccessLog     bool
 	AccessLogFile string
-	ErrorCode     int
 	Rewrite       RewriteRendererConfig
 	Header        HeaderRendererConfig
 	Static        StaticRendererConfig
@@ -47,11 +48,19 @@ type ServerConfig struct {
 	Default       DefaultRendererConfig
 }
 
+type ContextKeyID struct{}
+
+const (
+	SERVER_LOGGER string = "server"
+)
+
 // CreateServer creates a new instance
 func CreateServer(config *ServerConfig, renderers ...Renderer) (*Server, error) {
+	logger := log.New(os.Stdout, fmt.Sprint(SERVER_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	server := Server{
 		config:   config,
-		logger:   log.Default(),
+		logger:   logger,
 		renderer: nil,
 	}
 
@@ -103,11 +112,15 @@ func CreateServer(config *ServerConfig, renderers ...Renderer) (*Server, error) 
 func (s *Server) Start() {
 	go func() {
 		if s.config.TLS {
+			s.logger.Printf("Listening at https://%s", s.httpServer.Addr)
+
 			err := s.httpServer.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
 			if err != nil && err != http.ErrServerClosed {
 				log.Fatal(err)
 			}
 		} else {
+			s.logger.Printf("Listening at http://%s", s.httpServer.Addr)
+
 			err := s.httpServer.ListenAndServe()
 			if err != nil && err != http.ErrServerClosed {
 				log.Fatal(err)
@@ -138,5 +151,12 @@ func NewServerHandler(server *Server) *serverHandler {
 
 // ServeHTTP implements the HTTP server handler
 func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	id := uuid.New()
+
+	ctx := context.WithValue(r.Context(), ContextKeyID{}, id.String())
+	r = r.WithContext(ctx)
+
+	w.Header().Set("X-Correlation-ID", id.String())
+
 	h.server.renderer.handle(w, r)
 }

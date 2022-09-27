@@ -5,15 +5,12 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
-)
-
-const (
-	REWRITE_RULE_FLAG_REDIRECT  = "redirect"
-	REWRITE_RULE_FLAG_PERMANENT = "permanent"
 )
 
 // rewriteRenderer implements the rewrite renderer
@@ -23,7 +20,7 @@ type rewriteRenderer struct {
 
 	config  *RewriteRendererConfig
 	logger  *log.Logger
-	regexes []*regexp.Regexp
+	regexps []*regexp.Regexp
 }
 
 // RewriteRendererConfig implements the rewrite renderer configuration
@@ -40,10 +37,17 @@ type RewriteRule struct {
 	Last        bool
 }
 
+const (
+	REWRITE_LOGGER              string = "renderer[rewrite]"
+	REWRITE_RULE_FLAG_REDIRECT  string = "redirect"
+	REWRITE_RULE_FLAG_PERMANENT string = "permanent"
+)
+
 // CreateRewriteRenderer creates a new rewrite renderer
 func CreateRewriteRenderer(config *RewriteRendererConfig) (*rewriteRenderer, error) {
-	regexps := []*regexp.Regexp{}
+	logger := log.New(os.Stdout, fmt.Sprint(REWRITE_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
 
+	regexps := []*regexp.Regexp{}
 	for _, rule := range config.Rules {
 		r, err := regexp.Compile(rule.Path)
 		if err != nil {
@@ -55,14 +59,14 @@ func CreateRewriteRenderer(config *RewriteRendererConfig) (*rewriteRenderer, err
 
 	return &rewriteRenderer{
 		config:  config,
-		logger:  log.Default(),
-		regexes: regexps,
+		logger:  logger,
+		regexps: regexps,
 	}, nil
 }
 
 // handle implements the rewrite handler
 func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	for index, regexp := range r.regexes {
+	for index, regexp := range r.regexps {
 		if regexp.MatchString(req.URL.Path) {
 			stop := false
 			status := http.StatusFound

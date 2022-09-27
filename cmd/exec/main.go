@@ -32,9 +32,9 @@ func main() {
 
 	flag.Usage = func() {
 		fmt.Println()
-		fmt.Println("Usage: [OPTIONS] COMMAND")
+		fmt.Println("Usage: neon [OPTIONS] COMMAND")
 		fmt.Println()
-		fmt.Println("A web server ready for your Javascript application")
+		fmt.Println("The web server ready for your Javascript application")
 		fmt.Println()
 		fmt.Println("Options:")
 		flag.PrintDefaults()

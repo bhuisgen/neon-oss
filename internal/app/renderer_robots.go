@@ -5,8 +5,10 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -29,11 +31,17 @@ type RobotsRendererConfig struct {
 	CacheTTL int
 }
 
+const (
+	ROBOTS_LOGGER string = "renderer[robots]"
+)
+
 // CreateRobotsRenderer creates a new robots renderer
 func CreateRobotsRenderer(config *RobotsRendererConfig, loader *loader) (*robotsRenderer, error) {
+	logger := log.New(os.Stdout, fmt.Sprint(ROBOTS_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	return &robotsRenderer{
 		config: config,
-		logger: log.Default(),
+		logger: logger,
 		cache:  NewCache(),
 	}, nil
 }
@@ -98,11 +106,11 @@ func (r *robotsRenderer) render(req *http.Request) (*Render, error) {
 		Body:   body,
 		Status: http.StatusOK,
 		Valid:  true,
-		Cache:  r.config.Cache,
 	}
 
 	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
+		result.Cache = true
 	}
 
 	return &result, nil

@@ -5,8 +5,10 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 )
 
@@ -33,10 +35,15 @@ type HeaderRule struct {
 	Last bool
 }
 
+const (
+	HEADER_LOGGER string = "renderer[header]"
+)
+
 // CreateHeaderRenderer creates a new header renderer
 func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error) {
-	regexps := []*regexp.Regexp{}
+	logger := log.New(os.Stdout, fmt.Sprint(HEADER_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
 
+	regexps := []*regexp.Regexp{}
 	for _, rule := range config.Rules {
 		r, err := regexp.Compile(rule.Path)
 		if err != nil {
@@ -48,7 +55,7 @@ func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error)
 
 	return &headerRenderer{
 		config:  config,
-		logger:  log.Default(),
+		logger:  logger,
 		regexps: regexps,
 	}, nil
 }

@@ -25,7 +25,7 @@ type Render struct {
 
 // Resource
 type Resource struct {
-	Key     string
+	Name    string
 	Method  string
 	URL     string
 	Params  map[string]string

@@ -44,7 +44,7 @@ type FetcherConfig struct {
 
 // FetcherResource implements a fetcher resource
 type FetcherResource struct {
-	Key     string
+	Name    string
 	Method  string
 	URL     string
 	Params  map[string]string
@@ -60,8 +60,14 @@ type FetcherTemplate struct {
 	Headers map[string]string
 }
 
+const (
+	FETCHER_LOGGER string = "fetcher"
+)
+
 // NewFetcher creates a new instance
 func NewFetcher(config *FetcherConfig) *fetcher {
+	logger := log.New(os.Stdout, fmt.Sprint(FETCHER_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
@@ -108,20 +114,20 @@ func NewFetcher(config *FetcherConfig) *fetcher {
 
 	fetcher := &fetcher{
 		config:        config,
-		logger:        log.Default(),
+		logger:        logger,
 		client:        &client,
 		resources:     make(map[string]*Resource),
 		resourcesLock: sync.RWMutex{},
 		data:          NewCache(),
 	}
 
-	for _, resource := range config.Resources {
+	for _, r := range config.Resources {
 		fetcher.Register(&Resource{
-			Key:     resource.Key,
-			Method:  resource.Method,
-			URL:     resource.URL,
-			Params:  resource.Params,
-			Headers: resource.Headers,
+			Name:    r.Name,
+			Method:  r.Method,
+			URL:     r.URL,
+			Params:  r.Params,
+			Headers: r.Headers,
 		})
 	}
 
@@ -171,7 +177,7 @@ func (f *fetcher) request(ctx context.Context, method string, url string, params
 		}
 
 		if _, ok := os.LookupEnv("DEBUG"); ok {
-			f.logger.Printf("Fetch request: %s %s %s %s\n", method, r.URL.Path, r.URL.RawQuery, response.Status)
+			f.logger.Printf("Fetch request: method=%s, url=%s, code=%d\n", method, r.URL.String(), response.StatusCode)
 		}
 
 		switch response.StatusCode {
@@ -204,19 +210,19 @@ func (f *fetcher) request(ctx context.Context, method string, url string, params
 }
 
 // Fetch fetches a registered resource
-func (f *fetcher) Fetch(ctx context.Context, key string) error {
+func (f *fetcher) Fetch(ctx context.Context, name string) error {
 	f.resourcesLock.RLock()
 	defer f.resourcesLock.RUnlock()
 
-	if resource, ok := f.resources[key]; ok {
-		data, err := f.request(ctx, resource.Method, resource.URL, resource.Params, resource.Headers)
+	if r, ok := f.resources[name]; ok {
+		data, err := f.request(ctx, r.Method, r.URL, r.Params, r.Headers)
 		if err != nil {
-			f.logger.Printf("Failed to fetch resource '%s': %s", resource.Key, err)
+			f.logger.Printf("Failed to fetch resource '%s': %s", r.Name, err)
 
 			return err
 		}
 
-		f.data.Set(resource.Key, data, time.Duration(resource.TTL)*time.Second)
+		f.data.Set(r.Name, data, time.Duration(r.TTL)*time.Second)
 
 		return nil
 	}
@@ -230,10 +236,10 @@ func (f *fetcher) FetchAll(ctx context.Context, skip bool) error {
 	defer f.resourcesLock.RUnlock()
 
 	var err error
-	for _, resource := range f.resources {
-		data, err := f.request(ctx, resource.Method, resource.URL, resource.Params, resource.Headers)
+	for _, r := range f.resources {
+		data, err := f.request(ctx, r.Method, r.URL, r.Params, r.Headers)
 		if err != nil {
-			f.logger.Printf("Failed to fetch resource '%s': %s", resource.Key, err)
+			f.logger.Printf("Failed to fetch resource '%s': %s", r.Name, err)
 
 			if skip {
 				continue
@@ -242,18 +248,18 @@ func (f *fetcher) FetchAll(ctx context.Context, skip bool) error {
 			return err
 		}
 
-		f.data.Set(resource.Key, data, time.Duration(resource.TTL)*time.Second)
+		f.data.Set(r.Name, data, time.Duration(r.TTL)*time.Second)
 	}
 
 	return err
 }
 
-// Exists checks if a resource already exists
-func (f *fetcher) Exists(key string) bool {
+// Exists checks if a resource exists
+func (f *fetcher) Exists(name string) bool {
 	f.resourcesLock.Lock()
 	defer f.resourcesLock.Unlock()
 
-	if _, ok := f.resources[key]; !ok {
+	if _, ok := f.resources[name]; !ok {
 		return false
 	}
 
@@ -261,8 +267,8 @@ func (f *fetcher) Exists(key string) bool {
 }
 
 // Get returns the last fetched data of a resource
-func (f *fetcher) Get(key string) ([]byte, error) {
-	obj := f.data.Get(key)
+func (f *fetcher) Get(name string) ([]byte, error) {
+	obj := f.data.Get(name)
 	if obj == nil {
 		return nil, fmt.Errorf("no data found")
 	}
@@ -271,53 +277,53 @@ func (f *fetcher) Get(key string) ([]byte, error) {
 }
 
 // Register registers a resource
-func (f *fetcher) Register(resource *Resource) {
+func (f *fetcher) Register(r *Resource) {
 	f.resourcesLock.Lock()
 	defer f.resourcesLock.Unlock()
 
-	f.resources[resource.Key] = resource
+	f.resources[r.Name] = r
 }
 
 // Unregister unregisters a resource
-func (f *fetcher) Unregister(key string) {
+func (f *fetcher) Unregister(name string) {
 	f.resourcesLock.Lock()
 	defer f.resourcesLock.Unlock()
 
-	if _, ok := f.resources[key]; ok {
-		delete(f.resources, key)
+	if _, ok := f.resources[name]; ok {
+		delete(f.resources, name)
 	}
 }
 
 // CreateResourceFromTemplate creates a resource from a template
-func (f *fetcher) CreateResourceFromTemplate(name string, key string, params map[string]string,
+func (f *fetcher) CreateResourceFromTemplate(template string, resource string, params map[string]string,
 	headers map[string]string) (*Resource, error) {
-	for _, template := range f.config.Templates {
-		if template.Name != name {
+	for _, t := range f.config.Templates {
+		if t.Name != template {
 			continue
 		}
 
-		resourceParams := make(map[string]string)
-		for k, v := range template.Params {
-			resourceParams[k] = v
+		rParams := make(map[string]string)
+		for k, v := range t.Params {
+			rParams[k] = v
 		}
 		for k, v := range params {
-			resourceParams[k] = v
+			rParams[k] = v
 		}
 
-		resourceHeaders := make(map[string]string)
-		for k, v := range template.Headers {
-			resourceHeaders[k] = v
+		rHeaders := make(map[string]string)
+		for k, v := range t.Headers {
+			rHeaders[k] = v
 		}
 		for k, v := range headers {
-			resourceHeaders[k] = v
+			rHeaders[k] = v
 		}
 
 		return &Resource{
-			Key:     key,
-			Method:  template.Method,
-			URL:     template.URL,
-			Params:  resourceParams,
-			Headers: resourceHeaders,
+			Name:    resource,
+			Method:  t.Method,
+			URL:     t.URL,
+			Params:  rParams,
+			Headers: rHeaders,
 		}, nil
 	}
 

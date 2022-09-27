@@ -25,11 +25,10 @@ type serveCommand struct {
 // NewCheckCommand creates the command
 func NewServeCommand() *serveCommand {
 	c := serveCommand{}
-
 	c.flagset = flag.NewFlagSet("serve", flag.ExitOnError)
 	c.flagset.BoolVar(&c.verbose, "verbose", false, "Use verbose output")
 	c.flagset.Usage = func() {
-		fmt.Println("Usage: serve [OPTIONS]")
+		fmt.Println("Usage: neon serve [OPTIONS]")
 		fmt.Println()
 		fmt.Println("Options:")
 		c.flagset.PrintDefaults()
@@ -120,7 +119,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 			renderers = append(renderers, d)
 		}
 
-		e, err := app.CreateErrorRenderer(&app.ErrorRendererConfig{StatusCode: configServer.ErrorCode})
+		e, err := app.CreateErrorRenderer(&app.ErrorRendererConfig{})
 		if err != nil {
 			return err
 		}
@@ -139,6 +138,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 	}
 
 	log.Printf("%s version %s, commit %s\n", name, version, commit)
+
 	log.Println("Starting instance")
 
 	exit := make(chan os.Signal, 1)

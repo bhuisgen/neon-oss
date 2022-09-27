@@ -5,32 +5,15 @@
 package app
 
 import (
-	"regexp"
+	"fmt"
 	"strings"
 )
 
-var (
-	regexpParameters = regexp.MustCompile(`\:(.[^\:/]+)`)
-)
-
-// FindParameters finds the parameters in a string
-func FindParameters(s string) [][]string {
-	namedParams := regexpParameters.FindAllStringSubmatch(s, -1)
-
-	return namedParams
-}
-
-// ReplaceParameters replaces the parameters in a string by the given values
-func ReplaceParameters(s string, paramsKeys []string, paramsValues []string) string {
+// replaceParameters returns a copy of the string s with all its parameters replaced
+func replaceParameters(s string, params map[string]string) string {
 	tmp := s
-	keyParams := regexpParameters.FindAllString(s, -1)
-	for _, keyParam := range keyParams {
-		for index, param := range paramsKeys {
-			if param == keyParam {
-				tmp = strings.Replace(tmp, keyParam, paramsValues[index], -1)
-			}
-		}
+	for key, value := range params {
+		tmp = strings.ReplaceAll(tmp, fmt.Sprint("$", key), value)
 	}
-
 	return tmp
 }

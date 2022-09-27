@@ -5,6 +5,7 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -30,8 +31,14 @@ type StaticRendererConfig struct {
 	Index  bool
 }
 
+const (
+	STATIC_LOGGER string = "renderer[static]"
+)
+
 // CreateStaticRenderer creates a new static renderer
 func CreateStaticRenderer(config *StaticRendererConfig) (*staticRenderer, error) {
+	logger := log.New(os.Stdout, fmt.Sprint(STATIC_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	dir, err := filepath.Abs(config.Dir)
 	if err != nil {
 		return nil, err
@@ -46,7 +53,7 @@ func CreateStaticRenderer(config *StaticRendererConfig) (*staticRenderer, error)
 
 	return &staticRenderer{
 		config:        config,
-		logger:        log.Default(),
+		logger:        logger,
 		staticFS:      staticFS,
 		staticHandler: staticHandler,
 	}, nil

@@ -5,8 +5,10 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 )
 
 // errorRenderer implements the error renderer
@@ -20,20 +22,25 @@ type errorRenderer struct {
 
 // ErrorRendererConfig implements the error renderer configuration
 type ErrorRendererConfig struct {
-	StatusCode int
 }
+
+const (
+	ERROR_LOGGER string = "renderer[error]"
+)
 
 // CreateErrorRenderer creates a new error renderer
 func CreateErrorRenderer(config *ErrorRendererConfig) (*errorRenderer, error) {
+	logger := log.New(os.Stdout, fmt.Sprint(ERROR_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	return &errorRenderer{
 		config: config,
-		logger: log.Default(),
+		logger: logger,
 	}, nil
 }
 
 // handle implements the renderer handler
 func (r *errorRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(r.config.StatusCode)
+	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte{})
 }
 

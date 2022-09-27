@@ -10,16 +10,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-)
-
-const (
-	SITEMAP_KIND_SITEMAP                   string = "sitemap"
-	SITEMAP_KIND_SITEMAPINDEX              string = "sitemapindex"
-	SITEMAP_ENTRY_SITEMAPINDEX_TYPE_STATIC string = "static"
-	SITEMAP_ENTRY_SITEMAP_TYPE_STATIC      string = "static"
-	SITEMAP_ENTRY_SITEMAP_TYPE_LIST        string = "list"
 )
 
 // sitemapRenderer implements the sitemap renderer
@@ -88,11 +81,22 @@ type SitemapEntryList struct {
 	Priority                   string
 }
 
+const (
+	SITEMAP_LOGGER                         string = "renderer[sitemap]"
+	SITEMAP_KIND_SITEMAP                   string = "sitemap"
+	SITEMAP_KIND_SITEMAPINDEX              string = "sitemapindex"
+	SITEMAP_ENTRY_SITEMAPINDEX_TYPE_STATIC string = "static"
+	SITEMAP_ENTRY_SITEMAP_TYPE_STATIC      string = "static"
+	SITEMAP_ENTRY_SITEMAP_TYPE_LIST        string = "list"
+)
+
 // CreateSitemapRenderer creates a new sitemap renderer
 func CreateSitemapRenderer(config *SitemapRendererConfig, fetcher *fetcher) (*sitemapRenderer, error) {
+	logger := log.New(os.Stdout, fmt.Sprint(SITEMAP_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	return &sitemapRenderer{
 		config:  config,
-		logger:  log.Default(),
+		logger:  logger,
 		cache:   NewCache(),
 		fetcher: fetcher,
 	}, nil
@@ -175,11 +179,11 @@ func (r *sitemapRenderer) render(routeIndex int, req *http.Request) (*Render, er
 		Body:   body.Bytes(),
 		Status: status,
 		Valid:  valid,
-		Cache:  r.config.Cache,
 	}
 
 	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
+		result.Cache = true
 	}
 
 	return &result, nil
@@ -197,7 +201,7 @@ func (r *sitemapRenderer) generateSitemapIndex(routeIndex int, body *bytes.Buffe
 	for _, item := range r.config.Routes[routeIndex].SitemapIndex {
 		switch item.Type {
 		case SITEMAP_ENTRY_SITEMAPINDEX_TYPE_STATIC:
-			state, err = r.generateSitemapIndexStatic(body, r.absLink(item.Static.Loc))
+			state, err = r.generateSitemapIndexStatic(body, &item.Static)
 		}
 	}
 	if !state || err != nil {
@@ -210,9 +214,9 @@ func (r *sitemapRenderer) generateSitemapIndex(routeIndex int, body *bytes.Buffe
 }
 
 // generateSitemapIndexStatic generates a sitemap index static item
-func (r *sitemapRenderer) generateSitemapIndexStatic(buf *bytes.Buffer, loc string) (bool, error) {
+func (r *sitemapRenderer) generateSitemapIndexStatic(buf *bytes.Buffer, static *SitemapIndexEntryStatic) (bool, error) {
 	buf.Write([]byte("<sitemap>\n"))
-	buf.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", loc)))
+	buf.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", r.absLink(static.Loc))))
 	buf.Write([]byte("</sitemap>\n"))
 
 	return true, nil
@@ -231,12 +235,9 @@ func (r *sitemapRenderer) generateSitemap(routeIndex int, body *bytes.Buffer) (b
 	for _, item := range r.config.Routes[routeIndex].Sitemap {
 		switch item.Type {
 		case SITEMAP_ENTRY_SITEMAP_TYPE_STATIC:
-			state, err = r.generateSitemapStatic(body, r.absLink(item.Static.Loc), item.Static.Lastmod,
-				item.Static.Changefreq, item.Static.Priority)
+			state, err = r.generateSitemapStatic(body, &item.Static)
 		case SITEMAP_ENTRY_SITEMAP_TYPE_LIST:
-			state, err = r.generateSitemapList(body, item.List.Resource, item.List.ResourcePayloadItems,
-				item.List.ResourcePayloadItemLoc, item.List.ResourcePayloadItemLastmod, item.List.Changefreq,
-				item.List.Priority)
+			state, err = r.generateSitemapList(body, &item.List)
 		}
 		if err != nil || !state {
 			valid = false
@@ -248,47 +249,65 @@ func (r *sitemapRenderer) generateSitemap(routeIndex int, body *bytes.Buffer) (b
 	return valid, nil
 }
 
-// generateSitemapStatic generates a sitemap static item
-func (r *sitemapRenderer) generateSitemapStatic(buf *bytes.Buffer, loc string, lastmod string,
-	changefreq string, priority string) (bool, error) {
+// generateSitemapStatic generates a sitemap static
+func (r *sitemapRenderer) generateSitemapStatic(buf *bytes.Buffer, static *SitemapEntryStatic) (bool, error) {
 	buf.Write([]byte("<url>\n"))
-	buf.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", loc)))
-	buf.Write([]byte(fmt.Sprintf("<lastmod>%s</lastmod>\n", lastmod)))
-	buf.Write([]byte(fmt.Sprintf("<changefreq>%s</changefreq>\n", changefreq)))
-	buf.Write([]byte(fmt.Sprintf("<priority>%s</priority>\n", priority)))
+	buf.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", r.absLink(static.Loc))))
+	if static.Lastmod != "" {
+		buf.Write([]byte(fmt.Sprintf("<lastmod>%s</lastmod>\n", static.Lastmod)))
+	}
+	if static.Changefreq != "" {
+		buf.Write([]byte(fmt.Sprintf("<changefreq>%s</changefreq>\n", static.Changefreq)))
+	}
+	if static.Priority != "" {
+		buf.Write([]byte(fmt.Sprintf("<priority>%s</priority>\n", static.Priority)))
+	}
 	buf.Write([]byte("</url>\n"))
 
 	return true, nil
 }
 
-// generateSitemapStatic generates a sitemap list item
-func (r *sitemapRenderer) generateSitemapList(buf *bytes.Buffer, resource string, payloadItems string,
-	payloadItemLoc string, payloadItemLastmod string, changefreq string, priority string) (bool, error) {
-	response, err := r.fetcher.Get(resource)
+// generateSitemapStatic generates a sitemap list
+func (r *sitemapRenderer) generateSitemapList(buf *bytes.Buffer, list *SitemapEntryList) (bool, error) {
+	response, err := r.fetcher.Get(list.Resource)
 	if err != nil {
 		return false, nil
 	}
 
 	var payload interface{}
-
 	err = json.Unmarshal(response, &payload)
 	if err != nil {
 		return false, err
 	}
-
 	mPayload := payload.(map[string]interface{})
-	responseData := mPayload[payloadItems]
+	responseData := mPayload[list.ResourcePayloadItems]
 	payloadDataArray := responseData.([]interface{})
 
 	if len(payloadDataArray) > 0 {
 		for _, item := range payloadDataArray {
 			mItem := item.(map[string]interface{})
 
+			var loc, lastmod string
+			if v, ok := mItem[list.ResourcePayloadItemLoc].(string); ok {
+				loc = v
+			} else {
+				continue
+			}
+			if v, ok := mItem[list.ResourcePayloadItemLastmod].(string); ok {
+				lastmod = v
+			}
+
 			buf.Write([]byte("<url>\n"))
-			buf.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", r.absLink(mItem[payloadItemLoc].(string)))))
-			buf.Write([]byte(fmt.Sprintf("<lastmod>%s</lastmod>\n", mItem[payloadItemLastmod].(string))))
-			buf.Write([]byte(fmt.Sprintf("<changefreq>%s</changefreq>\n", changefreq)))
-			buf.Write([]byte(fmt.Sprintf("<priority>%s</priority>\n", priority)))
+			buf.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", r.absLink(loc))))
+			if lastmod != "" {
+				buf.Write([]byte(fmt.Sprintf("<lastmod>%s</lastmod>\n", lastmod)))
+			}
+			if list.Changefreq != "" {
+				buf.Write([]byte(fmt.Sprintf("<changefreq>%s</changefreq>\n", list.Changefreq)))
+			}
+			if list.Priority != "" {
+				buf.Write([]byte(fmt.Sprintf("<priority>%s</priority>\n", list.Priority)))
+			}
 			buf.Write([]byte("</url>\n"))
 		}
 	}

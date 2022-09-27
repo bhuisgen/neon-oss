@@ -22,7 +22,7 @@ func Logging(config *LoggingConfig, next http.Handler) http.Handler {
 		return next
 	}
 
-	logger := log.New(os.Stdout, "", log.LstdFlags)
+	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lmsgprefix)
 
 	if config.LogFile != "" {
 		f, err := os.OpenFile(config.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)

@@ -7,9 +7,11 @@ package app
 import (
 	"encoding/json"
 	"expvar"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"runtime"
 	"time"
 )
@@ -27,8 +29,14 @@ type monitorStats struct {
 	NumGC        uint32
 }
 
+const (
+	MONITOR_LOGGER string = "monitor"
+)
+
 // NewMonitor creates a new resources monitor
 func NewMonitor(delay int64) {
+	logger := log.New(os.Stdout, fmt.Sprint(MONITOR_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/debug/vars", expvar.Handler())
@@ -37,7 +45,7 @@ func NewMonitor(delay int64) {
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		log.Println(http.ListenAndServe("0.0.0.0:6060", mux))
+		http.ListenAndServe("0.0.0.0:6060", mux)
 	}()
 
 	var interval = time.Duration(delay) * time.Second
@@ -63,7 +71,7 @@ func NewMonitor(delay int64) {
 			s.NumGC = memstats.NumGC
 
 			data, _ := json.Marshal(s)
-			log.Printf("Monitor state: %s", string(data))
+			logger.Printf("Status: %s", string(data))
 		}
 	}()
 }

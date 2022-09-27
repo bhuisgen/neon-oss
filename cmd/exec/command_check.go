@@ -26,12 +26,11 @@ type checkCommand struct {
 // NewCheckCommand creates the command
 func NewCheckCommand() *checkCommand {
 	c := checkCommand{}
-
 	c.flagset = flag.NewFlagSet("check", flag.ExitOnError)
 	c.flagset.UintVar(&c.timeout, "timeout", 5, "Set the check timeout (seconds)")
 	c.flagset.BoolVar(&c.verbose, "verbose", false, "Use verbose output")
 	c.flagset.Usage = func() {
-		fmt.Println("Usage: check [OPTIONS]")
+		fmt.Println("Usage: neon check [OPTIONS]")
 		fmt.Println()
 		fmt.Println("Options:")
 		c.flagset.PrintDefaults()

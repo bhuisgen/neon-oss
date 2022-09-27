@@ -7,18 +7,19 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
-	"strings"
+	"os"
+	"strconv"
 	"time"
 )
 
 // loader implements the resources loader
 type loader struct {
-	config       *LoaderConfig
-	logger       *log.Logger
-	dataFailsafe bool
-	stop         chan struct{}
-	fetcher      *fetcher
+	config  *LoaderConfig
+	logger  *log.Logger
+	stop    chan struct{}
+	fetcher *fetcher
 }
 
 // LoaderConfig implements the resources loader configuration
@@ -45,23 +46,26 @@ type LoaderRuleStatic struct {
 
 // LoaderRuleSingle implements a single rule
 type LoaderRuleSingle struct {
-	Resource              string
-	ResourcePayloadItem   string
-	ItemTemplate          string
-	ItemTemplateKey       string
-	ItemTemplateKeyParams map[string]string
+	Resource                    string
+	ResourcePayloadItem         string
+	ItemTemplate                string
+	ItemTemplateResource        string
+	ItemTemplateResourceParams  map[string]string
+	ItemTemplateResourceHeaders map[string]string
 }
 
 // LoaderRuleList implements a list rule
 type LoaderRuleList struct {
-	Resource              string
-	ResourcePayloadItems  string
-	ItemTemplate          string
-	ItemTemplateKey       string
-	ItemTemplateKeyParams map[string]string
+	Resource                    string
+	ResourcePayloadItems        string
+	ItemTemplate                string
+	ItemTemplateResource        string
+	ItemTemplateResourceParams  map[string]string
+	ItemTemplateResourceHeaders map[string]string
 }
 
 const (
+	LOADER_LOGGER      string = "loader"
 	LOADER_TYPE_STATIC string = "static"
 	LOADER_TYPE_SINGLE string = "single"
 	LOADER_TYPE_LIST   string = "list"
@@ -69,12 +73,13 @@ const (
 
 // NewLoader creates a new loader
 func NewLoader(config *LoaderConfig, fetcher *fetcher) *loader {
+	logger := log.New(os.Stdout, fmt.Sprint(LOADER_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	return &loader{
-		config:       config,
-		logger:       log.Default(),
-		dataFailsafe: false,
-		stop:         make(chan struct{}),
-		fetcher:      fetcher,
+		config:  config,
+		logger:  logger,
+		stop:    make(chan struct{}),
+		fetcher: fetcher,
 	}
 }
 
@@ -106,13 +111,11 @@ func (l *loader) execute() {
 				var err error
 				switch rule.Type {
 				case LOADER_TYPE_STATIC:
-					err = l.loadStatic(ctx, rule.Static.Resource)
+					err = l.loadStatic(ctx, &rule.Static)
 				case LOADER_TYPE_SINGLE:
-					err = l.loadSingle(ctx, rule.Single.Resource, rule.Single.ResourcePayloadItem, rule.Single.ItemTemplate,
-						rule.Single.ItemTemplateKey, rule.Single.ItemTemplateKeyParams)
+					err = l.loadSingle(ctx, &rule.Single)
 				case LOADER_TYPE_LIST:
-					err = l.loadList(ctx, rule.List.Resource, rule.List.ResourcePayloadItems, rule.List.ItemTemplate,
-						rule.List.ItemTemplateKey, rule.List.ItemTemplateKeyParams)
+					err = l.loadList(ctx, &rule.List)
 				}
 
 				results <- err
@@ -159,7 +162,7 @@ func (l *loader) execute() {
 					}
 				}
 
-				l.logger.Printf("Loader results: success=%d, failure=%d, total=%d", success, failure, jobsCount)
+				l.logger.Printf("Results: success=%d, failure=%d, total=%d", success, failure, jobsCount)
 
 			case <-l.stop:
 				ticker.Stop()
@@ -171,8 +174,8 @@ func (l *loader) execute() {
 }
 
 // loadStatic loads a static resource
-func (l *loader) loadStatic(ctx context.Context, resource string) error {
-	err := l.fetcher.Fetch(ctx, resource)
+func (l *loader) loadStatic(ctx context.Context, rule *LoaderRuleStatic) error {
+	err := l.fetcher.Fetch(ctx, rule.Resource)
 	if err != nil {
 		return err
 	}
@@ -181,55 +184,62 @@ func (l *loader) loadStatic(ctx context.Context, resource string) error {
 }
 
 // loadSingle loads a single resource
-func (l *loader) loadSingle(ctx context.Context, resource string, payloadItem string, itemTemplate string,
-	itemKey string, itemKeyParams map[string]string) error {
-	err := l.fetcher.Fetch(ctx, resource)
+func (l *loader) loadSingle(ctx context.Context, rule *LoaderRuleSingle) error {
+	err := l.fetcher.Fetch(ctx, rule.Resource)
 	if err != nil {
 		return err
 	}
 
-	response, err := l.fetcher.Get(resource)
+	response, err := l.fetcher.Get(rule.Resource)
 	if err != nil {
 		return err
 	}
 
 	var payload interface{}
-
 	err = json.Unmarshal(response, &payload)
 	if err != nil {
 		return err
 	}
-
 	mPayload := payload.(map[string]interface{})
-	responseData := mPayload[payloadItem]
+	responseData := mPayload[rule.ResourcePayloadItem]
 	item := responseData.(map[string]interface{})
-
-	key := itemKey
-	keyParams := FindParameters(itemKey)
-	for _, param := range keyParams {
-		key = strings.Replace(key, param[0], item[param[1]].(string), -1)
-	}
-
-	params := make(map[string]string)
-	for k, v := range itemKeyParams {
-		value := v
-		valueParams := FindParameters(v)
-		for _, param := range valueParams {
-			value = strings.Replace(value, param[0], item[param[1]].(string), -1)
+	mItem := make(map[string]string)
+	for k, v := range item {
+		switch v.(type) {
+		case string:
+			mItem[k] = v.(string)
+		case int64:
+			mItem[k] = strconv.FormatInt(v.(int64), 10)
+		case bool:
+			mItem[k] = strconv.FormatBool(v.(bool))
 		}
-		params[k] = value
 	}
 
-	fetchResource, err := l.fetcher.CreateResourceFromTemplate(itemTemplate, key, params, nil)
+	rKey := replaceParameters(rule.ItemTemplateResource, mItem)
+	rParams := make(map[string]string)
+	for rParamKey, rParamValue := range rule.ItemTemplateResourceParams {
+		rParamKey = replaceParameters(rParamKey, mItem)
+		rParamValue = replaceParameters(rParamValue, mItem)
+		rParams[rParamKey] = rParamValue
+	}
+
+	rHeaders := make(map[string]string)
+	for rHeaderKey, rHeaderValue := range rule.ItemTemplateResourceParams {
+		rHeaderKey = replaceParameters(rHeaderKey, mItem)
+		rHeaderValue = replaceParameters(rHeaderValue, mItem)
+		rHeaders[rHeaderKey] = rHeaderValue
+	}
+
+	r, err := l.fetcher.CreateResourceFromTemplate(rule.ItemTemplate, rKey, rParams, rHeaders)
 	if err != nil {
 		return err
 	}
 
-	if !l.fetcher.Exists(fetchResource.Key) {
-		l.fetcher.Register(fetchResource)
+	if !l.fetcher.Exists(r.Name) {
+		l.fetcher.Register(r)
 	}
 
-	err = l.fetcher.Fetch(ctx, fetchResource.Key)
+	err = l.fetcher.Fetch(ctx, r.Name)
 	if err != nil {
 		return err
 	}
@@ -238,57 +248,63 @@ func (l *loader) loadSingle(ctx context.Context, resource string, payloadItem st
 }
 
 // loadList loads a list resource
-func (l *loader) loadList(ctx context.Context, resource string, payloadItems string, itemTemplate string,
-	itemKey string, itemKeyParams map[string]string) error {
-	err := l.fetcher.Fetch(ctx, resource)
+func (l *loader) loadList(ctx context.Context, rule *LoaderRuleList) error {
+	err := l.fetcher.Fetch(ctx, rule.Resource)
 	if err != nil {
 		return err
 	}
 
-	response, err := l.fetcher.Get(resource)
+	response, err := l.fetcher.Get(rule.Resource)
 	if err != nil {
 		return err
 	}
 
 	var payload interface{}
-
 	err = json.Unmarshal(response, &payload)
 	if err != nil {
 		return err
 	}
-
 	mPayload := payload.(map[string]interface{})
-	responseData := mPayload[payloadItems]
-
+	responseData := mPayload[rule.ResourcePayloadItems]
 	for _, data := range responseData.([]interface{}) {
 		item := data.(map[string]interface{})
-
-		key := itemKey
-		keyParams := FindParameters(itemKey)
-		for _, param := range keyParams {
-			key = strings.Replace(key, param[0], item[param[1]].(string), -1)
-		}
-
-		params := make(map[string]string)
-		for k, v := range itemKeyParams {
-			value := v
-			valueParams := FindParameters(v)
-			for _, param := range valueParams {
-				value = strings.Replace(value, param[0], item[param[1]].(string), -1)
+		mItem := make(map[string]string)
+		for k, v := range item {
+			switch v.(type) {
+			case string:
+				mItem[k] = v.(string)
+			case int64:
+				mItem[k] = strconv.FormatInt(v.(int64), 10)
+			case bool:
+				mItem[k] = strconv.FormatBool(v.(bool))
 			}
-			params[k] = value
 		}
 
-		fetchResource, err := l.fetcher.CreateResourceFromTemplate(itemTemplate, key, params, nil)
+		rKey := replaceParameters(rule.ItemTemplateResource, mItem)
+		rParams := make(map[string]string)
+		for rParamKey, rParamValue := range rule.ItemTemplateResourceParams {
+			rParamKey = replaceParameters(rParamKey, mItem)
+			rParamValue = replaceParameters(rParamValue, mItem)
+			rParams[rParamKey] = rParamValue
+		}
+
+		rHeaders := make(map[string]string)
+		for rHeaderKey, rHeaderValue := range rule.ItemTemplateResourceParams {
+			rHeaderKey = replaceParameters(rHeaderKey, mItem)
+			rHeaderValue = replaceParameters(rHeaderValue, mItem)
+			rHeaders[rHeaderKey] = rHeaderValue
+		}
+
+		r, err := l.fetcher.CreateResourceFromTemplate(rule.ItemTemplate, rKey, rParams, rHeaders)
 		if err != nil {
 			return err
 		}
 
-		if !l.fetcher.Exists(fetchResource.Key) {
-			l.fetcher.Register(fetchResource)
+		if !l.fetcher.Exists(r.Name) {
+			l.fetcher.Register(r)
 		}
 
-		err = l.fetcher.Fetch(ctx, fetchResource.Key)
+		err = l.fetcher.Fetch(ctx, r.Name)
 		if err != nil {
 			return err
 		}

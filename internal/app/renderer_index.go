@@ -22,12 +22,9 @@ type indexRenderer struct {
 	Renderer
 	next Renderer
 
-	config *IndexRendererConfig
-	logger *log.Logger
-	routes []struct {
-		matcher *regexp.Regexp
-		params  []string
-	}
+	config  *IndexRendererConfig
+	logger  *log.Logger
+	regexps []*regexp.Regexp
 	vmPool  *vmPool
 	cache   *cache
 	fetcher *fetcher
@@ -44,59 +41,45 @@ type IndexRendererConfig struct {
 	Timeout   int
 	Cache     bool
 	CacheTTL  int
-	Routes    []IndexRoute
+	Rules     []IndexRule
 }
 
-// IndexRoute implements a route
-type IndexRoute struct {
+// IndexRule implements a rule
+type IndexRule struct {
 	Path  string
-	State []IndexRouteStateEntry
+	State []IndexRuleStateEntry
+	Last  bool
 }
 
-// IndexRouteStateEntry implements a route state entry
-type IndexRouteStateEntry struct {
+// IndexRuleStateEntry implements a rule state entry
+type IndexRuleStateEntry struct {
 	Key      string
 	Resource string
 	Export   bool
 }
 
-var (
-	regexpRouteParameters = regexp.MustCompile(`\:(.[^\:/]+)`)
+const (
+	INDEX_LOGGER string = "renderer[index]"
 )
 
 // CreateIndexRenderer creates a new index renderer
 func CreateIndexRenderer(config *IndexRendererConfig, fetcher *fetcher) (*indexRenderer, error) {
-	routes := []struct {
-		matcher *regexp.Regexp
-		params  []string
-	}{}
+	logger := log.New(os.Stdout, fmt.Sprint(INDEX_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
 
-	for _, route := range config.Routes {
-		pattern := fmt.Sprintf("^%s/?$", regexpRouteParameters.ReplaceAllString(route.Path, "([^/]+)"))
-		matcher, err := regexp.Compile(pattern)
+	regexps := []*regexp.Regexp{}
+	for _, rule := range config.Rules {
+		r, err := regexp.Compile(rule.Path)
 		if err != nil {
 			return nil, err
 		}
 
-		params := []string{}
-		routeParams := regexpRouteParameters.FindAllString(route.Path, -1)
-		for _, param := range routeParams {
-			params = append(params, param)
-		}
-
-		routes = append(routes, struct {
-			matcher *regexp.Regexp
-			params  []string
-		}{
-			matcher: matcher,
-			params:  params,
-		})
+		regexps = append(regexps, r)
 	}
 
 	return &indexRenderer{
 		config:  config,
-		logger:  log.Default(),
-		routes:  routes,
+		logger:  logger,
+		regexps: regexps,
 		vmPool:  NewVMPool(),
 		cache:   NewCache(),
 		fetcher: fetcher,
@@ -195,14 +178,52 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 	var valid bool = true
 	var clientState map[string]interface{} = make(map[string]interface{})
 
-	for index, route := range r.config.Routes {
-		params := r.routes[index].matcher.FindStringSubmatch(req.URL.Path)
-		if params == nil {
+	for index, rule := range r.config.Rules {
+		if _, ok := os.LookupEnv("DEBUG"); ok {
+			r.logger.Printf("Index: id=%s, rule=%d, phase=check, path=%s", req.Context().Value(ContextKeyID{}).(string),
+				index+1, req.URL.Path)
+		}
+
+		m := r.regexps[index].FindStringSubmatch(req.URL.Path)
+		if m == nil {
 			continue
 		}
-		for _, entry := range route.State {
-			resourceKey := ReplaceParameters(entry.Resource, r.routes[index].params, params[1:])
-			stateKey := ReplaceParameters(entry.Key, r.routes[index].params, params[1:])
+
+		if _, ok := os.LookupEnv("DEBUG"); ok {
+			r.logger.Printf("Index: id=%s, rule=%d, phase=match, path=%s", req.Context().Value(ContextKeyID{}).(string),
+				index+1, req.URL.Path)
+		}
+
+		params := make(map[string]string)
+		for i, value := range m {
+			if i > 0 {
+				params[fmt.Sprint(i)] = value
+			}
+		}
+		for i, name := range r.regexps[index].SubexpNames() {
+			if i != 0 && name != "" {
+				params[name] = m[i]
+			}
+		}
+
+		if _, ok := os.LookupEnv("DEBUG"); ok {
+			r.logger.Printf("Index: id=%s, rule=%d, phase=params, path=%s, params=%s",
+				req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, params)
+		}
+
+		for _, entry := range rule.State {
+			if _, ok := os.LookupEnv("DEBUG"); ok {
+				r.logger.Printf("Index: id=%s, rule=%d, phase=state1, path=%s, state_key=%s, state_resource=%s",
+					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, entry.Key, entry.Resource)
+			}
+
+			stateKey := replaceParameters(entry.Key, params)
+			resourceKey := replaceParameters(entry.Resource, params)
+
+			if _, ok := os.LookupEnv("DEBUG"); ok {
+				r.logger.Printf("Index: id=%s, rule=%d, phase=state2, path=%s, state_key=%s, state_resource=%s",
+					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, stateKey, resourceKey)
+			}
 
 			serverStateResource, err := vm.serverStateResourceObject.NewInstance(ctx)
 			if err != nil {
@@ -233,11 +254,24 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 			}
 		}
 
-		break
+		if r.config.Rules[index].Last {
+			if _, ok := os.LookupEnv("DEBUG"); ok {
+				r.logger.Printf("Index: id=%s, rule=%d, phase=last, path=%s", req.Context().Value(ContextKeyID{}).(string),
+					index+1, req.URL.Path)
+			}
+
+			break
+		}
 	}
 
 	server.Set("state", serverState)
 	global.Set("server", server)
+
+	if _, ok := os.LookupEnv("DEBUG"); ok {
+		c, _ := json.Marshal(clientState)
+		r.logger.Printf("Index: id=%s, path=%s, client_state=%s", req.Context().Value(ContextKeyID{}).(string),
+			req.URL.Path, c)
+	}
 
 	buf, err := os.ReadFile(r.config.Bundle)
 	if err != nil {
@@ -303,11 +337,11 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		Body:   body,
 		Status: status,
 		Valid:  valid,
-		Cache:  r.config.Cache,
 	}
 
-	if result.Valid && result.Cache {
+	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
+		result.Cache = true
 	}
 
 	return &result, nil

@@ -7,6 +7,7 @@ package middlewares
 import (
 	"log"
 	"net/http"
+	"os"
 	"runtime/debug"
 )
 
@@ -17,8 +18,9 @@ func Recover(next http.Handler) http.Handler {
 			err := recover()
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-
-				log.Print(err, debug.Stack())
+				if _, ok := os.LookupEnv("DEBUG"); ok {
+					log.Print(err, debug.Stack())
+				}
 			}
 		}()
 

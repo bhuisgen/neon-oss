@@ -5,6 +5,7 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -30,11 +31,17 @@ type DefaultRendererConfig struct {
 	CacheTTL   int
 }
 
+const (
+	DEFAULT_LOGGER string = "renderer[default]"
+)
+
 // CreateDefaultRenderer creates a new default renderer
 func CreateDefaultRenderer(config *DefaultRendererConfig) (*defaultRenderer, error) {
+	logger := log.New(os.Stdout, fmt.Sprint(DEFAULT_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+
 	return &defaultRenderer{
 		config: config,
-		logger: log.Default(),
+		logger: logger,
 		cache:  NewCache(),
 	}, nil
 }
@@ -85,11 +92,11 @@ func (r *defaultRenderer) render(req *http.Request) (*Render, error) {
 		Body:   body,
 		Status: http.StatusOK,
 		Valid:  true,
-		Cache:  r.config.Cache,
 	}
 
 	if result.Valid && r.config.Cache {
 		r.cache.Set("default", &result, time.Duration(r.config.CacheTTL)*time.Second)
+		result.Cache = true
 	}
 
 	return &result, nil

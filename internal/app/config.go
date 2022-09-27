@@ -11,49 +11,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const (
-	CONFIG_FILE                              string = "config.yaml"
-	CONFIG_DEFAULT_SERVER_LISTENADDR         string = "localhost"
-	CONFIG_DEFAULT_SERVER_LISTENPORT         int    = 8080
-	CONFIG_DEFAULT_SERVER_TLS                bool   = false
-	CONFIG_DEFAULT_SERVER_READTIMEOUT        int    = 60
-	CONFIG_DEFAULT_SERVER_WRITETIMEOUT       int    = 60
-	CONFIG_DEFAULT_SERVER_ACCESSLOG          bool   = false
-	CONFIG_DEFAULT_SERVER_ACCESSLOGFILE      string = ""
-	CONFIG_DEFAULT_SERVER_ERRORCODE          int    = 500
-	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE     bool   = false
-	CONFIG_DEFAULT_SERVER_REWRITE_RULE_FLAG  string = ""
-	CONFIG_DEFAULT_SERVER_REWRITE_RULE_LAST  bool   = false
-	CONFIG_DEFAULT_SERVER_HEADER_ENABLE      bool   = false
-	CONFIG_DEFAULT_SERVER_HEADER_RULE_LAST   bool   = false
-	CONFIG_DEFAULT_SERVER_STATIC_ENABLE      bool   = false
-	CONFIG_DEFAULT_SERVER_STATIC_INDEX       bool   = false
-	CONFIG_DEFAULT_SERVER_ROBOTS_ENABLE      bool   = false
-	CONFIG_DEFAULT_SERVER_ROBOTS_PATH        string = "/robots.txt"
-	CONFIG_DEFAULT_SERVER_ROBOTS_CACHE       bool   = false
-	CONFIG_DEFAULT_SERVER_ROBOTS_CACHETTL    int    = 60
-	CONFIG_DEFAULT_SERVER_SITEMAP_ENABLE     bool   = false
-	CONFIG_DEFAULT_SERVER_SITEMAP_CACHE      bool   = false
-	CONFIG_DEFAULT_SERVER_SITEMAP_CACHETTL   int    = 60
-	CONFIG_DEFAULT_SERVER_INDEX_ENABLE       bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_ENV          string = "production"
-	CONFIG_DEFAULT_SERVER_INDEX_CONTAINER    string = "root"
-	CONFIG_DEFAULT_SERVER_INDEX_STATE        string = "state"
-	CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT      int    = 4
-	CONFIG_DEFAULT_SERVER_INDEX_CACHE        bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_CACHETTL     int    = 60
-	CONFIG_DEFAULT_SERVER_DEFAULT_ENABLE     bool   = false
-	CONFIG_DEFAULT_SERVER_DEFAULT_STATUSCODE int    = 200
-	CONFIG_DEFAULT_SERVER_DEFAULT_CACHE      bool   = false
-	CONFIG_DEFAULT_SERVER_DEFAULT_CACHETTL   int    = 60
-	CONFIG_DEFAULT_FETCHER_REQUESTTIMEOUT    int    = 60
-	CONFIG_DEFAULT_FETCHER_REQUESTRETRY      int    = 3
-	CONFIG_DEFAULT_FETCHER_REQUESTDELAY      int    = 1
-	CONFIG_DEFAULT_LOADER_EXECSTARTUP        int    = 15
-	CONFIG_DEFAULT_LOADER_EXECINTERVAL       int    = 60
-	CONFIG_DEFAULT_LOADER_EXECWORKERS        int    = 1
-)
-
 // Config implements the configuration
 type Config struct {
 	Server  []*ServerConfig
@@ -72,7 +29,6 @@ type yamlConfigServer struct {
 	WriteTimeout  *int    `yaml:"write_timeout"`
 	AccessLog     *bool   `yaml:"access_log"`
 	AccessLogFile *string `yaml:"access_log_file"`
-	ErrorCode     *int    `yaml:"error_code"`
 
 	Rewrite struct {
 		Enable *bool `yaml:"enable"`
@@ -153,14 +109,15 @@ type yamlConfigServer struct {
 		Timeout   *int    `yaml:"timeout"`
 		Cache     *bool   `yaml:"cache"`
 		CacheTTL  *int    `yaml:"cache_ttl"`
-		Routes    []struct {
+		Rules     []struct {
 			Path  string `yaml:"path"`
 			State []struct {
 				Key      string `yaml:"key"`
 				Resource string `yaml:"resource"`
 				Export   bool   `yaml:"export"`
 			} `yaml:"state"`
-		} `yaml:"routes"`
+			Last *bool `yaml:"last"`
+		} `yaml:"rules"`
 	} `yaml:"index"`
 
 	Default struct {
@@ -181,7 +138,7 @@ type yamlConfigFetcher struct {
 	RequestRetry       *int              `yaml:"request_retry"`
 	RequestDelay       *int              `yaml:"request_delay"`
 	Resources          []struct {
-		Key     string            `yaml:"key"`
+		Name    string            `yaml:"name"`
 		Method  string            `yaml:"method"`
 		URL     string            `yaml:"url"`
 		Params  map[string]string `yaml:"params"`
@@ -207,18 +164,20 @@ type yamlConfigLoader struct {
 			Resource string `yaml:"resource"`
 		} `yaml:"static"`
 		Single struct {
-			Resource              string            `yaml:"resource"`
-			ResourcePayloadItem   string            `yaml:"resource_payload_item"`
-			ItemTemplate          string            `yaml:"item_template"`
-			ItemTemplateKey       string            `yaml:"item_template_key"`
-			ItemTemplateKeyParams map[string]string `yaml:"item_template_key_params"`
+			Resource                    string            `yaml:"resource"`
+			ResourcePayloadItem         string            `yaml:"resource_payload_item"`
+			ItemTemplate                string            `yaml:"item_template"`
+			ItemTemplateResource        string            `yaml:"item_template_resource"`
+			ItemTemplateResourceParams  map[string]string `yaml:"item_template_resource_params"`
+			ItemTemplateResourceHeaders map[string]string `yaml:"item_template_resource_headers"`
 		} `yaml:"single"`
 		List struct {
-			Resource              string            `yaml:"resource"`
-			ResourcePayloadItems  string            `yaml:"resource_payload_items"`
-			ItemTemplate          string            `yaml:"item_template"`
-			ItemTemplateKey       string            `yaml:"item_template_key"`
-			ItemTemplateKeyParams map[string]string `yaml:"item_template_key_params"`
+			Resource                    string            `yaml:"resource"`
+			ResourcePayloadItems        string            `yaml:"resource_payload_items"`
+			ItemTemplate                string            `yaml:"item_template"`
+			ItemTemplateResource        string            `yaml:"item_template_resource"`
+			ItemTemplateResourceParams  map[string]string `yaml:"item_template_resource_params"`
+			ItemTemplateResourceHeaders map[string]string `yaml:"item_template_resource_headers"`
 		} `yaml:"list"`
 	} `yaml:"rules"`
 }
@@ -228,6 +187,49 @@ type yamlConfig struct {
 	Fetcher yamlConfigFetcher  `yaml:"fetcher"`
 	Loader  yamlConfigLoader   `yaml:"loader"`
 }
+
+const (
+	CONFIG_FILE                              string = "config.yaml"
+	CONFIG_DEFAULT_SERVER_LISTENADDR         string = "localhost"
+	CONFIG_DEFAULT_SERVER_LISTENPORT         int    = 8080
+	CONFIG_DEFAULT_SERVER_TLS                bool   = false
+	CONFIG_DEFAULT_SERVER_READTIMEOUT        int    = 60
+	CONFIG_DEFAULT_SERVER_WRITETIMEOUT       int    = 60
+	CONFIG_DEFAULT_SERVER_ACCESSLOG          bool   = false
+	CONFIG_DEFAULT_SERVER_ACCESSLOGFILE      string = ""
+	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE     bool   = false
+	CONFIG_DEFAULT_SERVER_REWRITE_RULE_FLAG  string = ""
+	CONFIG_DEFAULT_SERVER_REWRITE_RULE_LAST  bool   = false
+	CONFIG_DEFAULT_SERVER_HEADER_ENABLE      bool   = false
+	CONFIG_DEFAULT_SERVER_HEADER_RULE_LAST   bool   = false
+	CONFIG_DEFAULT_SERVER_STATIC_ENABLE      bool   = false
+	CONFIG_DEFAULT_SERVER_STATIC_INDEX       bool   = false
+	CONFIG_DEFAULT_SERVER_ROBOTS_ENABLE      bool   = false
+	CONFIG_DEFAULT_SERVER_ROBOTS_PATH        string = "/robots.txt"
+	CONFIG_DEFAULT_SERVER_ROBOTS_CACHE       bool   = false
+	CONFIG_DEFAULT_SERVER_ROBOTS_CACHETTL    int    = 60
+	CONFIG_DEFAULT_SERVER_SITEMAP_ENABLE     bool   = false
+	CONFIG_DEFAULT_SERVER_SITEMAP_CACHE      bool   = false
+	CONFIG_DEFAULT_SERVER_SITEMAP_CACHETTL   int    = 60
+	CONFIG_DEFAULT_SERVER_INDEX_ENABLE       bool   = false
+	CONFIG_DEFAULT_SERVER_INDEX_ENV          string = "production"
+	CONFIG_DEFAULT_SERVER_INDEX_CONTAINER    string = "root"
+	CONFIG_DEFAULT_SERVER_INDEX_STATE        string = "state"
+	CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT      int    = 4
+	CONFIG_DEFAULT_SERVER_INDEX_CACHE        bool   = false
+	CONFIG_DEFAULT_SERVER_INDEX_CACHETTL     int    = 60
+	CONFIG_DEFAULT_SERVER_DEFAULT_ENABLE     bool   = false
+	CONFIG_DEFAULT_SERVER_DEFAULT_STATUSCODE int    = 200
+	CONFIG_DEFAULT_SERVER_DEFAULT_CACHE      bool   = false
+	CONFIG_DEFAULT_SERVER_DEFAULT_CACHETTL   int    = 60
+	CONFIG_DEFAULT_SERVER_INDEX_RULE_LAST    bool   = false
+	CONFIG_DEFAULT_FETCHER_REQUESTTIMEOUT    int    = 60
+	CONFIG_DEFAULT_FETCHER_REQUESTRETRY      int    = 3
+	CONFIG_DEFAULT_FETCHER_REQUESTDELAY      int    = 1
+	CONFIG_DEFAULT_LOADER_EXECSTARTUP        int    = 15
+	CONFIG_DEFAULT_LOADER_EXECINTERVAL       int    = 900
+	CONFIG_DEFAULT_LOADER_EXECWORKERS        int    = 1
+)
 
 // LoadConfig loads the configuration settings
 func LoadConfig() (*Config, error) {
@@ -309,11 +311,6 @@ func parse(y *yamlConfig) (*Config, error) {
 		} else {
 			serverConfig.AccessLogFile = CONFIG_DEFAULT_SERVER_ACCESSLOGFILE
 		}
-		if yamlConfigServer.ErrorCode != nil {
-			serverConfig.ErrorCode = *yamlConfigServer.ErrorCode
-		} else {
-			serverConfig.ErrorCode = CONFIG_DEFAULT_SERVER_ERRORCODE
-		}
 
 		if yamlConfigServer.Rewrite.Enable != nil {
 			serverConfig.Rewrite.Enable = *yamlConfigServer.Rewrite.Enable
@@ -329,11 +326,6 @@ func parse(y *yamlConfig) (*Config, error) {
 				rule.Flag = *rewriteRule.Flag
 			} else {
 				rule.Flag = CONFIG_DEFAULT_SERVER_REWRITE_RULE_FLAG
-			}
-			if rewriteRule.Last != nil {
-				rule.Last = *rewriteRule.Last
-			} else {
-				rule.Last = CONFIG_DEFAULT_SERVER_REWRITE_RULE_LAST
 			}
 			serverConfig.Rewrite.Rules = append(serverConfig.Rewrite.Rules, rule)
 		}
@@ -466,18 +458,23 @@ func parse(y *yamlConfig) (*Config, error) {
 		} else {
 			serverConfig.Index.CacheTTL = CONFIG_DEFAULT_SERVER_INDEX_CACHETTL
 		}
-		for _, indexRoute := range yamlConfigServer.Index.Routes {
-			route := IndexRoute{
-				Path: indexRoute.Path,
+		for _, indexRule := range yamlConfigServer.Index.Rules {
+			rule := IndexRule{
+				Path: indexRule.Path,
 			}
-			for _, indexRouteStateEntry := range indexRoute.State {
-				route.State = append(route.State, IndexRouteStateEntry{
-					Key:      indexRouteStateEntry.Key,
-					Resource: indexRouteStateEntry.Resource,
-					Export:   indexRouteStateEntry.Export,
+			if indexRule.Last != nil {
+				rule.Last = *indexRule.Last
+			} else {
+				rule.Last = CONFIG_DEFAULT_SERVER_INDEX_RULE_LAST
+			}
+			for _, indexRuleStateEntry := range indexRule.State {
+				rule.State = append(rule.State, IndexRuleStateEntry{
+					Key:      indexRuleStateEntry.Key,
+					Resource: indexRuleStateEntry.Resource,
+					Export:   indexRuleStateEntry.Export,
 				})
 			}
-			serverConfig.Index.Routes = append(serverConfig.Index.Routes, route)
+			serverConfig.Index.Rules = append(serverConfig.Index.Rules, rule)
 		}
 
 		if yamlConfigServer.Default.Enable != nil {
@@ -528,7 +525,7 @@ func parse(y *yamlConfig) (*Config, error) {
 	}
 	for _, resource := range y.Fetcher.Resources {
 		fetcherConfig.Resources = append(fetcherConfig.Resources, FetcherResource{
-			Key:     resource.Key,
+			Name:    resource.Name,
 			Method:  resource.Method,
 			URL:     resource.URL,
 			Params:  resource.Params,
