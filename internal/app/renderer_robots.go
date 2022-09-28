@@ -107,7 +107,6 @@ func (r *robotsRenderer) render(req *http.Request) (*Render, error) {
 		Status: http.StatusOK,
 		Valid:  true,
 	}
-
 	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
 		result.Cache = true

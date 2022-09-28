@@ -93,7 +93,6 @@ func (r *defaultRenderer) render(req *http.Request) (*Render, error) {
 		Status: http.StatusOK,
 		Valid:  true,
 	}
-
 	if result.Valid && r.config.Cache {
 		r.cache.Set("default", &result, time.Duration(r.config.CacheTTL)*time.Second)
 		result.Cache = true

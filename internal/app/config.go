@@ -8,7 +8,7 @@ import (
 	"os"
 	"strconv"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Config implements the configuration
@@ -82,18 +82,18 @@ type yamlConfigServer struct {
 				Name   string `yaml:"name"`
 				Type   string `yaml:"type"`
 				Static struct {
-					Loc        string `yaml:"loc"`
-					Lastmod    string `yaml:"lastmod"`
-					Changefreq string `yaml:"changefreq"`
-					Priority   string `yaml:"priority"`
+					Loc        string  `yaml:"loc"`
+					Lastmod    *string `yaml:"lastmod"`
+					Changefreq *string `yaml:"changefreq"`
+					Priority   *string `yaml:"priority"`
 				} `yaml:"static"`
 				List struct {
-					Resource                   string `yaml:"resource"`
-					ResourcePayloadItems       string `yaml:"resource_payload_items"`
-					ResourcePayloadItemLoc     string `yaml:"resource_payload_item_loc"`
-					ResourcePayloadItemLastmod string `yaml:"resource_payload_item_lastmod"`
-					Changefreq                 string `yaml:"changefreq"`
-					Priority                   string `yaml:"priority"`
+					Resource                   string  `yaml:"resource"`
+					ResourcePayloadItems       string  `yaml:"resource_payload_items"`
+					ResourcePayloadItemLoc     string  `yaml:"resource_payload_item_loc"`
+					ResourcePayloadItemLastmod *string `yaml:"resource_payload_item_lastmod"`
+					Changefreq                 *string `yaml:"changefreq"`
+					Priority                   *string `yaml:"priority"`
 				} `yaml:"list"`
 			} `yaml:"sitemap"`
 		} `yaml:"routes"`

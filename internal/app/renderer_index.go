@@ -321,7 +321,7 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		}, nil
 	}
 
-	body, err := r.generateBody(*vm.render, *vm.title, vm.metas, vm.links, vm.scripts, clientState)
+	body, err := indexBody(r, *vm.render, *vm.title, vm.metas, vm.links, vm.scripts, clientState)
 	if err != nil {
 		r.logger.Printf("Failed to generate body: %s", err)
 
@@ -338,7 +338,6 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		Status: status,
 		Valid:  valid,
 	}
-
 	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
 		result.Cache = true
@@ -347,9 +346,10 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 	return &result, nil
 }
 
-// generateBody generates the final HTML body
-func (r *indexRenderer) generateBody(render []byte, title string, metas map[string]map[string]string,
-	links map[string]map[string]string, scripts map[string]map[string]string, state map[string]interface{}) ([]byte, error) {
+// indexBody generates the final HTML body
+func indexBody(r *indexRenderer, render []byte, title string, metas map[string]map[string]string,
+	links map[string]map[string]string, scripts map[string]map[string]string,
+	state map[string]interface{}) ([]byte, error) {
 	var body []byte
 	html, err := os.ReadFile(r.config.HTML)
 	if err != nil {
@@ -370,7 +370,7 @@ func (r *indexRenderer) generateBody(render []byte, title string, metas map[stri
 		buf.Reset()
 
 		for k, v := range attributes {
-			buf.Write([]byte(fmt.Sprintf(" %s=\"%s\"", k, v)))
+			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
 		}
 		body = bytes.Replace(body,
 			[]byte("</head>"),
@@ -384,7 +384,7 @@ func (r *indexRenderer) generateBody(render []byte, title string, metas map[stri
 		buf.Reset()
 
 		for k, v := range attributes {
-			buf.Write([]byte(fmt.Sprintf(" %s=\"%s\"", k, v)))
+			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
 		}
 		body = bytes.Replace(body,
 			[]byte("</head>"),
@@ -402,7 +402,7 @@ func (r *indexRenderer) generateBody(render []byte, title string, metas map[stri
 			if k == "children" {
 				content = v
 			}
-			buf.Write([]byte(fmt.Sprintf(" %s=\"%s\"", k, v)))
+			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
 		}
 		body = bytes.Replace(body,
 			[]byte("</head>"),

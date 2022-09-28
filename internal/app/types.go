@@ -15,11 +15,11 @@ type Renderer interface {
 // Render
 type Render struct {
 	Body           []byte
+	Valid          bool
 	Status         int
 	Redirect       bool
 	RedirectTarget string
 	RedirectStatus int
-	Valid          bool
 	Cache          bool
 }
 
