@@ -25,7 +25,7 @@ type ErrorRendererConfig struct {
 }
 
 const (
-	ERROR_LOGGER string = "renderer[error]"
+	ERROR_LOGGER string = "server[error]"
 )
 
 // CreateErrorRenderer creates a new error renderer

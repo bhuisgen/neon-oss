@@ -17,6 +17,7 @@ import (
 	"github.com/bhuisgen/neon/internal/app"
 )
 
+// checkCommand implements the check command
 type checkCommand struct {
 	flagset *flag.FlagSet
 	timeout uint
@@ -56,28 +57,37 @@ func (c *checkCommand) Init(args []string) error {
 }
 
 // Execute executes the command
-func (c *checkCommand) Execute(config *app.Config) error {
+func (c *checkCommand) Execute() error {
+	config, err := app.LoadConfig()
+	if err != nil {
+		fmt.Printf("Failed to load configuration: %s\n", err)
+
+		return err
+	}
+
 	for _, serverConfig := range config.Server {
 		tlsConfig := &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		}
 
-		if serverConfig.TLSCAFile != "" {
-			ca, err := os.ReadFile(serverConfig.TLSCAFile)
+		if serverConfig.TLSCAFile != nil {
+			ca, err := os.ReadFile(*serverConfig.TLSCAFile)
 			if err != nil {
+				fmt.Printf("Failed to read TLS CA file: %s\n", err)
+
 				return err
 			}
 
-			caCertPool := x509.NewCertPool()
-			if !caCertPool.AppendCertsFromPEM(ca) {
-				return err
-			}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(ca)
 
 			tlsConfig.RootCAs = caCertPool
 
-			if serverConfig.TLSCertFile != "" && serverConfig.TLSKeyFile != "" {
-				clientCert, err := tls.LoadX509KeyPair(serverConfig.TLSCertFile, serverConfig.TLSKeyFile)
+			if serverConfig.TLSCertFile != nil && serverConfig.TLSKeyFile != nil {
+				clientCert, err := tls.LoadX509KeyPair(*serverConfig.TLSCertFile, *serverConfig.TLSKeyFile)
 				if err != nil {
+					fmt.Printf("Failed to parse TLS certificate: %s\n", err)
+
 					return err
 				}
 
@@ -106,9 +116,16 @@ func (c *checkCommand) Execute(config *app.Config) error {
 		if serverConfig.TLS {
 			scheme = "https"
 		}
-		addr := fmt.Sprintf("%s:%d", serverConfig.ListenAddr, serverConfig.ListenPort)
+		url := fmt.Sprintf("%s://%s:%d", scheme, serverConfig.ListenAddr, serverConfig.ListenPort)
 
-		_, err := client.Head(scheme + "://" + addr)
+		_, err := client.Head(url)
+		if c.verbose {
+			if err != nil {
+				fmt.Printf("Check '%s': KO\n", url)
+			} else {
+				fmt.Printf("Check '%s': OK\n", url)
+			}
+		}
 		if err != nil {
 			return err
 		}

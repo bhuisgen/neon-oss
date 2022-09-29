@@ -32,7 +32,7 @@ type RobotsRendererConfig struct {
 }
 
 const (
-	ROBOTS_LOGGER string = "renderer[robots]"
+	ROBOTS_LOGGER string = "server[robots]"
 )
 
 // CreateRobotsRenderer creates a new robots renderer

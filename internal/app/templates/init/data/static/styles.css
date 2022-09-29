@@ -1,0 +1,28 @@
+html {
+  margin: 0px;
+  padding: 0px;
+}
+
+.section {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.container {
+  max-width: 1152px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 200px;
+}
+
+.status {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo {
+  width: 33%;
+  height: auto;
+}

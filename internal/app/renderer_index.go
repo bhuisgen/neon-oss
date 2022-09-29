@@ -55,11 +55,11 @@ type IndexRule struct {
 type IndexRuleStateEntry struct {
 	Key      string
 	Resource string
-	Export   bool
+	Export   *bool
 }
 
 const (
-	INDEX_LOGGER string = "renderer[index]"
+	INDEX_LOGGER string = "server[index]"
 )
 
 // CreateIndexRenderer creates a new index renderer
@@ -249,7 +249,7 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 			serverStateResource.Set("response", string(response))
 			serverState.Set(stateKey, serverStateResource)
 
-			if entry.Export {
+			if entry.Export != nil && *entry.Export {
 				clientState[stateKey] = string(response)
 			}
 		}

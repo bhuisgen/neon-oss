@@ -32,7 +32,7 @@ type DefaultRendererConfig struct {
 }
 
 const (
-	DEFAULT_LOGGER string = "renderer[default]"
+	DEFAULT_LOGGER string = "server[default]"
 )
 
 // CreateDefaultRenderer creates a new default renderer

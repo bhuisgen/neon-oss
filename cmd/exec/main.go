@@ -7,24 +7,23 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
-
-	"github.com/bhuisgen/neon/internal/app"
 )
 
 type command interface {
 	Name() string
 	Description() string
 	Init(args []string) error
-	Execute(config *app.Config) error
+	Execute() error
 }
 
 // main is the entrypoint
 func main() {
 	commands := []command{
+		NewInitCommand(),
 		NewCheckCommand(),
 		NewServeCommand(),
+		NewTestCommand(),
 	}
 
 	var showVersion bool
@@ -62,21 +61,16 @@ func main() {
 		flag.Usage()
 	}
 
-	config, err := app.LoadConfig()
-	if err != nil {
-		log.Fatal(fmt.Errorf("failed to load config: %w", err))
-	}
-
 	for _, c := range commands {
 		if c.Name() == args[0] {
 			err := c.Init(args[1:])
 			if err != nil {
-				log.Fatal(fmt.Errorf("failed to init command: %w", err))
+				os.Exit(1)
 			}
 
-			err = c.Execute(config)
+			err = c.Execute()
 			if err != nil {
-				log.Fatal(fmt.Errorf("failed to execute command: %w", err))
+				os.Exit(1)
 			}
 
 			os.Exit(0)

@@ -13,7 +13,7 @@ import (
 
 type LoggingConfig struct {
 	Log     bool
-	LogFile string
+	LogFile *string
 }
 
 // Logging is a middleware who log all incoming requests
@@ -24,8 +24,8 @@ func Logging(config *LoggingConfig, next http.Handler) http.Handler {
 
 	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lmsgprefix)
 
-	if config.LogFile != "" {
-		f, err := os.OpenFile(config.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if config.LogFile != nil {
+		f, err := os.OpenFile(*config.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatal(err)
 		}

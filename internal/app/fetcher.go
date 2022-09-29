@@ -31,9 +31,9 @@ type fetcher struct {
 
 // FetcherConfig implements the resources fetcher configuration
 type FetcherConfig struct {
-	RequestTLSCAFile   string
-	RequestTLSCertFile string
-	RequestTLSKeyFile  string
+	RequestTLSCAFile   *string
+	RequestTLSCertFile *string
+	RequestTLSKeyFile  *string
 	RequestHeaders     map[string]string
 	RequestTimeout     int
 	RequestRetry       int
@@ -72,8 +72,8 @@ func NewFetcher(config *FetcherConfig) *fetcher {
 		MinVersion: tls.VersionTLS12,
 	}
 
-	if config.RequestTLSCAFile != "" {
-		ca, err := os.ReadFile(config.RequestTLSCAFile)
+	if config.RequestTLSCAFile != nil {
+		ca, err := os.ReadFile(*config.RequestTLSCAFile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -85,8 +85,8 @@ func NewFetcher(config *FetcherConfig) *fetcher {
 
 		tlsConfig.RootCAs = caCertPool
 
-		if config.RequestTLSCertFile != "" && config.RequestTLSKeyFile != "" {
-			clientCert, err := tls.LoadX509KeyPair(config.RequestTLSCertFile, config.RequestTLSKeyFile)
+		if config.RequestTLSCertFile != nil && config.RequestTLSKeyFile != nil {
+			clientCert, err := tls.LoadX509KeyPair(*config.RequestTLSCertFile, *config.RequestTLSKeyFile)
 			if err != nil {
 				log.Fatal(err)
 			}

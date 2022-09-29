@@ -32,7 +32,7 @@ type StaticRendererConfig struct {
 }
 
 const (
-	STATIC_LOGGER string = "renderer[static]"
+	STATIC_LOGGER string = "server[static]"
 )
 
 // CreateStaticRenderer creates a new static renderer

@@ -7,7 +7,7 @@ TAG ?= dev
 
 all: build
 
-build: clean init
+build: init
 	docker build --build-arg BUILD_OS=linux --build-arg BUILD_ARCH=amd64 --build-arg TAG=$(TAG) \
 		--build-arg BUILD_DATE=$(DATE) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg GIT_URL=$(GIT_URL) \
 		-t neon:$(TAG) .

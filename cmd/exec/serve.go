@@ -17,12 +17,13 @@ import (
 	"github.com/bhuisgen/neon/internal/app"
 )
 
+// serveCommand implements the serve command
 type serveCommand struct {
 	flagset *flag.FlagSet
 	verbose bool
 }
 
-// NewCheckCommand creates the command
+// NewServeCommand creates the command
 func NewServeCommand() *serveCommand {
 	c := serveCommand{}
 	c.flagset = flag.NewFlagSet("serve", flag.ExitOnError)
@@ -54,7 +55,21 @@ func (c *serveCommand) Init(args []string) error {
 }
 
 // Execute executes the command
-func (c *serveCommand) Execute(config *app.Config) error {
+func (c *serveCommand) Execute() error {
+	config, err := app.LoadConfig()
+	if err != nil {
+		fmt.Printf("Failed to load configuration: %s\n", err)
+
+		return err
+	}
+
+	_, err = app.TestConfig(config)
+	if err != nil {
+		fmt.Printf("Failed to validate configuration: %s\n", err)
+
+		return err
+	}
+
 	var servers []*app.Server
 
 	fetcher := app.NewFetcher(config.Fetcher)
@@ -66,6 +81,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 		if configServer.Rewrite.Enable {
 			rewrite, err := app.CreateRewriteRenderer(&configServer.Rewrite)
 			if err != nil {
+				fmt.Printf("Failed to create server: %s\n", err)
 				return err
 			}
 			renderers = append(renderers, rewrite)
@@ -74,14 +90,17 @@ func (c *serveCommand) Execute(config *app.Config) error {
 		if configServer.Header.Enable {
 			header, err := app.CreateHeaderRenderer(&configServer.Header)
 			if err != nil {
+				fmt.Printf("Failed to create server: %s\n", err)
 				return err
 			}
+
 			renderers = append(renderers, header)
 		}
 
 		if configServer.Static.Enable {
 			static, err := app.CreateStaticRenderer(&configServer.Static)
 			if err != nil {
+				fmt.Printf("Failed to create server: %s\n", err)
 				return err
 			}
 			renderers = append(renderers, static)
@@ -90,6 +109,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 		if configServer.Robots.Enable {
 			robots, err := app.CreateRobotsRenderer(&configServer.Robots, loader)
 			if err != nil {
+				fmt.Printf("Failed to create server: %s\n", err)
 				return err
 			}
 			renderers = append(renderers, robots)
@@ -98,6 +118,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 		if configServer.Sitemap.Enable {
 			sitemap, err := app.CreateSitemapRenderer(&configServer.Sitemap, fetcher)
 			if err != nil {
+				fmt.Printf("Failed to create server: %s\n", err)
 				return err
 			}
 			renderers = append(renderers, sitemap)
@@ -106,6 +127,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 		if configServer.Index.Enable {
 			index, err := app.CreateIndexRenderer(&configServer.Index, fetcher)
 			if err != nil {
+				fmt.Printf("Failed to create index renderer: %s\n", err)
 				return err
 			}
 			renderers = append(renderers, index)
@@ -114,6 +136,7 @@ func (c *serveCommand) Execute(config *app.Config) error {
 		if configServer.Default.Enable {
 			d, err := app.CreateDefaultRenderer(&configServer.Default)
 			if err != nil {
+				fmt.Printf("Failed to create default renderer: %s\n", err)
 				return err
 			}
 			renderers = append(renderers, d)
@@ -121,12 +144,14 @@ func (c *serveCommand) Execute(config *app.Config) error {
 
 		e, err := app.CreateErrorRenderer(&app.ErrorRendererConfig{})
 		if err != nil {
+			fmt.Printf("Failed to create error renderer: %s\n", err)
 			return err
 		}
 		renderers = append(renderers, e)
 
 		server, err := app.CreateServer(configServer, renderers...)
 		if err != nil {
+			fmt.Printf("Failed to create server: %s\n", err)
 			return err
 		}
 

@@ -30,13 +30,15 @@ type HeaderRendererConfig struct {
 
 // HeaderRule implements a header rule
 type HeaderRule struct {
-	Path string
-	Add  map[string]string
-	Last bool
+	Path   string
+	Set    map[string]string
+	Add    map[string]string
+	Remove []string
+	Last   bool
 }
 
 const (
-	HEADER_LOGGER string = "renderer[header]"
+	HEADER_LOGGER string = "server[header]"
 )
 
 // CreateHeaderRenderer creates a new header renderer
@@ -64,12 +66,15 @@ func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error)
 func (r *headerRenderer) handle(w http.ResponseWriter, req *http.Request) {
 	for index, regexp := range r.regexps {
 		if regexp.MatchString(req.URL.Path) {
-			for k, v := range r.config.Rules[index].Add {
-				if w.Header().Get(k) == "" {
-					w.Header().Add(k, v)
-				}
+			for k, v := range r.config.Rules[index].Set {
+				w.Header().Set(k, v)
 			}
-
+			for k, v := range r.config.Rules[index].Add {
+				w.Header().Add(k, v)
+			}
+			for _, k := range r.config.Rules[index].Remove {
+				w.Header().Del(k)
+			}
 			if r.config.Rules[index].Last {
 				break
 			}

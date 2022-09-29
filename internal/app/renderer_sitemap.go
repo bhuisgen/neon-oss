@@ -68,7 +68,7 @@ type SitemapEntryStatic struct {
 	Loc        string
 	Lastmod    *string
 	Changefreq *string
-	Priority   *string
+	Priority   *float32
 }
 
 // SitemapEntryList implements a sitemap entry list
@@ -78,16 +78,23 @@ type SitemapEntryList struct {
 	ResourcePayloadItemLoc     string
 	ResourcePayloadItemLastmod *string
 	Changefreq                 *string
-	Priority                   *string
+	Priority                   *float32
 }
 
 const (
-	SITEMAP_LOGGER                         string = "renderer[sitemap]"
+	SITEMAP_LOGGER                         string = "server[sitemap]"
 	SITEMAP_KIND_SITEMAP                   string = "sitemap"
-	SITEMAP_KIND_SITEMAPINDEX              string = "sitemapindex"
+	SITEMAP_KIND_SITEMAPINDEX              string = "sitemap_index"
 	SITEMAP_ENTRY_SITEMAPINDEX_TYPE_STATIC string = "static"
 	SITEMAP_ENTRY_SITEMAP_TYPE_STATIC      string = "static"
 	SITEMAP_ENTRY_SITEMAP_TYPE_LIST        string = "list"
+	SITEMAP_CHANGEFREQ_ALWAYS              string = "always"
+	SITEMAP_CHANGEFREQ_HOURLY              string = "hourly"
+	SITEMAP_CHANGEFREQ_DAILY               string = "daily"
+	SITEMAP_CHANGEFREQ_WEEKLY              string = "weekly"
+	SITEMAP_CHANGEFREQ_MONTHLY             string = "monthly"
+	SITEMAP_CHANGEFREQ_YEARLY              string = "yearly"
+	SITEMAP_CHANGEFREQ_NEVER               string = "never"
 )
 
 // CreateSitemapRenderer creates a new sitemap renderer
@@ -264,7 +271,7 @@ func sitemapStatic(static *SitemapEntryStatic, r *sitemapRenderer, req *http.Req
 		buf.WriteString(fmt.Sprintf("<changefreq>%s</changefreq>\n", *static.Changefreq))
 	}
 	if static.Priority != nil {
-		buf.WriteString(fmt.Sprintf("<priority>%s</priority>\n", *static.Priority))
+		buf.WriteString(fmt.Sprintf("<priority>%.1f</priority>\n", *static.Priority))
 	}
 	buf.WriteString("</url>\n")
 
@@ -311,7 +318,7 @@ func sitemapList(list *SitemapEntryList, r *sitemapRenderer, req *http.Request,
 			buf.WriteString(fmt.Sprintf("<changefreq>%s</changefreq>\n", *list.Changefreq))
 		}
 		if list.Priority != nil {
-			buf.WriteString(fmt.Sprintf("<priority>%s</priority>\n", *list.Priority))
+			buf.WriteString(fmt.Sprintf("<priority>%.1f</priority>\n", *list.Priority))
 		}
 		buf.WriteString("</url>\n")
 	}

@@ -32,13 +32,13 @@ type ServerConfig struct {
 	ListenAddr    string
 	ListenPort    int
 	TLS           bool
-	TLSCAFile     string
-	TLSCertFile   string
-	TLSKeyFile    string
+	TLSCAFile     *string
+	TLSCertFile   *string
+	TLSKeyFile    *string
 	ReadTimeout   int
 	WriteTimeout  int
 	AccessLog     bool
-	AccessLogFile string
+	AccessLogFile *string
 	Rewrite       RewriteRendererConfig
 	Header        HeaderRendererConfig
 	Static        StaticRendererConfig
@@ -90,19 +90,24 @@ func CreateServer(config *ServerConfig, renderers ...Renderer) (*Server, error) 
 	}
 
 	if config.TLS {
-		ca, err := os.ReadFile(config.TLSCAFile)
-		if err != nil {
-			return nil, err
-		}
-
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(ca)
-
-		server.httpServer.TLSConfig = &tls.Config{
-			ClientCAs:  caCertPool,
+		tlsConfig := &tls.Config{
 			ClientAuth: tls.RequireAndVerifyClientCert,
 			MinVersion: tls.VersionTLS12,
 		}
+
+		if config.TLSCAFile != nil {
+			ca, err := os.ReadFile(*config.TLSCAFile)
+			if err != nil {
+				return nil, err
+			}
+
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(ca)
+
+			tlsConfig.ClientCAs = caCertPool
+		}
+
+		server.httpServer.TLSConfig = tlsConfig
 	}
 
 	return &server, nil
@@ -114,7 +119,7 @@ func (s *Server) Start() {
 		if s.config.TLS {
 			s.logger.Printf("Listening at https://%s", s.httpServer.Addr)
 
-			err := s.httpServer.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
+			err := s.httpServer.ListenAndServeTLS(*s.config.TLSCertFile, *s.config.TLSKeyFile)
 			if err != nil && err != http.ErrServerClosed {
 				log.Fatal(err)
 			}

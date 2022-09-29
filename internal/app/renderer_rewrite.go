@@ -33,12 +33,12 @@ type RewriteRendererConfig struct {
 type RewriteRule struct {
 	Path        string
 	Replacement string
-	Flag        string
+	Flag        *string
 	Last        bool
 }
 
 const (
-	REWRITE_LOGGER              string = "renderer[rewrite]"
+	REWRITE_LOGGER              string = "server[rewrite]"
 	REWRITE_RULE_FLAG_REDIRECT  string = "redirect"
 	REWRITE_RULE_FLAG_PERMANENT string = "permanent"
 )
@@ -71,17 +71,19 @@ func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request) {
 			stop := false
 			status := http.StatusFound
 
-			switch r.config.Rules[index].Flag {
-			case REWRITE_RULE_FLAG_REDIRECT:
-				stop = true
-				status = http.StatusFound
-			case REWRITE_RULE_FLAG_PERMANENT:
-				stop = true
-				status = http.StatusMovedPermanently
-			}
-			if strings.HasPrefix(r.config.Rules[index].Replacement, "http://") ||
-				strings.HasPrefix(r.config.Rules[index].Replacement, "https://") {
-				stop = true
+			if r.config.Rules[index].Flag != nil {
+				switch *r.config.Rules[index].Flag {
+				case REWRITE_RULE_FLAG_REDIRECT:
+					stop = true
+					status = http.StatusFound
+				case REWRITE_RULE_FLAG_PERMANENT:
+					stop = true
+					status = http.StatusMovedPermanently
+				}
+				if strings.HasPrefix(r.config.Rules[index].Replacement, "http://") ||
+					strings.HasPrefix(r.config.Rules[index].Replacement, "https://") {
+					stop = true
+				}
 			}
 
 			if stop {
