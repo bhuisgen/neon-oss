@@ -11,18 +11,19 @@
   </div>
 </main>
 `;
+  server.render(root, 200);
   server.setTitle("Neon");
   server.setMeta("name", { "itemprop": "name", "content": "Neon" });
   server.setMeta("description", { "name": "description", "content": "Neon Status App" });
   server.setMeta("copyright", { "name": "copyright", "content": "Boris HUISGEN" });
   server.setMeta("generator", { "name": "generator", "content": `neon (engine='server', date='${new Date().toUTCString()}')` });
-  server.setLink("canonical", { "rel": "canonical", "href": `http://localhost:8080/` });
+  server.setLink("canonical", { "rel": "canonical", "href": `http://localhost:8080${server.url()}` });
   server.setScript("schema-json-ld", {
     "type": "application/ld+json",
     "children": JSON.stringify({
       "@context": "http://schema.org",
       "@type": "WebSite",
-      url: "http://localhost:8080/",
+      url: `http://localhost:8080${server.url()}`,
       name: "Neon",
       inLanguage: "en-us",
       description: "Neon Status App",
@@ -34,5 +35,4 @@
       }
     })
   });
-  server.render(root, 200);
 })();

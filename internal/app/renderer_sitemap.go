@@ -82,24 +82,24 @@ type SitemapEntryList struct {
 }
 
 const (
-	SITEMAP_LOGGER                         string = "server[sitemap]"
-	SITEMAP_KIND_SITEMAP                   string = "sitemap"
-	SITEMAP_KIND_SITEMAPINDEX              string = "sitemap_index"
-	SITEMAP_ENTRY_SITEMAPINDEX_TYPE_STATIC string = "static"
-	SITEMAP_ENTRY_SITEMAP_TYPE_STATIC      string = "static"
-	SITEMAP_ENTRY_SITEMAP_TYPE_LIST        string = "list"
-	SITEMAP_CHANGEFREQ_ALWAYS              string = "always"
-	SITEMAP_CHANGEFREQ_HOURLY              string = "hourly"
-	SITEMAP_CHANGEFREQ_DAILY               string = "daily"
-	SITEMAP_CHANGEFREQ_WEEKLY              string = "weekly"
-	SITEMAP_CHANGEFREQ_MONTHLY             string = "monthly"
-	SITEMAP_CHANGEFREQ_YEARLY              string = "yearly"
-	SITEMAP_CHANGEFREQ_NEVER               string = "never"
+	sitemapLogger                      string = "server[sitemap]"
+	sitemapKindSitemapIndex            string = "sitemap_index"
+	sitemapKindSitemap                 string = "sitemap"
+	sitemapEntrySitemapIndexTypeStatic string = "static"
+	sitemapEntrySitemapTypeStatic      string = "static"
+	sitemapEntrySitemapTypeList        string = "list"
+	sitemapChangefreqAlways            string = "always"
+	sitemapChangefreqHourly            string = "hourly"
+	sitemapChangefreqDaily             string = "daily"
+	sitemapChangefreqWeekly            string = "weekly"
+	sitemapChangefreqMonthly           string = "monthly"
+	sitemapChangefreqYearly            string = "yearly"
+	sitemapChangefreqNever             string = "never"
 )
 
 // CreateSitemapRenderer creates a new sitemap renderer
 func CreateSitemapRenderer(config *SitemapRendererConfig, fetcher *fetcher) (*sitemapRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(SITEMAP_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(sitemapLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &sitemapRenderer{
 		config:  config,
@@ -164,9 +164,9 @@ func (r *sitemapRenderer) render(routeIndex int, req *http.Request) (*Render, er
 	var state bool
 	var err error
 	switch r.config.Routes[routeIndex].Kind {
-	case SITEMAP_KIND_SITEMAPINDEX:
+	case sitemapKindSitemapIndex:
 		body, state, err = sitemapIndex(&r.config.Routes[routeIndex].SitemapIndex, r, req)
-	case SITEMAP_KIND_SITEMAP:
+	case sitemapKindSitemap:
 		body, state, err = sitemap(&r.config.Routes[routeIndex].Sitemap, r, req)
 	}
 
@@ -206,7 +206,7 @@ func sitemapIndex(s *[]SitemapIndexEntry, r *sitemapRenderer, req *http.Request)
 	var err error
 	for _, item := range *s {
 		switch item.Type {
-		case SITEMAP_ENTRY_SITEMAPINDEX_TYPE_STATIC:
+		case sitemapEntrySitemapIndexTypeStatic:
 			state, err = sitemapIndexStatic(&item.Static, r, req, body)
 		}
 	}
@@ -244,9 +244,9 @@ func sitemap(s *[]SitemapEntry, r *sitemapRenderer, req *http.Request) ([]byte, 
 	var err error
 	for _, item := range *s {
 		switch item.Type {
-		case SITEMAP_ENTRY_SITEMAP_TYPE_STATIC:
+		case sitemapEntrySitemapTypeStatic:
 			state, err = sitemapStatic(&item.Static, r, req, body)
-		case SITEMAP_ENTRY_SITEMAP_TYPE_LIST:
+		case sitemapEntrySitemapTypeList:
 			state, err = sitemapList(&item.List, r, req, body)
 		}
 		if err != nil || !state {

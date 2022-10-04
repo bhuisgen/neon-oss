@@ -25,12 +25,12 @@ type ErrorRendererConfig struct {
 }
 
 const (
-	ERROR_LOGGER string = "server[error]"
+	errorLogger string = "server[error]"
 )
 
 // CreateErrorRenderer creates a new error renderer
 func CreateErrorRenderer(config *ErrorRendererConfig) (*errorRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(ERROR_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(errorLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &errorRenderer{
 		config: config,

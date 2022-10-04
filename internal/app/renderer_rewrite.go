@@ -38,14 +38,14 @@ type RewriteRule struct {
 }
 
 const (
-	REWRITE_LOGGER              string = "server[rewrite]"
-	REWRITE_RULE_FLAG_REDIRECT  string = "redirect"
-	REWRITE_RULE_FLAG_PERMANENT string = "permanent"
+	rewriteLogger              string = "server[rewrite]"
+	rewriteRuleFlagRedirect  string = "redirect"
+	rewriteRuleFlagPermanent string = "permanent"
 )
 
 // CreateRewriteRenderer creates a new rewrite renderer
 func CreateRewriteRenderer(config *RewriteRendererConfig) (*rewriteRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(REWRITE_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(rewriteLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	regexps := []*regexp.Regexp{}
 	for _, rule := range config.Rules {
@@ -73,10 +73,10 @@ func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request) {
 
 			if r.config.Rules[index].Flag != nil {
 				switch *r.config.Rules[index].Flag {
-				case REWRITE_RULE_FLAG_REDIRECT:
+				case rewriteRuleFlagRedirect:
 					stop = true
 					status = http.StatusFound
-				case REWRITE_RULE_FLAG_PERMANENT:
+				case rewriteRuleFlagPermanent:
 					stop = true
 					status = http.StatusMovedPermanently
 				}

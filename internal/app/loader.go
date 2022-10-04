@@ -65,15 +65,15 @@ type LoaderRuleList struct {
 }
 
 const (
-	LOADER_LOGGER      string = "loader"
-	LOADER_TYPE_STATIC string = "static"
-	LOADER_TYPE_SINGLE string = "single"
-	LOADER_TYPE_LIST   string = "list"
+	loaderLogger     string = "loader"
+	loaderTypeStatic string = "static"
+	loaderTypeSingle string = "single"
+	loaderTypeList   string = "list"
 )
 
 // NewLoader creates a new loader
 func NewLoader(config *LoaderConfig, fetcher *fetcher) *loader {
-	logger := log.New(os.Stdout, fmt.Sprint(LOADER_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(loaderLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &loader{
 		config:  config,
@@ -110,11 +110,11 @@ func (l *loader) execute() {
 				rule := l.config.Rules[ruleIndex]
 				var err error
 				switch rule.Type {
-				case LOADER_TYPE_STATIC:
+				case loaderTypeStatic:
 					err = l.loadStatic(ctx, &rule.Static)
-				case LOADER_TYPE_SINGLE:
+				case loaderTypeSingle:
 					err = l.loadSingle(ctx, &rule.Single)
-				case LOADER_TYPE_LIST:
+				case loaderTypeList:
 					err = l.loadList(ctx, &rule.List)
 				}
 

@@ -32,12 +32,12 @@ type DefaultRendererConfig struct {
 }
 
 const (
-	DEFAULT_LOGGER string = "server[default]"
+	defaultLogger string = "server[default]"
 )
 
 // CreateDefaultRenderer creates a new default renderer
 func CreateDefaultRenderer(config *DefaultRendererConfig) (*defaultRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(DEFAULT_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(defaultLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &defaultRenderer{
 		config: config,

@@ -13,8 +13,6 @@ import (
 	"os"
 	"regexp"
 	"time"
-
-	"rogchap.com/v8go"
 )
 
 // indexRenderer implements the index renderer
@@ -58,13 +56,24 @@ type IndexRuleStateEntry struct {
 	Export   *bool
 }
 
+// indexPage implements a page
+type indexPage struct {
+	HTML    *[]byte
+	Render  *[]byte
+	Title   *string
+	Metas   map[string]map[string]string
+	Links   map[string]map[string]string
+	Scripts map[string]map[string]string
+	State   *string
+}
+
 const (
-	INDEX_LOGGER string = "server[index]"
+	indexLogger string = "server[index]"
 )
 
 // CreateIndexRenderer creates a new index renderer
 func CreateIndexRenderer(config *IndexRendererConfig, fetcher *fetcher) (*indexRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(INDEX_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(indexLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	regexps := []*regexp.Regexp{}
 	for _, rule := range config.Rules {
@@ -130,53 +139,11 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		}
 	}
 
-	var vm = r.vmPool.Get()
-	defer r.vmPool.Put(vm)
-
-	vm.Configure()
-
-	ctx := v8go.NewContext(vm.isolate)
-	defer ctx.Close()
-
-	global := ctx.Global()
-
-	process, err := vm.processObject.NewInstance(ctx)
-	if err != nil {
-		r.logger.Printf("Failed to create process instance: %s", err)
-
-		return nil, err
-	}
-
-	global.Set("process", process)
-
-	env, err := vm.envObject.NewInstance(ctx)
-	if err != nil {
-		r.logger.Printf("Failed to create env instance: %s", err)
-
-		return nil, err
-	}
-
-	env.Set("ENV", r.config.Env)
-	process.Set("env", env)
-
-	server, err := vm.serverObject.NewInstance(ctx)
-	if err != nil {
-		r.logger.Printf("Failed to create server instance: %s", err)
-
-		return nil, err
-	}
-
-	server.Set("url", req.URL.Path)
-
-	serverState, err := vm.serverStateObject.NewInstance(ctx)
-	if err != nil {
-		r.logger.Printf("Failed to create server state instance: %s", err)
-
-		return nil, err
-	}
-
 	var valid bool = true
-	var clientState map[string]interface{} = make(map[string]interface{})
+	var mServerState map[string]ResourceResult
+	var serverState *string
+	var mClientState map[string]ResourceResult
+	var clientState *string
 
 	for index, rule := range r.config.Rules {
 		if _, ok := os.LookupEnv("DEBUG"); ok {
@@ -194,15 +161,18 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 				index+1, req.URL.Path)
 		}
 
-		params := make(map[string]string)
-		for i, value := range m {
-			if i > 0 {
-				params[fmt.Sprint(i)] = value
+		var params map[string]string
+		if len(m) > 1 {
+			params := make(map[string]string)
+			for i, value := range m {
+				if i > 0 {
+					params[fmt.Sprint(i)] = value
+				}
 			}
-		}
-		for i, name := range r.regexps[index].SubexpNames() {
-			if i != 0 && name != "" {
-				params[name] = m[i]
+			for i, name := range r.regexps[index].SubexpNames() {
+				if i != 0 && name != "" {
+					params[name] = m[i]
+				}
 			}
 		}
 
@@ -212,6 +182,13 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		}
 
 		for _, entry := range rule.State {
+			if mServerState == nil {
+				mServerState = make(map[string]ResourceResult)
+			}
+			if mClientState == nil && entry.Export != nil && *entry.Export {
+				mClientState = make(map[string]ResourceResult)
+			}
+
 			if _, ok := os.LookupEnv("DEBUG"); ok {
 				r.logger.Printf("Index: id=%s, rule=%d, phase=state1, path=%s, state_key=%s, state_resource=%s",
 					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, entry.Key, entry.Resource)
@@ -225,33 +202,55 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, stateKey, resourceKey)
 			}
 
-			serverStateResource, err := vm.serverStateResourceObject.NewInstance(ctx)
-			if err != nil {
-				r.logger.Printf("Failed to create server state resource instance: %s", err)
-
-				return nil, err
-			}
-
+			var resourceResult ResourceResult
 			response, err := r.fetcher.Get(resourceKey)
 			if err != nil {
 				if r.fetcher.Exists(resourceKey) {
-					serverStateResource.Set("loading", true)
+					resourceResult.Loading = true
 				} else {
-					serverStateResource.Set("error", "unknown resource")
+					resourceResult.Error = "unknown resource"
 				}
-				serverState.Set(stateKey, serverStateResource)
+
+				mServerState[stateKey] = resourceResult
+				if entry.Export != nil && *entry.Export {
+					mClientState[stateKey] = resourceResult
+				}
 
 				valid = false
 
 				continue
 			}
 
-			serverStateResource.Set("response", string(response))
-			serverState.Set(stateKey, serverStateResource)
+			resourceResult.Response = string(response)
 
+			mServerState[stateKey] = resourceResult
 			if entry.Export != nil && *entry.Export {
-				clientState[stateKey] = string(response)
+				mClientState[stateKey] = resourceResult
 			}
+		}
+
+		if mServerState != nil {
+			buf, err := json.Marshal(mServerState)
+			if err != nil {
+				r.logger.Printf("Failed to marshal server state: %s", err)
+
+				return nil, err
+			}
+
+			s := string(buf)
+			serverState = &s
+		}
+
+		if mClientState != nil {
+			buf, err := json.Marshal(mClientState)
+			if err != nil {
+				r.logger.Printf("Failed to marshal client state: %s", err)
+
+				return nil, err
+			}
+
+			s := string(buf)
+			clientState = &s
 		}
 
 		if r.config.Rules[index].Last {
@@ -264,71 +263,75 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		}
 	}
 
-	server.Set("state", serverState)
-	global.Set("server", server)
-
 	if _, ok := os.LookupEnv("DEBUG"); ok {
-		c, _ := json.Marshal(clientState)
-		r.logger.Printf("Index: id=%s, path=%s, client_state=%s", req.Context().Value(ContextKeyID{}).(string),
-			req.URL.Path, c)
+		if serverState != nil {
+			r.logger.Printf("Index: id=%s, path=%s, server_state=%s", req.Context().Value(ContextKeyID{}).(string),
+				req.URL.Path, *serverState)
+		}
+		if clientState != nil {
+			r.logger.Printf("Index: id=%s, path=%s, client_state=%s", req.Context().Value(ContextKeyID{}).(string),
+				req.URL.Path, *clientState)
+		}
 	}
 
+	var bundle string
 	buf, err := os.ReadFile(r.config.Bundle)
 	if err != nil {
 		r.logger.Printf("Failed to read bundle file '%s': %s", r.config.Bundle, err)
 
 		return nil, err
 	}
-	bundle := string(buf)
+	bundle = string(buf)
 
-	worker := func(values chan<- *v8go.Value, errors chan<- error) {
-		value, err := ctx.RunScript(bundle, r.config.Bundle)
-		if err != nil {
-			errors <- err
-			return
-		}
-		values <- value
+	var vm = r.vmPool.Get()
+	defer r.vmPool.Put(vm)
+	vm.Reset()
+
+	err = vm.Configure(r.config.Env, req, serverState)
+	if err != nil {
+		r.logger.Printf("Failed to configure VM: %s", err)
 	}
 
-	values := make(chan *v8go.Value, 1)
-	errors := make(chan error, 1)
+	vmResult, err := vm.Execute(r.config.Bundle, bundle, r.config.Timeout)
+	if err != nil {
+		r.logger.Printf("Failed to execute VM: %s", err)
 
-	go worker(values, errors)
-	select {
-	case <-values:
-
-	case err := <-errors:
-		r.logger.Printf("Failed to execute bundle: %s", err)
-		if _, ok := os.LookupEnv("DEBUG"); ok {
-			e := err.(*v8go.JSError)
-			r.logger.Printf(e.Message)
-			r.logger.Printf(e.Location)
-			r.logger.Printf(e.StackTrace)
-		}
-		return nil, err
-
-	case <-time.After(time.Duration(r.config.Timeout) * time.Second):
-		vm.isolate.TerminateExecution()
-		err := <-errors
 		return nil, err
 	}
 
-	if *vm.redirect {
+	if vmResult.Redirect {
 		return &Render{
 			Redirect:       true,
-			RedirectTarget: *vm.redirectURL,
-			RedirectStatus: *vm.redirectStatus,
+			RedirectTarget: vmResult.RedirectURL,
+			RedirectStatus: vmResult.RedirectStatus,
 		}, nil
 	}
 
-	body, err := indexBody(r, *vm.render, *vm.title, vm.metas, vm.links, vm.scripts, clientState)
+	html, err := os.ReadFile(r.config.HTML)
 	if err != nil {
-		r.logger.Printf("Failed to generate body: %s", err)
+		r.logger.Printf("Failed to read HTML file '%s': %s", r.config.Bundle, err)
 
 		return nil, err
 	}
 
-	var status int = *vm.status
+	page := indexPage{
+		HTML:    &html,
+		Render:  &vmResult.Render,
+		Title:   &vmResult.Title,
+		Metas:   vmResult.Metas,
+		Links:   vmResult.Links,
+		Scripts: vmResult.Scripts,
+		State:   clientState,
+	}
+
+	body, err := index(&page, r, req)
+	if err != nil {
+		r.logger.Printf("Failed to generate index: %s", err)
+
+		return nil, err
+	}
+
+	var status int = vmResult.Status
 	if !valid {
 		status = http.StatusServiceUnavailable
 	}
@@ -346,25 +349,20 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 	return &result, nil
 }
 
-// indexBody generates the final HTML body
-func indexBody(r *indexRenderer, render []byte, title string, metas map[string]map[string]string,
-	links map[string]map[string]string, scripts map[string]map[string]string,
-	state map[string]interface{}) ([]byte, error) {
+// index generates the final HTML body
+func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error) {
 	var body []byte
-	html, err := os.ReadFile(r.config.HTML)
-	if err != nil {
-		return nil, err
-	}
-	body = html
 
-	if title != "" {
+	body = *page.HTML
+
+	if page.Title != nil && *page.Title != "" {
 		body = bytes.Replace(body,
 			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<title>%s</title></head>", title)),
+			[]byte(fmt.Sprintf("<title>%s</title></head>", *page.Title)),
 			1)
 	}
 
-	for id, attributes := range metas {
+	for id, attributes := range page.Metas {
 		var buf = bufferPool.Get().(*bytes.Buffer)
 		defer bufferPool.Put(buf)
 		buf.Reset()
@@ -378,7 +376,7 @@ func indexBody(r *indexRenderer, render []byte, title string, metas map[string]m
 			1)
 	}
 
-	for id, attributes := range links {
+	for id, attributes := range page.Links {
 		var buf = bufferPool.Get().(*bytes.Buffer)
 		defer bufferPool.Put(buf)
 		buf.Reset()
@@ -392,7 +390,7 @@ func indexBody(r *indexRenderer, render []byte, title string, metas map[string]m
 			1)
 	}
 
-	for id, attributes := range scripts {
+	for id, attributes := range page.Scripts {
 		var buf = bufferPool.Get().(*bytes.Buffer)
 		defer bufferPool.Put(buf)
 		buf.Reset()
@@ -412,17 +410,13 @@ func indexBody(r *indexRenderer, render []byte, title string, metas map[string]m
 
 	body = bytes.Replace(body,
 		[]byte(fmt.Sprintf("<div id=\"%s\"></div>", r.config.Container)),
-		[]byte(fmt.Sprintf("<div id=\"%s\">%s</div>", r.config.Container, render)),
+		[]byte(fmt.Sprintf("<div id=\"%s\">%s</div>", r.config.Container, *page.Render)),
 		1)
 
-	if len(state) > 0 {
-		buf, err := json.Marshal(state)
-		if err != nil {
-			return nil, err
-		}
+	if page.State != nil {
 		body = bytes.Replace(body,
 			[]byte("</body>"),
-			[]byte(fmt.Sprintf("<script id=\"%s\" type=\"application/json\">%s</script></body>", r.config.State, buf)),
+			[]byte(fmt.Sprintf("<script id=\"%s\" type=\"application/json\">%s</script></body>", r.config.State, *page.State)),
 			1)
 	}
 

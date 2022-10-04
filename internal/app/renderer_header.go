@@ -38,12 +38,12 @@ type HeaderRule struct {
 }
 
 const (
-	HEADER_LOGGER string = "server[header]"
+	headerLogger string = "server[header]"
 )
 
 // CreateHeaderRenderer creates a new header renderer
 func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(HEADER_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(headerLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	regexps := []*regexp.Regexp{}
 	for _, rule := range config.Rules {

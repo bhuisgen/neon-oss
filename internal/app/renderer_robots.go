@@ -32,12 +32,12 @@ type RobotsRendererConfig struct {
 }
 
 const (
-	ROBOTS_LOGGER string = "server[robots]"
+	robotsLogger string = "server[robots]"
 )
 
 // CreateRobotsRenderer creates a new robots renderer
 func CreateRobotsRenderer(config *RobotsRendererConfig, loader *loader) (*robotsRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(ROBOTS_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(robotsLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &robotsRenderer{
 		config: config,

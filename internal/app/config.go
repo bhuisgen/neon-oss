@@ -200,50 +200,50 @@ type yamlConfigLoader struct {
 }
 
 const (
-	CONFIG_FILE                              string = "config.yaml"
-	CONFIG_DEFAULT_SERVER_LISTENADDR         string = "localhost"
-	CONFIG_DEFAULT_SERVER_LISTENPORT         int    = 8080
-	CONFIG_DEFAULT_SERVER_READTIMEOUT        int    = 60
-	CONFIG_DEFAULT_SERVER_WRITETIMEOUT       int    = 60
-	CONFIG_DEFAULT_SERVER_ACCESSLOG          bool   = false
-	CONFIG_DEFAULT_SERVER_REWRITE_ENABLE     bool   = false
-	CONFIG_DEFAULT_SERVER_REWRITE_RULE_LAST  bool   = false
-	CONFIG_DEFAULT_SERVER_HEADER_ENABLE      bool   = false
-	CONFIG_DEFAULT_SERVER_HEADER_RULE_LAST   bool   = false
-	CONFIG_DEFAULT_SERVER_STATIC_ENABLE      bool   = false
-	CONFIG_DEFAULT_SERVER_STATIC_INDEX       bool   = false
-	CONFIG_DEFAULT_SERVER_ROBOTS_ENABLE      bool   = false
-	CONFIG_DEFAULT_SERVER_ROBOTS_PATH        string = "/robots.txt"
-	CONFIG_DEFAULT_SERVER_ROBOTS_CACHE       bool   = false
-	CONFIG_DEFAULT_SERVER_ROBOTS_CACHETTL    int    = 60
-	CONFIG_DEFAULT_SERVER_SITEMAP_ENABLE     bool   = false
-	CONFIG_DEFAULT_SERVER_SITEMAP_CACHE      bool   = false
-	CONFIG_DEFAULT_SERVER_SITEMAP_CACHETTL   int    = 60
-	CONFIG_DEFAULT_SERVER_INDEX_ENABLE       bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_ENV          string = "production"
-	CONFIG_DEFAULT_SERVER_INDEX_CONTAINER    string = "root"
-	CONFIG_DEFAULT_SERVER_INDEX_STATE        string = "state"
-	CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT      int    = 4
-	CONFIG_DEFAULT_SERVER_INDEX_CACHE        bool   = false
-	CONFIG_DEFAULT_SERVER_INDEX_CACHETTL     int    = 60
-	CONFIG_DEFAULT_SERVER_DEFAULT_ENABLE     bool   = false
-	CONFIG_DEFAULT_SERVER_DEFAULT_STATUSCODE int    = 200
-	CONFIG_DEFAULT_SERVER_DEFAULT_CACHE      bool   = false
-	CONFIG_DEFAULT_SERVER_DEFAULT_CACHETTL   int    = 60
-	CONFIG_DEFAULT_SERVER_INDEX_RULE_LAST    bool   = false
-	CONFIG_DEFAULT_FETCHER_REQUESTTIMEOUT    int    = 60
-	CONFIG_DEFAULT_FETCHER_REQUESTRETRY      int    = 3
-	CONFIG_DEFAULT_FETCHER_REQUESTDELAY      int    = 1
-	CONFIG_DEFAULT_LOADER_EXECSTARTUP        int    = 15
-	CONFIG_DEFAULT_LOADER_EXECINTERVAL       int    = 900
-	CONFIG_DEFAULT_LOADER_EXECWORKERS        int    = 1
+	configFile                           string = "config.yaml"
+	configDefaultServerListenAddr        string = "localhost"
+	configDefaultServerListenPort        int    = 8080
+	configDefaultServerReadTimeout       int    = 60
+	configDefaultServerWriteTimeout      int    = 60
+	configDefaultServerAccessLog         bool   = false
+	configDefaultServerRewriteEnable     bool   = false
+	configDefaultServerRewriteRuleLast   bool   = false
+	configDefaultServerHeaderEnable      bool   = false
+	configDefaultServerHeaderRuleLast    bool   = false
+	configDefaultServerStaticEnable      bool   = false
+	configDefaultServerStaticIndex       bool   = false
+	configDefaultServerRobotsEnable      bool   = false
+	configDefaultServerRobotsPath        string = "/robots.txt"
+	configDefaultServerRobotsCache       bool   = false
+	configDefaultServerRobotsCacheTTL    int    = 60
+	configDefaultServerSitemapEnable     bool   = false
+	configDefaultServerSitemapCache      bool   = false
+	configDefaultServerSitemapCacheTTL   int    = 60
+	configDefaultServerIndexEnable       bool   = false
+	configDefaultServerIndexEnv          string = "production"
+	configDefaultServerIndexContainer    string = "root"
+	configDefaultServerIndexState        string = "state"
+	configDefaultServerIndexTimeout      int    = 4
+	configDefaultServerIndexCache        bool   = false
+	configDefaultServerIndexCacheTTL     int    = 60
+	configDefaultServerIndexRuleLast     bool   = false
+	configDefaultServerDefaultEnable     bool   = false
+	configDefaultServerDefaultStatusCode int    = 200
+	configDefaultServerDefaultCache      bool   = false
+	configDefaultServerDefaultCacheTTL   int    = 60
+	configDefaultFetcherRequestTimeout   int    = 60
+	configDefaultFetcherRequestRetry     int    = 3
+	configDefaultFetcherRequestDelay     int    = 1
+	configDefaultLoaderExecStartup       int    = 15
+	configDefaultLoaderExecInterval      int    = 900
+	configDefaultLoaderExecWorkers       int    = 1
 )
 
 // LoadConfig loads the configuration settings
 func LoadConfig() (*Config, error) {
 	file, ok := os.LookupEnv("CONFIG_FILE")
 	if !ok {
-		file = CONFIG_FILE
+		file = configFile
 	}
 
 	yamlFile, err := os.ReadFile(file)
@@ -275,7 +275,7 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 		if yamlConfigServer.ListenAddr != nil {
 			serverConfig.ListenAddr = *yamlConfigServer.ListenAddr
 		} else {
-			listenAddr := CONFIG_DEFAULT_SERVER_LISTENADDR
+			listenAddr := configDefaultServerListenAddr
 			if v, ok := os.LookupEnv("LISTEN_ADDR"); ok && index == 0 {
 				listenAddr = v
 			}
@@ -284,7 +284,7 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 		if yamlConfigServer.ListenPort != nil {
 			serverConfig.ListenPort = *yamlConfigServer.ListenPort
 		} else {
-			listenPort := CONFIG_DEFAULT_SERVER_LISTENPORT
+			listenPort := configDefaultServerListenPort
 			if v, ok := os.LookupEnv("LISTEN_PORT"); ok && index == 0 {
 				if vInt, err := strconv.ParseInt(v, 10, 0); err == nil {
 					listenPort = int(vInt)
@@ -307,17 +307,17 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 		if yamlConfigServer.ReadTimeout != nil {
 			serverConfig.ReadTimeout = *yamlConfigServer.ReadTimeout
 		} else {
-			serverConfig.ReadTimeout = CONFIG_DEFAULT_SERVER_READTIMEOUT
+			serverConfig.ReadTimeout = configDefaultServerReadTimeout
 		}
 		if yamlConfigServer.WriteTimeout != nil {
 			serverConfig.WriteTimeout = *yamlConfigServer.WriteTimeout
 		} else {
-			serverConfig.WriteTimeout = CONFIG_DEFAULT_SERVER_WRITETIMEOUT
+			serverConfig.WriteTimeout = configDefaultServerWriteTimeout
 		}
 		if yamlConfigServer.AccessLog != nil {
 			serverConfig.AccessLog = *yamlConfigServer.AccessLog
 		} else {
-			serverConfig.AccessLog = CONFIG_DEFAULT_SERVER_ACCESSLOG
+			serverConfig.AccessLog = configDefaultServerAccessLog
 		}
 		if yamlConfigServer.AccessLogFile != nil {
 			serverConfig.AccessLogFile = yamlConfigServer.AccessLogFile
@@ -326,7 +326,7 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 		if yamlConfigServer.Rewrite.Enable != nil {
 			serverConfig.Rewrite.Enable = *yamlConfigServer.Rewrite.Enable
 		} else {
-			serverConfig.Rewrite.Enable = CONFIG_DEFAULT_SERVER_REWRITE_ENABLE
+			serverConfig.Rewrite.Enable = configDefaultServerRewriteEnable
 		}
 		for _, rewriteRule := range yamlConfigServer.Rewrite.Rules {
 			rule := RewriteRule{
@@ -342,7 +342,7 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 		if yamlConfigServer.Header.Enable != nil {
 			serverConfig.Header.Enable = *yamlConfigServer.Header.Enable
 		} else {
-			serverConfig.Header.Enable = CONFIG_DEFAULT_SERVER_HEADER_ENABLE
+			serverConfig.Header.Enable = configDefaultServerHeaderEnable
 		}
 		for _, headerRule := range yamlConfigServer.Header.Rules {
 			rule := HeaderRule{
@@ -354,7 +354,7 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 			if headerRule.Last != nil {
 				rule.Last = *headerRule.Last
 			} else {
-				rule.Last = CONFIG_DEFAULT_SERVER_HEADER_RULE_LAST
+				rule.Last = configDefaultServerHeaderRuleLast
 			}
 			serverConfig.Header.Rules = append(serverConfig.Header.Rules, rule)
 		}
@@ -362,52 +362,52 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 		if yamlConfigServer.Static.Enable != nil {
 			serverConfig.Static.Enable = *yamlConfigServer.Static.Enable
 		} else {
-			serverConfig.Static.Enable = CONFIG_DEFAULT_SERVER_STATIC_ENABLE
+			serverConfig.Static.Enable = configDefaultServerStaticEnable
 		}
 		serverConfig.Static.Dir = yamlConfigServer.Static.Dir
 		if yamlConfigServer.Static.Index != nil {
 			serverConfig.Static.Index = *yamlConfigServer.Static.Index
 		} else {
-			serverConfig.Static.Index = CONFIG_DEFAULT_SERVER_STATIC_INDEX
+			serverConfig.Static.Index = configDefaultServerStaticIndex
 		}
 
 		if yamlConfigServer.Robots.Enable != nil {
 			serverConfig.Robots.Enable = *yamlConfigServer.Robots.Enable
 		} else {
-			serverConfig.Robots.Enable = CONFIG_DEFAULT_SERVER_ROBOTS_ENABLE
+			serverConfig.Robots.Enable = configDefaultServerRobotsEnable
 		}
 		if yamlConfigServer.Robots.Path != nil {
 			serverConfig.Robots.Path = *yamlConfigServer.Robots.Path
 		} else {
-			serverConfig.Robots.Path = CONFIG_DEFAULT_SERVER_ROBOTS_PATH
+			serverConfig.Robots.Path = configDefaultServerRobotsPath
 		}
 		serverConfig.Robots.Hosts = yamlConfigServer.Robots.Hosts
 		if yamlConfigServer.Robots.Cache != nil {
 			serverConfig.Robots.Cache = *yamlConfigServer.Robots.Cache
 		} else {
-			serverConfig.Robots.Cache = CONFIG_DEFAULT_SERVER_ROBOTS_CACHE
+			serverConfig.Robots.Cache = configDefaultServerRobotsCache
 		}
 		if yamlConfigServer.Robots.CacheTTL != nil {
 			serverConfig.Robots.CacheTTL = *yamlConfigServer.Robots.CacheTTL
 		} else {
-			serverConfig.Robots.CacheTTL = CONFIG_DEFAULT_SERVER_ROBOTS_CACHETTL
+			serverConfig.Robots.CacheTTL = configDefaultServerRobotsCacheTTL
 		}
 
 		if yamlConfigServer.Sitemap.Enable != nil {
 			serverConfig.Sitemap.Enable = *yamlConfigServer.Sitemap.Enable
 		} else {
-			serverConfig.Sitemap.Enable = CONFIG_DEFAULT_SERVER_SITEMAP_ENABLE
+			serverConfig.Sitemap.Enable = configDefaultServerSitemapEnable
 		}
 		serverConfig.Sitemap.Root = yamlConfigServer.Sitemap.Root
 		if yamlConfigServer.Sitemap.Cache != nil {
 			serverConfig.Sitemap.Cache = *yamlConfigServer.Sitemap.Cache
 		} else {
-			serverConfig.Sitemap.Cache = CONFIG_DEFAULT_SERVER_SITEMAP_CACHE
+			serverConfig.Sitemap.Cache = configDefaultServerSitemapCache
 		}
 		if yamlConfigServer.Sitemap.CacheTTL != nil {
 			serverConfig.Sitemap.CacheTTL = *yamlConfigServer.Sitemap.CacheTTL
 		} else {
-			serverConfig.Sitemap.CacheTTL = CONFIG_DEFAULT_SERVER_SITEMAP_CACHETTL
+			serverConfig.Sitemap.CacheTTL = configDefaultServerSitemapCacheTTL
 		}
 		for _, sitemapRoute := range yamlConfigServer.Sitemap.Routes {
 			route := SitemapRoute{
@@ -435,39 +435,39 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 		if yamlConfigServer.Index.Enable != nil {
 			serverConfig.Index.Enable = *yamlConfigServer.Index.Enable
 		} else {
-			serverConfig.Index.Enable = CONFIG_DEFAULT_SERVER_INDEX_ENABLE
+			serverConfig.Index.Enable = configDefaultServerIndexEnable
 		}
 		serverConfig.Index.HTML = yamlConfigServer.Index.HTML
 		serverConfig.Index.Bundle = yamlConfigServer.Index.Bundle
 		if yamlConfigServer.Index.Env != nil {
 			serverConfig.Index.Env = *yamlConfigServer.Index.Env
 		} else {
-			serverConfig.Index.Env = CONFIG_DEFAULT_SERVER_INDEX_ENV
+			serverConfig.Index.Env = configDefaultServerIndexEnv
 		}
 		if yamlConfigServer.Index.Container != nil {
 			serverConfig.Index.Container = *yamlConfigServer.Index.Container
 		} else {
-			serverConfig.Index.Container = CONFIG_DEFAULT_SERVER_INDEX_CONTAINER
+			serverConfig.Index.Container = configDefaultServerIndexContainer
 		}
 		if yamlConfigServer.Index.State != nil {
 			serverConfig.Index.State = *yamlConfigServer.Index.State
 		} else {
-			serverConfig.Index.State = CONFIG_DEFAULT_SERVER_INDEX_STATE
+			serverConfig.Index.State = configDefaultServerIndexState
 		}
 		if yamlConfigServer.Index.Timeout != nil {
 			serverConfig.Index.Timeout = *yamlConfigServer.Index.Timeout
 		} else {
-			serverConfig.Index.Timeout = CONFIG_DEFAULT_SERVER_INDEX_TIMEOUT
+			serverConfig.Index.Timeout = configDefaultServerIndexTimeout
 		}
 		if yamlConfigServer.Index.Cache != nil {
 			serverConfig.Index.Cache = *yamlConfigServer.Index.Cache
 		} else {
-			serverConfig.Index.Cache = CONFIG_DEFAULT_SERVER_INDEX_CACHE
+			serverConfig.Index.Cache = configDefaultServerIndexCache
 		}
 		if yamlConfigServer.Index.CacheTTL != nil {
 			serverConfig.Index.CacheTTL = *yamlConfigServer.Index.CacheTTL
 		} else {
-			serverConfig.Index.CacheTTL = CONFIG_DEFAULT_SERVER_INDEX_CACHETTL
+			serverConfig.Index.CacheTTL = configDefaultServerIndexCacheTTL
 		}
 		for _, indexRule := range yamlConfigServer.Index.Rules {
 			rule := IndexRule{
@@ -476,7 +476,7 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 			if indexRule.Last != nil {
 				rule.Last = *indexRule.Last
 			} else {
-				rule.Last = CONFIG_DEFAULT_SERVER_INDEX_RULE_LAST
+				rule.Last = configDefaultServerIndexRuleLast
 			}
 			for _, indexRuleStateEntry := range indexRule.State {
 				entry := IndexRuleStateEntry{
@@ -494,23 +494,23 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 		if yamlConfigServer.Default.Enable != nil {
 			serverConfig.Default.Enable = *yamlConfigServer.Default.Enable
 		} else {
-			serverConfig.Default.Enable = CONFIG_DEFAULT_SERVER_DEFAULT_ENABLE
+			serverConfig.Default.Enable = configDefaultServerDefaultEnable
 		}
 		serverConfig.Default.File = yamlConfigServer.Default.File
 		if yamlConfigServer.Default.StatusCode != nil {
 			serverConfig.Default.StatusCode = *yamlConfigServer.Default.StatusCode
 		} else {
-			serverConfig.Default.StatusCode = CONFIG_DEFAULT_SERVER_DEFAULT_STATUSCODE
+			serverConfig.Default.StatusCode = configDefaultServerDefaultStatusCode
 		}
 		if yamlConfigServer.Default.Cache != nil {
 			serverConfig.Default.Cache = *yamlConfigServer.Default.Cache
 		} else {
-			serverConfig.Default.Cache = CONFIG_DEFAULT_SERVER_DEFAULT_CACHE
+			serverConfig.Default.Cache = configDefaultServerDefaultCache
 		}
 		if yamlConfigServer.Default.CacheTTL != nil {
 			serverConfig.Default.CacheTTL = *yamlConfigServer.Default.CacheTTL
 		} else {
-			serverConfig.Default.CacheTTL = CONFIG_DEFAULT_SERVER_DEFAULT_CACHETTL
+			serverConfig.Default.CacheTTL = configDefaultServerDefaultCacheTTL
 		}
 
 		c.Server = append(c.Server, &serverConfig)
@@ -524,17 +524,17 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 	if y.Fetcher.RequestTimeout != nil {
 		fetcherConfig.RequestTimeout = *y.Fetcher.RequestTimeout
 	} else {
-		fetcherConfig.RequestTimeout = CONFIG_DEFAULT_FETCHER_REQUESTTIMEOUT
+		fetcherConfig.RequestTimeout = configDefaultFetcherRequestTimeout
 	}
 	if y.Fetcher.RequestRetry != nil {
 		fetcherConfig.RequestRetry = *y.Fetcher.RequestRetry
 	} else {
-		fetcherConfig.RequestRetry = CONFIG_DEFAULT_FETCHER_REQUESTRETRY
+		fetcherConfig.RequestRetry = configDefaultFetcherRequestRetry
 	}
 	if y.Fetcher.RequestDelay != nil {
 		fetcherConfig.RequestDelay = *y.Fetcher.RequestDelay
 	} else {
-		fetcherConfig.RequestDelay = CONFIG_DEFAULT_FETCHER_REQUESTDELAY
+		fetcherConfig.RequestDelay = configDefaultFetcherRequestDelay
 	}
 	for _, resource := range y.Fetcher.Resources {
 		fetcherConfig.Resources = append(fetcherConfig.Resources, FetcherResource{
@@ -561,17 +561,17 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 	if y.Loader.ExecStartup != nil {
 		loaderConfig.ExecStartup = *y.Loader.ExecStartup
 	} else {
-		loaderConfig.ExecStartup = CONFIG_DEFAULT_LOADER_EXECSTARTUP
+		loaderConfig.ExecStartup = configDefaultLoaderExecStartup
 	}
 	if y.Loader.ExecInterval != nil {
 		loaderConfig.ExecInterval = *y.Loader.ExecInterval
 	} else {
-		loaderConfig.ExecInterval = CONFIG_DEFAULT_LOADER_EXECINTERVAL
+		loaderConfig.ExecInterval = configDefaultLoaderExecInterval
 	}
 	if y.Loader.ExecWorkers != nil {
 		loaderConfig.ExecWorkers = *y.Loader.ExecWorkers
 	} else {
-		loaderConfig.ExecWorkers = CONFIG_DEFAULT_LOADER_EXECWORKERS
+		loaderConfig.ExecWorkers = configDefaultLoaderExecWorkers
 	}
 	for _, rule := range y.Loader.Rules {
 		loaderConfig.Rules = append(loaderConfig.Rules, LoaderRule{
@@ -732,8 +732,8 @@ func TestConfig(c *Config) ([]string, error) {
 				if route.Kind != "" {
 					validKind := false
 					for _, k := range []string{
-						SITEMAP_KIND_SITEMAPINDEX,
-						SITEMAP_KIND_SITEMAP,
+						sitemapKindSitemapIndex,
+						sitemapKindSitemap,
 					} {
 						if k == route.Kind {
 							validKind = true
@@ -743,7 +743,7 @@ func TestConfig(c *Config) ([]string, error) {
 						report = append(report, fmt.Sprintf("sitemap: route option '%s', invalid kind", "kind"))
 					}
 				}
-				if route.Kind == SITEMAP_KIND_SITEMAPINDEX {
+				if route.Kind == sitemapKindSitemapIndex {
 					for _, entry := range route.SitemapIndex {
 						if entry.Name == "" {
 							report = append(report,
@@ -751,7 +751,7 @@ func TestConfig(c *Config) ([]string, error) {
 						}
 						validType := false
 						for _, t := range []string{
-							SITEMAP_ENTRY_SITEMAPINDEX_TYPE_STATIC,
+							sitemapEntrySitemapIndexTypeStatic,
 						} {
 							if t == entry.Type {
 								validType = true
@@ -761,7 +761,7 @@ func TestConfig(c *Config) ([]string, error) {
 							report = append(report,
 								fmt.Sprintf("sitemap: sitemap_index entry option '%s', invalid/missing value", "type"))
 						}
-						if entry.Type == SITEMAP_ENTRY_SITEMAPINDEX_TYPE_STATIC {
+						if entry.Type == sitemapEntrySitemapIndexTypeStatic {
 							if entry.Static.Loc == "" {
 								report = append(report,
 									fmt.Sprintf("sitemap: sitemap_index static entry option '%s', invalid/missing value", "loc"))
@@ -769,7 +769,7 @@ func TestConfig(c *Config) ([]string, error) {
 						}
 					}
 				}
-				if route.Kind == SITEMAP_KIND_SITEMAP {
+				if route.Kind == sitemapKindSitemap {
 					for _, entry := range route.Sitemap {
 						if entry.Name == "" {
 							report = append(report,
@@ -782,8 +782,8 @@ func TestConfig(c *Config) ([]string, error) {
 						if entry.Type != "" {
 							validType := false
 							for _, t := range []string{
-								SITEMAP_ENTRY_SITEMAP_TYPE_STATIC,
-								SITEMAP_ENTRY_SITEMAP_TYPE_LIST,
+								sitemapEntrySitemapTypeStatic,
+								sitemapEntrySitemapTypeList,
 							} {
 								if t == entry.Type {
 									validType = true
@@ -794,7 +794,7 @@ func TestConfig(c *Config) ([]string, error) {
 									fmt.Sprintf("sitemap: sitemap entry option '%s', invalid type", "type"))
 							}
 						}
-						if entry.Type == SITEMAP_ENTRY_SITEMAP_TYPE_STATIC {
+						if entry.Type == sitemapEntrySitemapTypeStatic {
 							if entry.Static.Loc == "" {
 								report = append(report,
 									fmt.Sprintf("sitemap: sitemap static entry option '%s', invalid/missing value", "loc"))
@@ -810,13 +810,13 @@ func TestConfig(c *Config) ([]string, error) {
 							if entry.Static.Changefreq != nil && *entry.Static.Changefreq != "" {
 								validChangefreq := false
 								for _, c := range []string{
-									SITEMAP_CHANGEFREQ_ALWAYS,
-									SITEMAP_CHANGEFREQ_HOURLY,
-									SITEMAP_CHANGEFREQ_DAILY,
-									SITEMAP_CHANGEFREQ_WEEKLY,
-									SITEMAP_CHANGEFREQ_MONTHLY,
-									SITEMAP_CHANGEFREQ_YEARLY,
-									SITEMAP_CHANGEFREQ_NEVER,
+									sitemapChangefreqAlways,
+									sitemapChangefreqHourly,
+									sitemapChangefreqDaily,
+									sitemapChangefreqWeekly,
+									sitemapChangefreqMonthly,
+									sitemapChangefreqYearly,
+									sitemapChangefreqNever,
 								} {
 									if c == *entry.Static.Changefreq {
 										validChangefreq = true
@@ -832,7 +832,7 @@ func TestConfig(c *Config) ([]string, error) {
 									fmt.Sprintf("sitemap: sitemap static entry option '%s', invalid/missing value", "priority"))
 							}
 						}
-						if entry.Type == SITEMAP_ENTRY_SITEMAP_TYPE_LIST {
+						if entry.Type == sitemapEntrySitemapTypeList {
 							if entry.List.Resource == "" {
 								report = append(report,
 									fmt.Sprintf("sitemap: sitemap list entry option '%s', invalid/missing value", "resource"))
@@ -871,13 +871,13 @@ func TestConfig(c *Config) ([]string, error) {
 							if entry.List.Changefreq != nil && *entry.List.Changefreq != "" {
 								validChangefreq := false
 								for _, c := range []string{
-									SITEMAP_CHANGEFREQ_ALWAYS,
-									SITEMAP_CHANGEFREQ_HOURLY,
-									SITEMAP_CHANGEFREQ_DAILY,
-									SITEMAP_CHANGEFREQ_WEEKLY,
-									SITEMAP_CHANGEFREQ_MONTHLY,
-									SITEMAP_CHANGEFREQ_YEARLY,
-									SITEMAP_CHANGEFREQ_NEVER,
+									sitemapChangefreqAlways,
+									sitemapChangefreqHourly,
+									sitemapChangefreqDaily,
+									sitemapChangefreqWeekly,
+									sitemapChangefreqMonthly,
+									sitemapChangefreqYearly,
+									sitemapChangefreqNever,
 								} {
 									if c == *entry.List.Changefreq {
 										validChangefreq = true
@@ -1127,9 +1127,9 @@ func TestConfig(c *Config) ([]string, error) {
 			if rule.Type != "" {
 				validType := false
 				for _, t := range []string{
-					LOADER_TYPE_STATIC,
-					LOADER_TYPE_SINGLE,
-					LOADER_TYPE_LIST,
+					loaderTypeStatic,
+					loaderTypeSingle,
+					loaderTypeList,
 				} {
 					if t == rule.Type {
 						validType = true
@@ -1138,12 +1138,12 @@ func TestConfig(c *Config) ([]string, error) {
 				if !validType {
 					report = append(report, fmt.Sprintf("loader: rule option '%s', invalid type", "type"))
 				}
-				if rule.Type == LOADER_TYPE_SINGLE {
+				if rule.Type == loaderTypeSingle {
 					if rule.Static.Resource == "" {
 						report = append(report, fmt.Sprintf("loader: static rule option '%s', invalid/missing value", "resource"))
 					}
 				}
-				if rule.Type == LOADER_TYPE_SINGLE {
+				if rule.Type == loaderTypeSingle {
 					if rule.Single.Resource == "" {
 						report = append(report, fmt.Sprintf("loader: single rule option '%s', invalid/missing value", "resource"))
 					}
@@ -1172,7 +1172,7 @@ func TestConfig(c *Config) ([]string, error) {
 							fmt.Sprintf("loader: single rule option '%s', invalid/missing value", "item_template_resource"))
 					}
 				}
-				if rule.Type == LOADER_TYPE_LIST {
+				if rule.Type == loaderTypeList {
 					if rule.List.Resource == "" {
 						report = append(report, fmt.Sprintf("loader: list rule option '%s', invalid/missing value", "resource"))
 					}
@@ -1243,7 +1243,7 @@ var template_data_static_logo512 []byte
 func GenerateConfig() error {
 	file, ok := os.LookupEnv("CONFIG_FILE")
 	if !ok {
-		file = CONFIG_FILE
+		file = configFile
 	}
 
 	_, err := os.Stat(file)

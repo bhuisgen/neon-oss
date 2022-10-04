@@ -32,12 +32,12 @@ type StaticRendererConfig struct {
 }
 
 const (
-	STATIC_LOGGER string = "server[static]"
+	staticLogger string = "server[static]"
 )
 
 // CreateStaticRenderer creates a new static renderer
 func CreateStaticRenderer(config *StaticRendererConfig) (*staticRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(STATIC_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(staticLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	dir, err := filepath.Abs(config.Dir)
 	if err != nil {

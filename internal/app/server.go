@@ -51,12 +51,12 @@ type ServerConfig struct {
 type ContextKeyID struct{}
 
 const (
-	SERVER_LOGGER string = "server"
+	serverLogger string = "server"
 )
 
 // CreateServer creates a new instance
 func CreateServer(config *ServerConfig, renderers ...Renderer) (*Server, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(SERVER_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(serverLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	server := Server{
 		config:   config,

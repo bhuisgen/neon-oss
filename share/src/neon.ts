@@ -9,14 +9,14 @@
  */
 export interface Server {
   /**
-   * The server request URL.
+   * Returns the server request URL.
    */
-  url: string;
+  url(): string;
 
   /**
-   * The server state.
+   * Returns the server state.
    */
-  state: Record<string, ServerResource>;
+  state(): Record<string, ServerResource>;
 
   /**
    * Renders a page.

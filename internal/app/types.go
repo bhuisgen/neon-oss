@@ -14,21 +14,28 @@ type Renderer interface {
 
 // Render
 type Render struct {
-	Body           []byte
-	Valid          bool
-	Status         int
-	Redirect       bool
-	RedirectTarget string
-	RedirectStatus int
-	Cache          bool
+	Body           []byte `json:"body"`
+	Valid          bool   `json:"valid"`
+	Status         int    `json:"status"`
+	Redirect       bool   `json:"redirect"`
+	RedirectTarget string `json:"redirectTarget"`
+	RedirectStatus int    `json:"redirectStatus"`
+	Cache          bool   `json:"cache"`
 }
 
 // Resource
 type Resource struct {
-	Name    string
-	Method  string
-	URL     string
-	Params  map[string]string
-	Headers map[string]string
-	TTL     int64
+	Name    string            `json:"name"`
+	Method  string            `json:"method"`
+	URL     string            `json:"url"`
+	Params  map[string]string `json:"params"`
+	Headers map[string]string `json:"headers"`
+	TTL     int64             `json:"ttl"`
+}
+
+// ResourceResult
+type ResourceResult struct {
+	Loading  bool   `json:"loading"`
+	Error    string `json:"error"`
+	Response string `json:"response"`
 }

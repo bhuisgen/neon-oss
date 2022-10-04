@@ -30,12 +30,12 @@ type monitorStats struct {
 }
 
 const (
-	MONITOR_LOGGER string = "monitor"
+	monitorLogger string = "monitor"
 )
 
 // NewMonitor creates a new resources monitor
 func NewMonitor(delay int64) {
-	logger := log.New(os.Stdout, fmt.Sprint(MONITOR_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(monitorLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	go func() {
 		mux := http.NewServeMux()

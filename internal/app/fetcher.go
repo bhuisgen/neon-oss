@@ -61,12 +61,12 @@ type FetcherTemplate struct {
 }
 
 const (
-	FETCHER_LOGGER string = "fetcher"
+	fetcherLogger string = "fetcher"
 )
 
 // NewFetcher creates a new instance
 func NewFetcher(config *FetcherConfig) *fetcher {
-	logger := log.New(os.Stdout, fmt.Sprint(FETCHER_LOGGER, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stdout, fmt.Sprint(fetcherLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -302,20 +302,26 @@ func (f *fetcher) CreateResourceFromTemplate(template string, resource string, p
 			continue
 		}
 
-		rParams := make(map[string]string)
-		for k, v := range t.Params {
-			rParams[k] = v
-		}
-		for k, v := range params {
-			rParams[k] = v
+		var rParams map[string]string
+		if t.Params != nil {
+			rParams := make(map[string]string)
+			for k, v := range t.Params {
+				rParams[k] = v
+			}
+			for k, v := range params {
+				rParams[k] = v
+			}
 		}
 
-		rHeaders := make(map[string]string)
-		for k, v := range t.Headers {
-			rHeaders[k] = v
-		}
-		for k, v := range headers {
-			rHeaders[k] = v
+		var rHeaders map[string]string
+		if t.Headers != nil {
+			rHeaders := make(map[string]string)
+			for k, v := range t.Headers {
+				rHeaders[k] = v
+			}
+			for k, v := range headers {
+				rHeaders[k] = v
+			}
 		}
 
 		return &Resource{
