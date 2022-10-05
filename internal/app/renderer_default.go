@@ -81,17 +81,17 @@ func (r *defaultRenderer) render(req *http.Request) (*Render, error) {
 		}
 	}
 
-	body, err := os.ReadFile(r.config.File)
+	body, err := defaultFile(r, req)
 	if err != nil {
-		r.logger.Printf("Failed to read default file '%s': %s", r.config.File, err)
+		r.logger.Printf("Failed to render: %s", err)
 
 		return nil, err
 	}
 
 	result := Render{
 		Body:   body,
-		Status: http.StatusOK,
 		Valid:  true,
+		Status: http.StatusOK,
 	}
 	if result.Valid && r.config.Cache {
 		r.cache.Set("default", &result, time.Duration(r.config.CacheTTL)*time.Second)
@@ -99,4 +99,16 @@ func (r *defaultRenderer) render(req *http.Request) (*Render, error) {
 	}
 
 	return &result, nil
+}
+
+// defaultFile generates a default file
+func defaultFile(r *defaultRenderer, req *http.Request) ([]byte, error) {
+	body, err := os.ReadFile(r.config.File)
+	if err != nil {
+		r.logger.Printf("Failed to read default file '%s': %s", r.config.File, err)
+
+		return nil, err
+	}
+
+	return body, nil
 }

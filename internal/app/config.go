@@ -74,6 +74,7 @@ type yamlConfigServer struct {
 		Enable   *bool    `yaml:"enable"`
 		Path     *string  `yaml:"path,omitempty"`
 		Hosts    []string `yaml:"hosts,omitempty"`
+		Sitemaps []string `yaml:"sitemaps,omitempty"`
 		Cache    *bool    `yaml:"cache,omitempty"`
 		CacheTTL *int     `yaml:"cache_ttl,omitempty"`
 	} `yaml:"robots,omitempty"`
@@ -382,6 +383,7 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 			serverConfig.Robots.Path = configDefaultServerRobotsPath
 		}
 		serverConfig.Robots.Hosts = yamlConfigServer.Robots.Hosts
+		serverConfig.Robots.Sitemaps = yamlConfigServer.Robots.Sitemaps
 		if yamlConfigServer.Robots.Cache != nil {
 			serverConfig.Robots.Cache = *yamlConfigServer.Robots.Cache
 		} else {

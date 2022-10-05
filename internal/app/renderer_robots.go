@@ -5,6 +5,7 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/http"
@@ -27,6 +28,7 @@ type RobotsRendererConfig struct {
 	Enable   bool
 	Path     string
 	Hosts    []string
+	Sitemaps []string
 	Cache    bool
 	CacheTTL int
 }
@@ -87,25 +89,17 @@ func (r *robotsRenderer) render(req *http.Request) (*Render, error) {
 		}
 	}
 
-	var body []byte
+	body, err := robots(r, req)
+	if err != nil {
+		r.logger.Printf("Failed to render: %s", err)
 
-	var allow bool
-	for _, host := range r.config.Hosts {
-		if host == req.Host {
-			allow = true
-		}
-	}
-
-	if allow {
-		body = []byte("User-Agent: *\nAllow: /\n")
-	} else {
-		body = []byte("User-Agent: *\nDisallow: /\n")
+		return nil, err
 	}
 
 	result := Render{
 		Body:   body,
-		Status: http.StatusOK,
 		Valid:  true,
+		Status: http.StatusOK,
 	}
 	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
@@ -113,4 +107,33 @@ func (r *robotsRenderer) render(req *http.Request) (*Render, error) {
 	}
 
 	return &result, nil
+}
+
+// robots generates the robots.txt content
+func robots(r *robotsRenderer, req *http.Request) ([]byte, error) {
+	var body = bufferPool.Get().(*bytes.Buffer)
+	defer bufferPool.Put(body)
+	body.Reset()
+
+	body.WriteString("User-Agent: *\n")
+
+	var check bool
+	for _, host := range r.config.Hosts {
+		if host == req.Host {
+			check = true
+		}
+	}
+	if !check {
+		body.WriteString("Disallow: /\n")
+
+		return body.Bytes(), nil
+	}
+
+	body.WriteString("Allow: /\n")
+
+	for _, s := range r.config.Sitemaps {
+		body.WriteString(fmt.Sprintf("Sitemap: %s\n", s))
+	}
+
+	return body.Bytes(), nil
 }

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -194,8 +195,8 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, entry.Key, entry.Resource)
 			}
 
-			stateKey := replaceParameters(entry.Key, params)
-			resourceKey := replaceParameters(entry.Resource, params)
+			stateKey := replaceIndexRouteParameters(entry.Key, params)
+			resourceKey := replaceIndexRouteParameters(entry.Resource, params)
 
 			if _, ok := os.LookupEnv("DEBUG"); ok {
 				r.logger.Printf("Index: id=%s, rule=%d, phase=state2, path=%s, state_key=%s, state_resource=%s",
@@ -357,7 +358,7 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 	return &result, nil
 }
 
-// index generates the final HTML body
+// index generates the final index response body
 func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error) {
 	var body []byte
 
@@ -431,4 +432,13 @@ func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error)
 	}
 
 	return body, nil
+}
+
+// replaceIndexRouteParameters returns a copy of the string s with all its parameters replaced
+func replaceIndexRouteParameters(s string, params map[string]string) string {
+	tmp := s
+	for key, value := range params {
+		tmp = strings.ReplaceAll(tmp, fmt.Sprint("$", key), value)
+	}
+	return tmp
 }

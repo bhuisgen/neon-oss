@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -215,18 +216,18 @@ func (l *loader) loadSingle(ctx context.Context, rule *LoaderRuleSingle) error {
 		}
 	}
 
-	rKey := replaceParameters(rule.ItemTemplateResource, mItem)
+	rKey := replaceLoaderResourceParameters(rule.ItemTemplateResource, mItem)
 	rParams := make(map[string]string)
 	for rParamKey, rParamValue := range rule.ItemTemplateResourceParams {
-		rParamKey = replaceParameters(rParamKey, mItem)
-		rParamValue = replaceParameters(rParamValue, mItem)
+		rParamKey = replaceLoaderResourceParameters(rParamKey, mItem)
+		rParamValue = replaceLoaderResourceParameters(rParamValue, mItem)
 		rParams[rParamKey] = rParamValue
 	}
 
 	rHeaders := make(map[string]string)
 	for rHeaderKey, rHeaderValue := range rule.ItemTemplateResourceParams {
-		rHeaderKey = replaceParameters(rHeaderKey, mItem)
-		rHeaderValue = replaceParameters(rHeaderValue, mItem)
+		rHeaderKey = replaceLoaderResourceParameters(rHeaderKey, mItem)
+		rHeaderValue = replaceLoaderResourceParameters(rHeaderValue, mItem)
 		rHeaders[rHeaderKey] = rHeaderValue
 	}
 
@@ -280,18 +281,18 @@ func (l *loader) loadList(ctx context.Context, rule *LoaderRuleList) error {
 			}
 		}
 
-		rKey := replaceParameters(rule.ItemTemplateResource, mItem)
+		rKey := replaceLoaderResourceParameters(rule.ItemTemplateResource, mItem)
 		rParams := make(map[string]string)
 		for rParamKey, rParamValue := range rule.ItemTemplateResourceParams {
-			rParamKey = replaceParameters(rParamKey, mItem)
-			rParamValue = replaceParameters(rParamValue, mItem)
+			rParamKey = replaceLoaderResourceParameters(rParamKey, mItem)
+			rParamValue = replaceLoaderResourceParameters(rParamValue, mItem)
 			rParams[rParamKey] = rParamValue
 		}
 
 		rHeaders := make(map[string]string)
 		for rHeaderKey, rHeaderValue := range rule.ItemTemplateResourceParams {
-			rHeaderKey = replaceParameters(rHeaderKey, mItem)
-			rHeaderValue = replaceParameters(rHeaderValue, mItem)
+			rHeaderKey = replaceLoaderResourceParameters(rHeaderKey, mItem)
+			rHeaderValue = replaceLoaderResourceParameters(rHeaderValue, mItem)
 			rHeaders[rHeaderKey] = rHeaderValue
 		}
 
@@ -311,4 +312,13 @@ func (l *loader) loadList(ctx context.Context, rule *LoaderRuleList) error {
 	}
 
 	return nil
+}
+
+// replaceLoaderResourceParameters returns a copy of the string s with all its parameters replaced
+func replaceLoaderResourceParameters(s string, params map[string]string) string {
+	tmp := s
+	for key, value := range params {
+		tmp = strings.ReplaceAll(tmp, fmt.Sprint("$", key), value)
+	}
+	return tmp
 }

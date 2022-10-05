@@ -169,10 +169,15 @@ func (r *sitemapRenderer) render(routeIndex int, req *http.Request) (*Render, er
 	case sitemapKindSitemap:
 		body, state, err = sitemap(&r.config.Routes[routeIndex].Sitemap, r, req)
 	}
+	if err != nil {
+		r.logger.Printf("Failed to render: %s", err)
+
+		return nil, err
+	}
 
 	var valid bool = true
-	var status = http.StatusOK
-	if !state || err != nil {
+	var status int = http.StatusOK
+	if !state {
 		valid = false
 	}
 	if !valid {
@@ -181,8 +186,8 @@ func (r *sitemapRenderer) render(routeIndex int, req *http.Request) (*Render, er
 
 	result := Render{
 		Body:   body,
-		Status: status,
 		Valid:  valid,
+		Status: status,
 	}
 	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
@@ -209,9 +214,12 @@ func sitemapIndex(s *[]SitemapIndexEntry, r *sitemapRenderer, req *http.Request)
 		case sitemapEntrySitemapIndexTypeStatic:
 			state, err = sitemapIndexStatic(&item.Static, r, req, body)
 		}
-	}
-	if !state || err != nil {
-		valid = false
+		if err != nil {
+			return nil, false, err
+		}
+		if !state {
+			valid = false
+		}
 	}
 
 	body.WriteString("</sitemapindex>\n")
@@ -219,7 +227,7 @@ func sitemapIndex(s *[]SitemapIndexEntry, r *sitemapRenderer, req *http.Request)
 	return body.Bytes(), valid, err
 }
 
-// sitemapIndexStatic generates a sitemap index static item
+// sitemapIndexStatic generates a sitemap index static entry
 func sitemapIndexStatic(static *SitemapIndexEntryStatic, r *sitemapRenderer, req *http.Request,
 	buf *bytes.Buffer) (bool, error) {
 	buf.WriteString("<sitemap>\n")
@@ -249,7 +257,10 @@ func sitemap(s *[]SitemapEntry, r *sitemapRenderer, req *http.Request) ([]byte, 
 		case sitemapEntrySitemapTypeList:
 			state, err = sitemapList(&item.List, r, req, body)
 		}
-		if err != nil || !state {
+		if err != nil {
+			return nil, false, err
+		}
+		if !state {
 			valid = false
 		}
 	}
@@ -259,7 +270,7 @@ func sitemap(s *[]SitemapEntry, r *sitemapRenderer, req *http.Request) ([]byte, 
 	return body.Bytes(), valid, err
 }
 
-// sitemapStatic generates a sitemap static
+// sitemapStatic generates a sitemap static entry
 func sitemapStatic(static *SitemapEntryStatic, r *sitemapRenderer, req *http.Request,
 	buf *bytes.Buffer) (bool, error) {
 	buf.WriteString("<url>\n")
@@ -278,7 +289,7 @@ func sitemapStatic(static *SitemapEntryStatic, r *sitemapRenderer, req *http.Req
 	return true, nil
 }
 
-// sitemapList generates a sitemap list
+// sitemapList generates a sitemap list entry
 func sitemapList(list *SitemapEntryList, r *sitemapRenderer, req *http.Request,
 	buf *bytes.Buffer) (bool, error) {
 	response, err := r.fetcher.Get(list.Resource)

@@ -30,6 +30,22 @@ server:
       enable: true
       hosts:
         - localhost:8080
+      sitemaps:
+        - http://localhost:8080/sitemap.xml
+
+    sitemap:
+      enable: true
+      root: http://localhost:8080
+      routes:
+        - path: /sitemap.xml
+          kind: sitemap
+          sitemap:
+            - name: index
+              type: static
+              static:
+                loc: /
+                changefreq: always
+                priority: 1.0
 
 fetcher:
   request_headers:
