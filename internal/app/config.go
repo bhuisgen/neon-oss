@@ -117,7 +117,7 @@ type yamlConfigServer struct {
 	Index struct {
 		Enable    *bool   `yaml:"enable"`
 		HTML      string  `yaml:"html"`
-		Bundle    string  `yaml:"bundle"`
+		Bundle    *string `yaml:"bundle"`
 		Env       *string `yaml:"env,omitempty"`
 		Container *string `yaml:"container,omitempty"`
 		State     *string `yaml:"state,omitempty"`
@@ -911,16 +911,18 @@ func TestConfig(c *Config) ([]string, error) {
 					htmlFile.Close()
 				}
 			}
-			if server.Index.Bundle == "" {
-				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "bundle"))
-			}
-			if server.Index.Bundle != "" {
-				bundleFile, err := os.Open(server.Index.Bundle)
-				if err != nil {
-					report = append(report, fmt.Sprintf("index: option '%s', failed to open file", "bundle"))
+			if server.Index.Bundle != nil {
+				if *server.Index.Bundle == "" {
+					report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "bundle"))
 				}
-				if bundleFile != nil {
-					bundleFile.Close()
+				if *server.Index.Bundle != "" {
+					bundleFile, err := os.Open(*server.Index.Bundle)
+					if err != nil {
+						report = append(report, fmt.Sprintf("index: option '%s', failed to open file", "bundle"))
+					}
+					if bundleFile != nil {
+						bundleFile.Close()
+					}
 				}
 			}
 			if server.Index.Env == "" {

@@ -32,7 +32,7 @@ type indexRenderer struct {
 type IndexRendererConfig struct {
 	Enable    bool
 	HTML      string
-	Bundle    string
+	Bundle    *string
 	Env       string
 	Container string
 	State     string
@@ -274,54 +274,59 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		}
 	}
 
-	var bundle string
-	buf, err := os.ReadFile(r.config.Bundle)
-	if err != nil {
-		r.logger.Printf("Failed to read bundle file '%s': %s", r.config.Bundle, err)
+	var vmResult *vmResult
+	if r.config.Bundle != nil {
+		var bundle string
+		buf, err := os.ReadFile(*r.config.Bundle)
+		if err != nil {
+			r.logger.Printf("Failed to read bundle file '%s': %s", *r.config.Bundle, err)
 
-		return nil, err
-	}
-	bundle = string(buf)
+			return nil, err
+		}
+		bundle = string(buf)
 
-	var vm = r.vmPool.Get()
-	defer r.vmPool.Put(vm)
-	vm.Reset()
+		var vm = r.vmPool.Get()
+		defer r.vmPool.Put(vm)
+		vm.Reset()
 
-	err = vm.Configure(r.config.Env, req, serverState)
-	if err != nil {
-		r.logger.Printf("Failed to configure VM: %s", err)
-	}
+		err = vm.Configure(r.config.Env, req, serverState)
+		if err != nil {
+			r.logger.Printf("Failed to configure VM: %s", err)
+		}
 
-	vmResult, err := vm.Execute(r.config.Bundle, bundle, r.config.Timeout)
-	if err != nil {
-		r.logger.Printf("Failed to execute VM: %s", err)
+		vmResult, err := vm.Execute(*r.config.Bundle, bundle, r.config.Timeout)
+		if err != nil {
+			r.logger.Printf("Failed to execute VM: %s", err)
 
-		return nil, err
-	}
+			return nil, err
+		}
 
-	if vmResult.Redirect {
-		return &Render{
-			Redirect:       true,
-			RedirectTarget: vmResult.RedirectURL,
-			RedirectStatus: vmResult.RedirectStatus,
-		}, nil
+		if vmResult.Redirect {
+			return &Render{
+				Redirect:       true,
+				RedirectTarget: vmResult.RedirectURL,
+				RedirectStatus: vmResult.RedirectStatus,
+			}, nil
+		}
 	}
 
 	html, err := os.ReadFile(r.config.HTML)
 	if err != nil {
-		r.logger.Printf("Failed to read HTML file '%s': %s", r.config.Bundle, err)
+		r.logger.Printf("Failed to read HTML file '%s': %s", r.config.HTML, err)
 
 		return nil, err
 	}
 
 	page := indexPage{
-		HTML:    &html,
-		Render:  &vmResult.Render,
-		Title:   &vmResult.Title,
-		Metas:   vmResult.Metas,
-		Links:   vmResult.Links,
-		Scripts: vmResult.Scripts,
-		State:   clientState,
+		HTML: &html,
+	}
+	if vmResult != nil {
+		page.Render = &vmResult.Render
+		page.Title = &vmResult.Title
+		page.Metas = vmResult.Metas
+		page.Links = vmResult.Links
+		page.Scripts = vmResult.Scripts
+		page.State = clientState
 	}
 
 	body, err := index(&page, r, req)
@@ -331,15 +336,18 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		return nil, err
 	}
 
-	var status int = vmResult.Status
+	var status int = http.StatusOK
+	if vmResult != nil {
+		status = vmResult.Status
+	}
 	if !valid {
 		status = http.StatusServiceUnavailable
 	}
 
 	result := Render{
 		Body:   body,
-		Status: status,
 		Valid:  valid,
+		Status: status,
 	}
 	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
@@ -408,10 +416,12 @@ func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error)
 			1)
 	}
 
-	body = bytes.Replace(body,
-		[]byte(fmt.Sprintf("<div id=\"%s\"></div>", r.config.Container)),
-		[]byte(fmt.Sprintf("<div id=\"%s\">%s</div>", r.config.Container, *page.Render)),
-		1)
+	if page.Render != nil {
+		body = bytes.Replace(body,
+			[]byte(fmt.Sprintf("<div id=\"%s\"></div>", r.config.Container)),
+			[]byte(fmt.Sprintf("<div id=\"%s\">%s</div>", r.config.Container, *page.Render)),
+			1)
+	}
 
 	if page.State != nil {
 		body = bytes.Replace(body,
