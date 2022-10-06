@@ -74,7 +74,7 @@ const (
 
 // CreateIndexRenderer creates a new index renderer
 func CreateIndexRenderer(config *IndexRendererConfig, fetcher *fetcher) (*indexRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(indexLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(indexLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	regexps := []*regexp.Regexp{}
 	for _, rule := range config.Rules {
@@ -97,8 +97,8 @@ func CreateIndexRenderer(config *IndexRendererConfig, fetcher *fetcher) (*indexR
 }
 
 // handle implements the renderer handler
-func (r *indexRenderer) handle(w http.ResponseWriter, req *http.Request) {
-	result, err := r.render(req)
+func (r *indexRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+	result, err := r.render(req, info)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
@@ -130,7 +130,7 @@ func (r *indexRenderer) setNext(renderer Renderer) {
 }
 
 // render makes a new render
-func (r *indexRenderer) render(req *http.Request) (*Render, error) {
+func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, error) {
 	if r.config.Cache {
 		obj := r.cache.Get(req.URL.Path)
 		if obj != nil {
@@ -164,7 +164,7 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 
 		var params map[string]string
 		if len(m) > 1 {
-			params := make(map[string]string)
+			params = make(map[string]string)
 			for i, value := range m {
 				if i > 0 {
 					params[fmt.Sprint(i)] = value
@@ -290,12 +290,12 @@ func (r *indexRenderer) render(req *http.Request) (*Render, error) {
 		defer r.vmPool.Put(vm)
 		vm.Reset()
 
-		err = vm.Configure(r.config.Env, req, serverState)
+		err = vm.Configure(r.config.Env, info, req, serverState)
 		if err != nil {
 			r.logger.Printf("Failed to configure VM: %s", err)
 		}
 
-		vmResult, err := vm.Execute(*r.config.Bundle, bundle, r.config.Timeout)
+		vmResult, err = vm.Execute(*r.config.Bundle, bundle, r.config.Timeout)
 		if err != nil {
 			r.logger.Printf("Failed to execute VM: %s", err)
 

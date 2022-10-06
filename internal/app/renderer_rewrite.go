@@ -38,14 +38,14 @@ type RewriteRule struct {
 }
 
 const (
-	rewriteLogger              string = "server[rewrite]"
+	rewriteLogger            string = "server[rewrite]"
 	rewriteRuleFlagRedirect  string = "redirect"
 	rewriteRuleFlagPermanent string = "permanent"
 )
 
 // CreateRewriteRenderer creates a new rewrite renderer
 func CreateRewriteRenderer(config *RewriteRendererConfig) (*rewriteRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(rewriteLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(rewriteLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	regexps := []*regexp.Regexp{}
 	for _, rule := range config.Rules {
@@ -65,7 +65,7 @@ func CreateRewriteRenderer(config *RewriteRendererConfig) (*rewriteRenderer, err
 }
 
 // handle implements the rewrite handler
-func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request) {
+func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	for index, regexp := range r.regexps {
 		if regexp.MatchString(req.URL.Path) {
 			stop := false
@@ -106,7 +106,7 @@ func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	r.next.handle(w, req)
+	r.next.handle(w, req, info)
 }
 
 // setNext configures the next renderer

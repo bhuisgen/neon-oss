@@ -9,17 +9,72 @@
  */
 export interface Server {
   /**
-   * Returns the server request URL.
+   * Return the server address.
    */
-  url(): string;
+  addr(): string;
 
   /**
-   * Returns the server state.
+   * Return the server port.
    */
-  state(): Record<string, ServerResource>;
+  port(): number;
 
   /**
-   * Renders a page.
+   * Returns the server version.
+   */
+  version(): string;
+
+  /**
+   * Returns the request method.
+   */
+  requestMethod(): string;
+
+  /**
+   * Returns the request protocol.
+   */
+  requestProto(): string;
+
+  /**
+   * Returns the request protocol major version.
+   */
+  requestProtoMajor(): number;
+
+  /**
+   * Returns the request protocol minor version.
+   */
+  requestProtoMinor(): number;
+
+  /**
+   * Returns the request remote address.
+   */
+  requestRemoteAddr(): string;
+
+  /**
+   * Returns the request host.
+   */
+  requestHost(): string;
+
+  /**
+   * Returns the request path.
+   */
+  requestPath(): string;
+
+  /**
+   * Returns the request query parameters.
+   */
+  requestQuery(): Record<string, string[]>
+
+  /**
+   * Returns the request headers.
+   */
+  requestHeaders(): Record<string, string[]>;
+
+  /**
+   * Returns the state.
+   */
+  state(): Record<string, Resource>;
+
+  /**
+   * Renders the page to client.
    *
    * @param html the HTML content
    * @param status the response status code
@@ -33,6 +88,14 @@ export interface Server {
    * @param status the redirect status code
    */
   redirect(url: string, status: number): void;
+
+  /**
+   * Sets a response header
+   *
+   * @param key the key
+   * @param value  the value
+   */
+  setHeader(key: string, value: string): void;
 
   /**
    * Sets the HTML page title
@@ -67,11 +130,11 @@ export interface Server {
 }
 
 /**
- * Server resource interface
+ * Resource interface
  *
- * @interface ServerResource
+ * @interface Resource
  */
-export interface ServerResource {
+export interface Resource {
   /**
    * The resource loading state.
    */

@@ -162,7 +162,7 @@ func (c *serveCommand) Execute() error {
 		app.NewMonitor(300)
 	}
 
-	log.Printf("%s version %s, commit %s\n", name, version, commit)
+	log.Printf("%s version %s, commit %s\n", app.Name, app.Version, app.Commit)
 
 	log.Println("Starting instance")
 

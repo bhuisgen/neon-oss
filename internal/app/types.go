@@ -8,7 +8,7 @@ import "net/http"
 
 // Renderer
 type Renderer interface {
-	handle(http.ResponseWriter, *http.Request)
+	handle(http.ResponseWriter, *http.Request, *ServerInfo)
 	setNext(Renderer)
 }
 
@@ -38,4 +38,11 @@ type ResourceResult struct {
 	Loading  bool   `json:"loading"`
 	Error    string `json:"error"`
 	Response string `json:"response"`
+}
+
+// ServerInfo
+type ServerInfo struct {
+	Addr    string `json:"addr"`
+	Port    int    `json:"port"`
+	Version string `json:"version"`
 }

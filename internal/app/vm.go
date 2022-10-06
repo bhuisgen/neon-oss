@@ -5,6 +5,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,13 +29,15 @@ type vm struct {
 
 // vmData implements the data of a VM
 type vmData struct {
-	url            *string
+	server         *ServerInfo
+	req            *http.Request
 	state          *string
 	render         *[]byte
 	status         *int
 	redirect       *bool
 	redirectURL    *string
 	redirectStatus *int
+	headers        map[string]string
 	title          *string
 	metas          map[string]map[string]string
 	links          map[string]map[string]string
@@ -47,14 +50,14 @@ const (
 
 // NewVM creates a new VM
 func NewVM() *vm {
-	logger := log.New(os.Stdout, fmt.Sprint(vmLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(vmLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 	isolate := v8go.NewIsolate()
 	processObject := v8go.NewObjectTemplate(isolate)
 	envObject := v8go.NewObjectTemplate(isolate)
 	serverObject := v8go.NewObjectTemplate(isolate)
 	context := v8go.NewContext(isolate)
 
-	vm := vm{
+	v := vm{
 		logger:        logger,
 		isolate:       isolate,
 		processObject: processObject,
@@ -64,30 +67,105 @@ func NewVM() *vm {
 		data:          &vmData{},
 	}
 
-	serverObject.Set("url", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		v, _ := v8go.NewValue(vm.isolate, *vm.data.url)
-
-		return v
+	serverObject.Set("addr", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		value, _ := v8go.NewValue(v.isolate, v.data.server.Addr)
+		return value
 	}))
 
-	serverObject.Set("state", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		v, _ := v8go.JSONParse(vm.context, *vm.data.state)
+	serverObject.Set("port", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		value, _ := v8go.NewValue(v.isolate, int32(v.data.server.Port))
+		return value
+	}))
 
-		return v
+	serverObject.Set("version", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		value, _ := v8go.NewValue(v.isolate, v.data.server.Version)
+		return value
+	}))
+
+	serverObject.Set("requestMethod", v8go.NewFunctionTemplate(isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.Method)
+			return value
+		}))
+
+	serverObject.Set("requestProto", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		value, _ := v8go.NewValue(v.isolate, v.data.req.Proto)
+		return value
+	}))
+
+	serverObject.Set("requestProtoMajor", v8go.NewFunctionTemplate(isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.ProtoMajor)
+			return value
+		}))
+
+	serverObject.Set("requestProtoMinor", v8go.NewFunctionTemplate(isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.ProtoMinor)
+			return value
+		}))
+
+	serverObject.Set("requestRemoteAddr", v8go.NewFunctionTemplate(isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.RemoteAddr)
+			return value
+		}))
+
+	serverObject.Set("requestHost", v8go.NewFunctionTemplate(isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.Host)
+			return value
+		}))
+
+	serverObject.Set("requestPath", v8go.NewFunctionTemplate(isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.URL.Path)
+			return value
+		}))
+
+	serverObject.Set("requestQuery", v8go.NewFunctionTemplate(isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			var value *v8go.Value
+			q := v.data.req.URL.Query()
+			data, err := json.Marshal(&q)
+			if err != nil {
+				value, _ = v8go.JSONParse(v.context, "{}")
+			} else {
+				value, _ = v8go.JSONParse(v.context, string(data))
+			}
+			return value
+		}))
+
+	serverObject.Set("RequestHeaders", v8go.NewFunctionTemplate(isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			var value *v8go.Value
+			h := v.data.req.Header
+			data, err := json.Marshal(&h)
+			if err != nil {
+				value, _ = v8go.JSONParse(v.context, "{}")
+			} else {
+				value, _ = v8go.JSONParse(v.context, string(data))
+			}
+			return value
+		}))
+
+	serverObject.Set("state", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		value, _ := v8go.JSONParse(v.context, *v.data.state)
+		return value
 	}))
 
 	serverObject.Set("render", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 		args := info.Args()
 		if len(args) > 0 {
 			render := []byte(args[0].String())
-			vm.data.render = &render
+			v.data.render = &render
 
 			if len(args) > 1 {
 				status, err := strconv.Atoi(args[1].String())
 				if err != nil {
 					status = http.StatusOK
 				}
-				vm.data.status = &status
+				v.data.status = &status
 			}
 		}
 		return nil
@@ -98,17 +176,33 @@ func NewVM() *vm {
 		if len(args) > 0 {
 			redirect := true
 			redirectURL := args[0].String()
-			vm.data.redirect = &redirect
-			vm.data.redirectURL = &redirectURL
+			v.data.redirect = &redirect
+			v.data.redirectURL = &redirectURL
 
 			if len(args) > 1 {
 				redirectStatus, err := strconv.Atoi(args[1].String())
 				if err != nil {
 					redirectStatus = http.StatusTemporaryRedirect
 				}
-				vm.data.redirectStatus = &redirectStatus
+				v.data.redirectStatus = &redirectStatus
 			}
 		}
+		return nil
+	}))
+
+	serverObject.Set("setHeader", v8go.NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		args := info.Args()
+		if len(args) > 1 {
+			key := args[0].String()
+			value := args[1].String()
+
+			if v.data.headers == nil {
+				v.data.headers = make(map[string]string)
+			}
+
+			v.data.headers[key] = value
+		}
+
 		return nil
 	}))
 
@@ -116,7 +210,7 @@ func NewVM() *vm {
 		args := info.Args()
 		if len(args) > 0 {
 			title := args[0].String()
-			vm.data.title = &title
+			v.data.title = &title
 		}
 		return nil
 	}))
@@ -127,15 +221,15 @@ func NewVM() *vm {
 			id := args[0].String()
 			data := args[1].Object()
 
-			if vm.data.metas == nil {
-				vm.data.metas = make(map[string]map[string]string)
+			if v.data.metas == nil {
+				v.data.metas = make(map[string]map[string]string)
 			}
 
-			vm.data.metas[id] = make(map[string]string)
+			v.data.metas[id] = make(map[string]string)
 			for _, attribute := range []string{"name", "itemprop", "content", "charset", "http-equiv", "scheme", "property"} {
 				if ok := data.Has(attribute); ok {
-					v, _ := data.Get(attribute)
-					vm.data.metas[id][attribute] = v.String()
+					value, _ := data.Get(attribute)
+					v.data.metas[id][attribute] = value.String()
 				}
 			}
 		}
@@ -148,16 +242,16 @@ func NewVM() *vm {
 			id := args[0].String()
 			data := args[1].Object()
 
-			if vm.data.links == nil {
-				vm.data.links = make(map[string]map[string]string)
+			if v.data.links == nil {
+				v.data.links = make(map[string]map[string]string)
 			}
 
-			vm.data.links[id] = make(map[string]string)
+			v.data.links[id] = make(map[string]string)
 			for _, attribute := range []string{"rel", "href", "hreflang", "type", "sizes", "media", "as",
 				"crossorigin", "disabled", "importance", "integrity", "referrerpolicy", "title"} {
 				if ok := data.Has(attribute); ok {
-					v, _ := data.Get(attribute)
-					vm.data.links[id][attribute] = v.String()
+					value, _ := data.Get(attribute)
+					v.data.links[id][attribute] = value.String()
 				}
 			}
 		}
@@ -170,23 +264,23 @@ func NewVM() *vm {
 			id := args[0].String()
 			data := args[1].Object()
 
-			if vm.data.scripts == nil {
-				vm.data.scripts = make(map[string]map[string]string)
+			if v.data.scripts == nil {
+				v.data.scripts = make(map[string]map[string]string)
 			}
 
-			vm.data.scripts[id] = make(map[string]string)
+			v.data.scripts[id] = make(map[string]string)
 			for _, attribute := range []string{"type", "src", "async", "crossorigin", "defer", "integrity", "nomodule",
 				"nonce", "referrerpolicy", "children"} {
 				if ok := data.Has(attribute); ok {
-					v, _ := data.Get(attribute)
-					vm.data.scripts[id][attribute] = v.String()
+					value, _ := data.Get(attribute)
+					v.data.scripts[id][attribute] = value.String()
 				}
 			}
 		}
 		return nil
 	}))
 
-	return &vm
+	return &v
 }
 
 // Close closes the VM
@@ -201,9 +295,25 @@ func (v *vm) Reset() {
 }
 
 // Configure configures the VM
-func (v *vm) Configure(envName string, req *http.Request, state *string) error {
-	v.data.url = &req.URL.Path
-	v.data.state = state
+func (v *vm) Configure(envName string, info *ServerInfo, req *http.Request, state *string) error {
+	if info != nil {
+		v.data.server = info
+	} else {
+		empty := ServerInfo{}
+		v.data.server = &empty
+	}
+	if req != nil {
+		v.data.req = req
+	} else {
+		empty := http.Request{}
+		v.data.req = &empty
+	}
+	if state != nil {
+		v.data.state = state
+	} else {
+		empty := "{}"
+		v.data.state = &empty
+	}
 
 	global := v.context.Global()
 

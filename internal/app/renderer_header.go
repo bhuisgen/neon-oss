@@ -43,7 +43,7 @@ const (
 
 // CreateHeaderRenderer creates a new header renderer
 func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(headerLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(headerLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	regexps := []*regexp.Regexp{}
 	for _, rule := range config.Rules {
@@ -63,7 +63,7 @@ func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error)
 }
 
 // handle implements the header handler
-func (r *headerRenderer) handle(w http.ResponseWriter, req *http.Request) {
+func (r *headerRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	for index, regexp := range r.regexps {
 		if regexp.MatchString(req.URL.Path) {
 			for k, v := range r.config.Rules[index].Set {
@@ -81,7 +81,7 @@ func (r *headerRenderer) handle(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	r.next.handle(w, req)
+	r.next.handle(w, req, info)
 }
 
 // setNext configures the next renderer

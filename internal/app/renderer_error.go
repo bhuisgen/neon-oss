@@ -30,7 +30,7 @@ const (
 
 // CreateErrorRenderer creates a new error renderer
 func CreateErrorRenderer(config *ErrorRendererConfig) (*errorRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(errorLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(errorLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &errorRenderer{
 		config: config,
@@ -39,7 +39,7 @@ func CreateErrorRenderer(config *ErrorRendererConfig) (*errorRenderer, error) {
 }
 
 // handle implements the renderer handler
-func (r *errorRenderer) handle(w http.ResponseWriter, req *http.Request) {
+func (r *errorRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte{})
 }

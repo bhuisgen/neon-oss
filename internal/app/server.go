@@ -25,6 +25,7 @@ type Server struct {
 	logger     *log.Logger
 	httpServer *http.Server
 	renderer   Renderer
+	info       *ServerInfo
 }
 
 // ServerConfig implements the server configuration
@@ -56,12 +57,17 @@ const (
 
 // CreateServer creates a new instance
 func CreateServer(config *ServerConfig, renderers ...Renderer) (*Server, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(serverLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(serverLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	server := Server{
 		config:   config,
 		logger:   logger,
 		renderer: nil,
+		info: &ServerInfo{
+			Addr:    config.ListenAddr,
+			Port:    config.ListenPort,
+			Version: Version,
+		},
 	}
 
 	var previous Renderer
@@ -161,7 +167,8 @@ func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := context.WithValue(r.Context(), ContextKeyID{}, id.String())
 	r = r.WithContext(ctx)
 
+	w.Header().Set("Server", fmt.Sprint("neon/", Version))
 	w.Header().Set("X-Correlation-ID", id.String())
 
-	h.server.renderer.handle(w, r)
+	h.server.renderer.handle(w, r, h.server.info)
 }

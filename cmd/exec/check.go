@@ -78,8 +78,8 @@ func (c *checkCommand) Execute() error {
 				return err
 			}
 
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(ca)
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(ca)
 
 			tlsConfig.RootCAs = caCertPool
 

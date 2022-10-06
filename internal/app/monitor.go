@@ -35,7 +35,7 @@ const (
 
 // NewMonitor creates a new resources monitor
 func NewMonitor(delay int64) {
-	logger := log.New(os.Stdout, fmt.Sprint(monitorLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(monitorLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	go func() {
 		mux := http.NewServeMux()

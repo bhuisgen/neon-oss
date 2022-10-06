@@ -74,7 +74,7 @@ const (
 
 // NewLoader creates a new loader
 func NewLoader(config *LoaderConfig, fetcher *fetcher) *loader {
-	logger := log.New(os.Stdout, fmt.Sprint(loaderLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(loaderLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &loader{
 		config:  config,

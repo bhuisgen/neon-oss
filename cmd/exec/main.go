@@ -8,6 +8,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/bhuisgen/neon/internal/app"
 )
 
 type command interface {
@@ -52,7 +54,7 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("%s version %s, commit %s\n", name, version, commit)
+		fmt.Printf("%s version %s, commit %s\n", app.Name, app.Version, app.Commit)
 		os.Exit(0)
 	}
 

@@ -37,7 +37,7 @@ const (
 
 // CreateStaticRenderer creates a new static renderer
 func CreateStaticRenderer(config *StaticRendererConfig) (*staticRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(staticLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(staticLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	dir, err := filepath.Abs(config.Dir)
 	if err != nil {
@@ -60,9 +60,9 @@ func CreateStaticRenderer(config *StaticRendererConfig) (*staticRenderer, error)
 }
 
 // handle implements the renderer handler
-func (r *staticRenderer) handle(w http.ResponseWriter, req *http.Request) {
+func (r *staticRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	if !r.staticFS.exists(req.URL.Path) {
-		r.next.handle(w, req)
+		r.next.handle(w, req, info)
 
 		return
 	}

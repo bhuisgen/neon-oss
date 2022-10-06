@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// LoggingConfig implements the configuration of the logging middleware
 type LoggingConfig struct {
 	Log     bool
 	LogFile *string

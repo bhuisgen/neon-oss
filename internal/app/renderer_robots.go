@@ -39,7 +39,7 @@ const (
 
 // CreateRobotsRenderer creates a new robots renderer
 func CreateRobotsRenderer(config *RobotsRendererConfig, loader *loader) (*robotsRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(robotsLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(robotsLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &robotsRenderer{
 		config: config,
@@ -49,9 +49,9 @@ func CreateRobotsRenderer(config *RobotsRendererConfig, loader *loader) (*robots
 }
 
 // handle implements the renderer handler
-func (r *robotsRenderer) handle(w http.ResponseWriter, req *http.Request) {
+func (r *robotsRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	if req.URL.Path != r.config.Path {
-		r.next.handle(w, req)
+		r.next.handle(w, req, info)
 
 		return
 	}
@@ -115,8 +115,6 @@ func robots(r *robotsRenderer, req *http.Request) ([]byte, error) {
 	defer bufferPool.Put(body)
 	body.Reset()
 
-	body.WriteString("User-Agent: *\n")
-
 	var check bool
 	for _, host := range r.config.Hosts {
 		if host == req.Host {
@@ -124,14 +122,19 @@ func robots(r *robotsRenderer, req *http.Request) ([]byte, error) {
 		}
 	}
 	if !check {
+		body.WriteString("User-agent: *\n")
 		body.WriteString("Disallow: /\n")
 
 		return body.Bytes(), nil
 	}
 
+	body.WriteString("User-agent: *\n")
 	body.WriteString("Allow: /\n")
 
-	for _, s := range r.config.Sitemaps {
+	for i, s := range r.config.Sitemaps {
+		if i == 0 {
+			body.WriteString("\n")
+		}
 		body.WriteString(fmt.Sprintf("Sitemap: %s\n", s))
 	}
 

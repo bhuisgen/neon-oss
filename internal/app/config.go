@@ -1231,17 +1231,20 @@ var template_data_static_styles []byte
 //go:embed templates/init/data/static/manifest.json
 var template_data_static_manifest []byte
 
+//go:embed templates/init/data/static/Rubik-VariableFont_wght.ttf
+var template_data_static_font_rubik []byte
+
 //go:embed templates/init/data/static/favicon.ico
 var template_data_static_favicon []byte
 
+//go:embed templates/init/data/static/icon192.png
+var template_data_static_icon192 []byte
+
+//go:embed templates/init/data/static/icon512.png
+var template_data_static_icon512 []byte
+
 //go:embed templates/init/data/static/logo.png
 var template_data_static_logo []byte
-
-//go:embed templates/init/data/static/logo192.png
-var template_data_static_logo192 []byte
-
-//go:embed templates/init/data/static/logo512.png
-var template_data_static_logo512 []byte
 
 // GenerateConfig creates a default configuration file
 func GenerateConfig() error {
@@ -1281,14 +1284,15 @@ func GenerateConfig() error {
 	}
 
 	files := map[string][]byte{
-		"data/index.html":           template_data_html,
-		"data/bundle.js":            template_data_bundle,
-		"data/static/styles.css":    template_data_static_styles,
-		"data/static/manifest.json": template_data_static_manifest,
-		"data/static/favicon.ico":   template_data_static_favicon,
-		"data/static/logo.png":      template_data_static_logo,
-		"data/static/logo192.png":   template_data_static_logo192,
-		"data/static/logo512.png":   template_data_static_logo512,
+		"data/index.html":                         template_data_html,
+		"data/bundle.js":                          template_data_bundle,
+		"data/static/styles.css":                  template_data_static_styles,
+		"data/static/manifest.json":               template_data_static_manifest,
+		"data/static/Rubik-VariableFont_wght.ttf": template_data_static_font_rubik,
+		"data/static/favicon.ico":                 template_data_static_favicon,
+		"data/static/icon192.png":                 template_data_static_icon192,
+		"data/static/icon512.png":                 template_data_static_icon512,
+		"data/static/logo.png":                    template_data_static_logo,
 	}
 
 	for name, template := range files {

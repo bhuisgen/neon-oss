@@ -99,7 +99,7 @@ const (
 
 // CreateSitemapRenderer creates a new sitemap renderer
 func CreateSitemapRenderer(config *SitemapRendererConfig, fetcher *fetcher) (*sitemapRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(sitemapLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(sitemapLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &sitemapRenderer{
 		config:  config,
@@ -110,7 +110,7 @@ func CreateSitemapRenderer(config *SitemapRendererConfig, fetcher *fetcher) (*si
 }
 
 // handle implements the renderer handler
-func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request) {
+func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	var routeIndex int = -1
 	for index, route := range r.config.Routes {
 		if route.Path != req.URL.Path {
@@ -122,7 +122,7 @@ func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request) {
 		break
 	}
 	if routeIndex == -1 {
-		r.next.handle(w, req)
+		r.next.handle(w, req, info)
 
 		return
 	}

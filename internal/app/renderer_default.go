@@ -37,7 +37,7 @@ const (
 
 // CreateDefaultRenderer creates a new default renderer
 func CreateDefaultRenderer(config *DefaultRendererConfig) (*defaultRenderer, error) {
-	logger := log.New(os.Stdout, fmt.Sprint(defaultLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(os.Stderr, fmt.Sprint(defaultLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &defaultRenderer{
 		config: config,
@@ -47,7 +47,7 @@ func CreateDefaultRenderer(config *DefaultRendererConfig) (*defaultRenderer, err
 }
 
 // handle implements the default renderer
-func (r *defaultRenderer) handle(w http.ResponseWriter, req *http.Request) {
+func (r *defaultRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	result, err := r.render(req)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
