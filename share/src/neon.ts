@@ -22,64 +22,78 @@ export interface Server {
    * Returns the server version.
    */
   version(): string;
+}
 
+/**
+ * Request interface
+ *
+ * @interface Request
+ */
+export interface Request {
   /**
    * Returns the request method.
    */
-  requestMethod(): string;
+  method(): string;
 
   /**
    * Returns the request protocol.
    */
-  requestProto(): string;
+  proto(): string;
 
   /**
    * Returns the request protocol major version.
    */
-  requestProtoMajor(): number;
+  protoMajor(): number;
 
   /**
    * Returns the request protocol minor version.
    */
-  requestProtoMinor(): number;
+  protoMinor(): number;
 
   /**
    * Returns the request remote address.
    */
-  requestRemoteAddr(): string;
+  remoteAddr(): string;
 
   /**
    * Returns the request host.
    */
-  requestHost(): string;
+  host(): string;
 
   /**
    * Returns the request path.
    */
-  requestPath(): string;
+  path(): string;
 
   /**
    * Returns the request query parameters.
    */
-  requestQuery(): Record<string, string[]>
+  query(): Record<string, string[]>
 
   /**
    * Returns the request headers.
    */
-  requestHeaders(): Record<string, string[]>;
+  headers(): Record<string, string[]>;
 
   /**
-   * Returns the state.
+   * Returns the request state.
    */
   state(): Record<string, Resource>;
+}
 
+/**
+ * Server interface
+ *
+ * @interface Response
+ */
+export interface Response {
   /**
-   * Renders the page to client.
+   * Renders the response to the client.
    *
-   * @param html the HTML content
+   * @param root the root content
    * @param status the response status code
    */
-  render(html: string, status: number): void;
+  render(root: string, status: number): void;
 
   /**
    * Redirects the client to another URL.
@@ -98,14 +112,14 @@ export interface Server {
   setHeader(key: string, value: string): void;
 
   /**
-   * Sets the HTML page title
+   * Sets the page title
    *
    * @param title the title
    */
   setTitle(title: string): void;
 
   /**
-   * Sets the HTML page metadata
+   * Sets a page metadata
    *
    * @param id the meta id
    * @param attributes the meta attributes
@@ -113,7 +127,7 @@ export interface Server {
   setMeta(id: string, attributes: Record<string, string>): void;
 
   /**
-   * Sets the HTML page link.
+   * Sets a page link.
    *
    * @param id the link id
    * @param attributes the link attributes
@@ -121,7 +135,7 @@ export interface Server {
   setLink(id: string, attributes: Record<string, string>): void;
 
   /**
-   * Sets the HTML page script.
+   * Sets a page script.
    *
    * @param id the script id
    * @param attributes the script attributes

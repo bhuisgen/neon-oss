@@ -9,8 +9,35 @@ import (
 	"sync"
 )
 
-var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
+// BufferPool
+type BufferPool interface {
+	Get() *bytes.Buffer
+	Put(b *bytes.Buffer)
+}
+
+// bufferPool implements a buffer pool
+type bufferPool struct {
+	pool sync.Pool
+}
+
+// newBufferPool creates a new buffer pool
+func newBufferPool() *bufferPool {
+	return &bufferPool{
+		pool: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
+			},
+		},
+	}
+}
+
+// Get selects a buffer from the pool
+func (p *bufferPool) Get() *bytes.Buffer {
+	return p.pool.Get().(*bytes.Buffer)
+}
+
+// Put adds a buffer to the pool
+func (p *bufferPool) Put(b *bytes.Buffer) {
+	b.Reset()
+	p.pool.Put(b)
 }

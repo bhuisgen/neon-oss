@@ -19,13 +19,18 @@ import (
 	"github.com/bhuisgen/neon/internal/app/middlewares"
 )
 
-// server implements the server instance
-type Server struct {
-	config     *ServerConfig
-	logger     *log.Logger
-	httpServer *http.Server
-	renderer   Renderer
-	info       *ServerInfo
+// server implements a server
+type server struct {
+	config                      *ServerConfig
+	logger                      *log.Logger
+	httpServer                  *http.Server
+	renderer                    Renderer
+	info                        *ServerInfo
+	osCreate                    func(name string) (*os.File, error)
+	osReadFile                  func(name string) ([]byte, error)
+	httpServerListenAndServe    func(server *http.Server) error
+	httpServerListenAndServeTLS func(server *http.Server, certFile string, keyFile string) error
+	httpServerShutdown          func(server *http.Server, context context.Context) error
 }
 
 // ServerConfig implements the server configuration
@@ -40,13 +45,18 @@ type ServerConfig struct {
 	WriteTimeout  int
 	AccessLog     bool
 	AccessLogFile *string
-	Rewrite       RewriteRendererConfig
-	Header        HeaderRendererConfig
-	Static        StaticRendererConfig
-	Robots        RobotsRendererConfig
-	Sitemap       SitemapRendererConfig
-	Index         IndexRendererConfig
-	Default       DefaultRendererConfig
+	Renderer      *ServerRendererConfig
+}
+
+// ServerRendererConfig implements the server renderers configuration
+type ServerRendererConfig struct {
+	Rewrite *RewriteRendererConfig
+	Header  *HeaderRendererConfig
+	Static  *StaticRendererConfig
+	Robots  *RobotsRendererConfig
+	Sitemap *SitemapRendererConfig
+	Index   *IndexRendererConfig
+	Default *DefaultRendererConfig
 }
 
 type ContextKeyID struct{}
@@ -55,56 +65,104 @@ const (
 	serverLogger string = "server"
 )
 
-// CreateServer creates a new instance
-func CreateServer(config *ServerConfig, renderers ...Renderer) (*Server, error) {
-	logger := log.New(os.Stderr, fmt.Sprint(serverLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+// serverOsCreate redirects to os.Create
+func serverOsCreate(name string) (*os.File, error) {
+	return os.Create(name)
+}
 
-	server := Server{
+// serverOsReadFile redirects to os.ReadFile
+func serverOsReadFile(name string) ([]byte, error) {
+	return os.ReadFile(name)
+}
+
+// serverHttpServerListenAndServe redirects to http.Server.ListenAndServe
+func serverHttpServerListenAndServe(server *http.Server) error {
+	return server.ListenAndServe()
+}
+
+// serverHttpListenAndServeTLS redirects to http.Server.ListenAndServeTLS
+func serverHttpListenAndServeTLS(server *http.Server, certFile string, keyFile string) error {
+	return server.ListenAndServeTLS(certFile, keyFile)
+}
+
+// httpServerShutdown redirects to http.Server.Shutdown
+func httpServerShutdown(server *http.Server, context context.Context) error {
+	return server.Shutdown(context)
+}
+
+// CreateServer creates a new server instance
+func CreateServer(config *ServerConfig, renderers ...Renderer) (*server, error) {
+	s := server{
 		config:   config,
-		logger:   logger,
+		logger:   log.New(os.Stderr, fmt.Sprint(serverLogger, ": "), log.LstdFlags|log.Lmsgprefix),
 		renderer: nil,
 		info: &ServerInfo{
 			Addr:    config.ListenAddr,
 			Port:    config.ListenPort,
 			Version: Version,
 		},
+		osCreate:                    serverOsCreate,
+		osReadFile:                  serverOsReadFile,
+		httpServerListenAndServe:    serverHttpServerListenAndServe,
+		httpServerListenAndServeTLS: serverHttpListenAndServeTLS,
+		httpServerShutdown:          httpServerShutdown,
 	}
 
+	err := s.initialize(renderers...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+// initialize initializes the server
+func (s *server) initialize(renderers ...Renderer) error {
 	var previous Renderer
 	for index, renderer := range renderers {
 		if index == 0 {
-			server.renderer = renderer
+			s.renderer = renderer
 			previous = renderer
 			continue
 		}
 
-		previous.setNext(renderer)
+		previous.Next(renderer)
 		previous = renderer
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("/", middlewares.Recover(middlewares.Logging(&middlewares.LoggingConfig{
-		Log:     server.config.AccessLog,
-		LogFile: server.config.AccessLogFile,
-	}, NewServerHandler(&server))))
+	recoverConfig := middlewares.RecoverConfig{}
 
-	server.httpServer = &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", config.ListenAddr, config.ListenPort),
-		Handler:      mux,
-		ReadTimeout:  time.Duration(config.ReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(config.WriteTimeout) * time.Second,
+	loggerConfig := middlewares.LoggerConfig{
+		Log: s.config.AccessLog,
+	}
+	if s.config.AccessLogFile != nil {
+		logFile, err := s.osCreate(*s.config.AccessLogFile)
+		if err != nil {
+			return err
+		}
+		loggerConfig.Writer = logFile
 	}
 
-	if config.TLS {
+	mux := http.NewServeMux()
+	mux.Handle("/", middlewares.Recover(&recoverConfig, middlewares.Logger(&loggerConfig, NewServerHandler(s))))
+
+	s.httpServer = &http.Server{
+		Addr:         fmt.Sprintf("%s:%d", s.config.ListenAddr, s.config.ListenPort),
+		Handler:      mux,
+		ReadTimeout:  time.Duration(s.config.ReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(s.config.WriteTimeout) * time.Second,
+	}
+
+	if s.config.TLS {
 		tlsConfig := &tls.Config{
 			ClientAuth: tls.RequireAndVerifyClientCert,
 			MinVersion: tls.VersionTLS12,
 		}
 
-		if config.TLSCAFile != nil {
-			ca, err := os.ReadFile(*config.TLSCAFile)
+		if s.config.TLSCAFile != nil {
+			ca, err := s.osReadFile(*s.config.TLSCAFile)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			caCertPool := x509.NewCertPool()
@@ -113,48 +171,52 @@ func CreateServer(config *ServerConfig, renderers ...Renderer) (*Server, error) 
 			tlsConfig.ClientCAs = caCertPool
 		}
 
-		server.httpServer.TLSConfig = tlsConfig
+		s.httpServer.TLSConfig = tlsConfig
 	}
 
-	return &server, nil
+	return nil
 }
 
 // Start starts the server instance
-func (s *Server) Start() {
+func (s *server) Start() error {
 	go func() {
 		if s.config.TLS {
 			s.logger.Printf("Listening at https://%s", s.httpServer.Addr)
 
-			err := s.httpServer.ListenAndServeTLS(*s.config.TLSCertFile, *s.config.TLSKeyFile)
+			err := s.httpServerListenAndServeTLS(s.httpServer, *s.config.TLSCertFile, *s.config.TLSKeyFile)
 			if err != nil && err != http.ErrServerClosed {
-				log.Fatal(err)
+				log.Print(err)
 			}
 		} else {
 			s.logger.Printf("Listening at http://%s", s.httpServer.Addr)
 
-			err := s.httpServer.ListenAndServe()
+			err := s.httpServerListenAndServe(s.httpServer)
 			if err != nil && err != http.ErrServerClosed {
-				log.Fatal(err)
+				log.Print(err)
 			}
 		}
 	}()
+
+	return nil
 }
 
 // Stop stops the server instance
-func (s *Server) Stop(ctx context.Context) {
-	err := s.httpServer.Shutdown(ctx)
+func (s *server) Stop(ctx context.Context) error {
+	err := s.httpServerShutdown(s.httpServer, ctx)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	return nil
 }
 
 // serverHandler implements the server handler
 type serverHandler struct {
-	server *Server
+	server *server
 }
 
 // NewServerHandler creates a new server handler
-func NewServerHandler(server *Server) *serverHandler {
+func NewServerHandler(server *server) *serverHandler {
 	return &serverHandler{
 		server: server,
 	}
@@ -170,5 +232,5 @@ func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Server", fmt.Sprint("neon/", Version))
 	w.Header().Set("X-Correlation-ID", id.String())
 
-	h.server.renderer.handle(w, r, h.server.info)
+	h.server.renderer.Handle(w, r, h.server.info)
 }

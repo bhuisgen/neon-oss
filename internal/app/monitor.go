@@ -5,9 +5,11 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/pprof"
@@ -16,7 +18,21 @@ import (
 	"time"
 )
 
-// monitorStats implements the resources monitor statistics
+// monitor implements a metrics monitor
+type monitor struct {
+	config     *MonitorConfig
+	logger     *log.Logger
+	stopLogger chan struct{}
+	stopTracer chan struct{}
+}
+
+// MonitorConfig implements the monitor configuration
+type MonitorConfig struct {
+	Delay  int
+	Writer io.Writer
+}
+
+// monitorStats implements the monitor statistics
 type monitorStats struct {
 	NumGoroutine int
 	Alloc        uint64
@@ -34,8 +50,50 @@ const (
 )
 
 // NewMonitor creates a new resources monitor
-func NewMonitor(delay int64) {
-	logger := log.New(os.Stderr, fmt.Sprint(monitorLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+func NewMonitor(config *MonitorConfig) *monitor {
+	return &monitor{
+		config:     config,
+		logger:     log.New(os.Stderr, fmt.Sprint(monitorLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		stopLogger: make(chan struct{}),
+		stopTracer: make(chan struct{}),
+	}
+}
+
+// Start starts the monitor
+func (m *monitor) Start() {
+	go func() {
+		var memstats runtime.MemStats
+		var goroutine = expvar.NewInt("Goroutine")
+		var s monitorStats
+		ticker := time.NewTicker(time.Duration(m.config.Delay) * time.Second)
+
+		for {
+			select {
+			case <-ticker.C:
+				runtime.ReadMemStats(&memstats)
+
+				s.NumGoroutine = runtime.NumGoroutine()
+				goroutine.Set(int64(s.NumGoroutine))
+
+				s.Alloc = memstats.Alloc
+				s.TotalAlloc = memstats.TotalAlloc
+				s.Sys = memstats.Sys
+				s.Frees = memstats.Frees
+				s.Mallocs = memstats.Mallocs
+				s.LiveObjects = s.Mallocs - s.Frees
+				s.PauseTotalNs = memstats.PauseTotalNs
+				s.NumGC = memstats.NumGC
+
+				data, _ := json.Marshal(s)
+				m.logger.Printf("Status: %s", string(data))
+
+			case <-m.stopLogger:
+				ticker.Stop()
+
+				return
+			}
+		}
+	}()
 
 	go func() {
 		mux := http.NewServeMux()
@@ -45,33 +103,26 @@ func NewMonitor(delay int64) {
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		http.ListenAndServe("0.0.0.0:6060", mux)
-	}()
 
-	var interval = time.Duration(delay) * time.Second
-	var memstats runtime.MemStats
-	var goroutine = expvar.NewInt("Goroutine")
-	var s monitorStats
-	go func() {
-		for {
-			<-time.After(interval)
-
-			runtime.ReadMemStats(&memstats)
-
-			s.NumGoroutine = runtime.NumGoroutine()
-			goroutine.Set(int64(s.NumGoroutine))
-
-			s.Alloc = memstats.Alloc
-			s.TotalAlloc = memstats.TotalAlloc
-			s.Sys = memstats.Sys
-			s.Frees = memstats.Frees
-			s.Mallocs = memstats.Mallocs
-			s.LiveObjects = s.Mallocs - s.Frees
-			s.PauseTotalNs = memstats.PauseTotalNs
-			s.NumGC = memstats.NumGC
-
-			data, _ := json.Marshal(s)
-			logger.Printf("Status: %s", string(data))
+		tracer := http.Server{
+			Addr:    "0.0.0.0:6060",
+			Handler: mux,
 		}
+
+		go tracer.ListenAndServe()
+
+		<-m.stopTracer
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer func() {
+			cancel()
+		}()
+
+		tracer.Shutdown(ctx)
 	}()
+}
+
+// Stop stops the monitor
+func (m *monitor) Stop(ctx context.Context) {
+	m.stopLogger <- struct{}{}
+	m.stopTracer <- struct{}{}
 }

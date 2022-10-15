@@ -13,9 +13,6 @@ import (
 
 // errorRenderer implements the error renderer
 type errorRenderer struct {
-	Renderer
-	next Renderer
-
 	config *ErrorRendererConfig
 	logger *log.Logger
 }
@@ -30,21 +27,20 @@ const (
 
 // CreateErrorRenderer creates a new error renderer
 func CreateErrorRenderer(config *ErrorRendererConfig) (*errorRenderer, error) {
-	logger := log.New(os.Stderr, fmt.Sprint(errorLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-
 	return &errorRenderer{
 		config: config,
-		logger: logger,
+		logger: log.New(os.Stderr, fmt.Sprint(errorLogger, ": "), log.LstdFlags|log.Lmsgprefix),
 	}, nil
 }
 
-// handle implements the renderer handler
-func (r *errorRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+// Handle implements the renderer
+func (r *errorRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte{})
+
+	r.logger.Printf("Render completed (url=%s, status=%d)", req.URL.Path, http.StatusInternalServerError)
 }
 
-// setNext configures the next renderer
-func (r *errorRenderer) setNext(renderer Renderer) {
-	r.next = renderer
+// Next configures the next renderer
+func (r *errorRenderer) Next(renderer Renderer) {
 }

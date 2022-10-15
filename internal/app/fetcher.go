@@ -19,17 +19,20 @@ import (
 	"time"
 )
 
-// fetcher implements the resources fetcher
+// fetcher implements a fetcher
 type fetcher struct {
-	config        *FetcherConfig
-	logger        *log.Logger
-	client        *http.Client
-	resources     map[string]*Resource
-	resourcesLock sync.RWMutex
-	data          *cache
+	config                         *FetcherConfig
+	logger                         *log.Logger
+	requester                      FetchRequester
+	resources                      map[string]*Resource
+	resourcesLock                  sync.RWMutex
+	data                           Cache
+	osReadFile                     func(name string) ([]byte, error)
+	x509CertPoolAppendCertsFromPEM func(pool *x509.CertPool, pemCerts []byte) bool
+	tlsLoadX509KeyPair             func(certFile, keyFile string) (tls.Certificate, error)
 }
 
-// FetcherConfig implements the resources fetcher configuration
+// FetcherConfig implements a fetcher configuration
 type FetcherConfig struct {
 	RequestTLSCAFile   *string
 	RequestTLSCertFile *string
@@ -64,31 +67,71 @@ const (
 	fetcherLogger string = "fetcher"
 )
 
-// NewFetcher creates a new instance
-func NewFetcher(config *FetcherConfig) *fetcher {
-	logger := log.New(os.Stderr, fmt.Sprint(fetcherLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+// fetcherOsReadFile redirects to os.ReadFile
+func fetcherOsReadFile(name string) ([]byte, error) {
+	return os.ReadFile(name)
+}
 
+// fetcherTlsLoadX509KeyPair redirects to tls.LoadX509KeyPair
+func fetcherTlsLoadX509KeyPair(certFile string, keyFile string) (tls.Certificate, error) {
+	return tls.LoadX509KeyPair(certFile, keyFile)
+}
+
+// fetcherX509CertPoolAppendCertsFromPEM redirects to x509.CertPool.AppendCertsFromPEM
+func fetcherX509CertPoolAppendCertsFromPEM(pool *x509.CertPool, pemCerts []byte) bool {
+	return pool.AppendCertsFromPEM(pemCerts)
+}
+
+// CreateFetcher creates a new fetcher instance
+func CreateFetcher(config *FetcherConfig) (*fetcher, error) {
+	return createFetcherWithRequester(config, nil)
+}
+
+// createFetcherWithRequester creates a new fetcher instance with the given requester
+func createFetcherWithRequester(config *FetcherConfig, fetchRequester FetchRequester) (*fetcher, error) {
+	f := &fetcher{
+		config:                         config,
+		logger:                         log.New(os.Stderr, fmt.Sprint(fetcherLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		requester:                      fetchRequester,
+		resources:                      make(map[string]*Resource),
+		resourcesLock:                  sync.RWMutex{},
+		data:                           newCache(),
+		osReadFile:                     fetcherOsReadFile,
+		tlsLoadX509KeyPair:             fetcherTlsLoadX509KeyPair,
+		x509CertPoolAppendCertsFromPEM: fetcherX509CertPoolAppendCertsFromPEM,
+	}
+
+	err := f.initialize(fetchRequester)
+	if err != nil {
+		return nil, err
+	}
+
+	return f, nil
+}
+
+// initialize initializes the fetcher
+func (f *fetcher) initialize(fetchRequester FetchRequester) error {
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
 
-	if config.RequestTLSCAFile != nil {
-		ca, err := os.ReadFile(*config.RequestTLSCAFile)
+	if f.config.RequestTLSCAFile != nil {
+		ca, err := f.osReadFile(*f.config.RequestTLSCAFile)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		caCertPool := x509.NewCertPool()
-		if !caCertPool.AppendCertsFromPEM(ca) {
-			log.Fatal(err)
+		if !f.x509CertPoolAppendCertsFromPEM(caCertPool, ca) {
+			return errors.New("CA certificate not added into pool")
 		}
 
 		tlsConfig.RootCAs = caCertPool
 
-		if config.RequestTLSCertFile != nil && config.RequestTLSKeyFile != nil {
-			clientCert, err := tls.LoadX509KeyPair(*config.RequestTLSCertFile, *config.RequestTLSKeyFile)
+		if f.config.RequestTLSCertFile != nil && f.config.RequestTLSKeyFile != nil {
+			clientCert, err := f.tlsLoadX509KeyPair(*f.config.RequestTLSCertFile, *f.config.RequestTLSKeyFile)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
 			tlsConfig.Certificates = []tls.Certificate{clientCert}
@@ -98,31 +141,27 @@ func NewFetcher(config *FetcherConfig) *fetcher {
 	transport := http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		Dial: (&net.Dialer{
-			Timeout: time.Duration(config.RequestTimeout) * time.Second,
+			Timeout: time.Duration(f.config.RequestTimeout) * time.Second,
 		}).Dial,
 		TLSClientConfig:       tlsConfig,
-		TLSHandshakeTimeout:   time.Duration(config.RequestTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(config.RequestTimeout) * time.Second,
-		ExpectContinueTimeout: time.Duration(config.RequestTimeout) * time.Second,
+		TLSHandshakeTimeout:   time.Duration(f.config.RequestTimeout) * time.Second,
+		ResponseHeaderTimeout: time.Duration(f.config.RequestTimeout) * time.Second,
+		ExpectContinueTimeout: time.Duration(f.config.RequestTimeout) * time.Second,
 		ForceAttemptHTTP2:     true,
 	}
 
 	client := http.Client{
 		Transport: &transport,
-		Timeout:   time.Duration(config.RequestTimeout) * time.Second,
+		Timeout:   time.Duration(f.config.RequestTimeout) * time.Second,
 	}
 
-	fetcher := &fetcher{
-		config:        config,
-		logger:        logger,
-		client:        &client,
-		resources:     make(map[string]*Resource),
-		resourcesLock: sync.RWMutex{},
-		data:          NewCache(),
+	if fetchRequester == nil {
+		f.requester = newFetchRequester(f.logger, &client, f.config.RequestHeaders, f.config.RequestRetry,
+			time.Duration(f.config.RequestDelay)*time.Second)
 	}
 
-	for _, r := range config.Resources {
-		fetcher.Register(&Resource{
+	for _, r := range f.config.Resources {
+		f.Register(&Resource{
 			Name:    r.Name,
 			Method:  r.Method,
 			URL:     r.URL,
@@ -131,82 +170,7 @@ func NewFetcher(config *FetcherConfig) *fetcher {
 		})
 	}
 
-	return fetcher
-}
-
-// request fetches an API with the given parameters
-func (f *fetcher) request(ctx context.Context, method string, url string, params map[string]string,
-	headers map[string]string) ([]byte, error) {
-	r, err := http.NewRequestWithContext(ctx, method, url, nil)
-	if err != nil {
-		f.logger.Printf("Failed to create request: %s", err)
-
-		return nil, err
-	}
-
-	query := r.URL.Query()
-	for key, value := range params {
-		query.Add(key, value)
-	}
-	r.URL.RawQuery = query.Encode()
-
-	for key, value := range f.config.RequestHeaders {
-		r.Header.Set(key, value)
-	}
-	for key, value := range headers {
-		r.Header.Set(key, value)
-	}
-
-	var attempt int
-	for {
-		attempt += 1
-
-		response, err := f.client.Do(r)
-		if err != nil {
-			f.logger.Printf("Failed to send request: %s %s %s", method, url, err)
-
-			return nil, err
-		}
-		defer response.Body.Close()
-
-		responseBody, err := io.ReadAll(response.Body)
-		if err != nil {
-			f.logger.Printf("Failed to read request response: %s", err)
-
-			return nil, err
-		}
-
-		if _, ok := os.LookupEnv("DEBUG"); ok {
-			f.logger.Printf("Fetch request: method=%s, url=%s, code=%d\n", method, r.URL.String(), response.StatusCode)
-		}
-
-		switch response.StatusCode {
-		case 429, 500, 502, 503, 504:
-			if attempt >= f.config.RequestRetry {
-				return nil, fmt.Errorf("request error %d", response.StatusCode)
-			}
-
-			if f.config.RequestDelay > 0 {
-				f.logger.Printf("Retrying request attempt %d/%d, delaying for %d seconds", attempt, f.config.RequestRetry,
-					f.config.RequestDelay)
-
-				time.Sleep(time.Duration(f.config.RequestDelay) * time.Second)
-			} else {
-				f.logger.Printf("Retrying request attempt %d/%d", attempt, f.config.RequestRetry)
-			}
-
-			continue
-
-		default:
-			if response.StatusCode < 200 || response.StatusCode > 299 {
-				return nil, fmt.Errorf("request error %d", response.StatusCode)
-			}
-
-			break
-		}
-
-		return responseBody, nil
-	}
+	return nil
 }
 
 // Fetch fetches a registered resource
@@ -215,7 +179,7 @@ func (f *fetcher) Fetch(ctx context.Context, name string) error {
 	defer f.resourcesLock.RUnlock()
 
 	if r, ok := f.resources[name]; ok {
-		data, err := f.request(ctx, r.Method, r.URL, r.Params, r.Headers)
+		data, err := f.requester.Fetch(ctx, r.Method, r.URL, r.Params, r.Headers)
 		if err != nil {
 			f.logger.Printf("Failed to fetch resource '%s': %s", r.Name, err)
 
@@ -228,30 +192,6 @@ func (f *fetcher) Fetch(ctx context.Context, name string) error {
 	}
 
 	return fmt.Errorf("no resource found")
-}
-
-// FetchAll fetches all registered resources
-func (f *fetcher) FetchAll(ctx context.Context, skip bool) error {
-	f.resourcesLock.RLock()
-	defer f.resourcesLock.RUnlock()
-
-	var err error
-	for _, r := range f.resources {
-		data, err := f.request(ctx, r.Method, r.URL, r.Params, r.Headers)
-		if err != nil {
-			f.logger.Printf("Failed to fetch resource '%s': %s", r.Name, err)
-
-			if skip {
-				continue
-			}
-
-			return err
-		}
-
-		f.data.Set(r.Name, data, time.Duration(r.TTL)*time.Second)
-	}
-
-	return err
 }
 
 // Exists checks if a resource exists
@@ -268,6 +208,9 @@ func (f *fetcher) Exists(name string) bool {
 
 // Get returns the last fetched data of a resource
 func (f *fetcher) Get(name string) ([]byte, error) {
+	f.resourcesLock.Lock()
+	defer f.resourcesLock.Unlock()
+
 	obj := f.data.Get(name)
 	if obj == nil {
 		return nil, fmt.Errorf("no data found")
@@ -289,9 +232,7 @@ func (f *fetcher) Unregister(name string) {
 	f.resourcesLock.Lock()
 	defer f.resourcesLock.Unlock()
 
-	if _, ok := f.resources[name]; ok {
-		delete(f.resources, name)
-	}
+	delete(f.resources, name)
 }
 
 // CreateResourceFromTemplate creates a resource from a template
@@ -333,5 +274,126 @@ func (f *fetcher) CreateResourceFromTemplate(template string, resource string, p
 		}, nil
 	}
 
-	return nil, errors.New("failed to find template")
+	return nil, errors.New("template not found")
+}
+
+// FetchRequester
+type FetchRequester interface {
+	Fetch(ctx context.Context, method string, url string, params map[string]string,
+		headers map[string]string) ([]byte, error)
+}
+
+// fetchRequester implements the default fetch requester
+type fetchRequester struct {
+	logger                    *log.Logger
+	client                    *http.Client
+	headers                   map[string]string
+	retry                     int
+	delay                     time.Duration
+	httpNewRequestWithContext func(ctx context.Context, method string, url string, body io.Reader) (*http.Request, error)
+	httpClientDo              func(client *http.Client, req *http.Request) (*http.Response, error)
+	ioReadAll                 func(r io.Reader) ([]byte, error)
+}
+
+// fetchRequesterHttpNewRequestWithContext redirects to http.NewRequestWithContext
+func fetchRequesterHttpNewRequestWithContext(ctx context.Context, method string, url string,
+	body io.Reader) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, method, url, body)
+}
+
+// fetchRequestHttpClientDo redirects to http.Client.Do
+func fetchRequestHttpClientDo(client *http.Client, req *http.Request) (*http.Response, error) {
+	return client.Do(req)
+}
+
+// fetchRequesterIoReadAll redirects to io.ReadAll
+func fetchRequesterIoReadAll(r io.Reader) ([]byte, error) {
+	return io.ReadAll(r)
+}
+
+// newFetchRequester creates a new fetch requester instance
+func newFetchRequester(logger *log.Logger, client *http.Client, headers map[string]string, retry int,
+	delay time.Duration) *fetchRequester {
+	return &fetchRequester{
+		logger:                    logger,
+		client:                    client,
+		headers:                   headers,
+		retry:                     retry,
+		delay:                     delay,
+		httpNewRequestWithContext: fetchRequesterHttpNewRequestWithContext,
+		httpClientDo:              fetchRequestHttpClientDo,
+		ioReadAll:                 fetchRequesterIoReadAll,
+	}
+}
+
+// Fetch fetches an API with the given parameters
+func (r *fetchRequester) Fetch(ctx context.Context, method string, url string, params map[string]string,
+	headers map[string]string) ([]byte, error) {
+	req, err := r.httpNewRequestWithContext(ctx, method, url, nil)
+	if err != nil {
+		r.logger.Printf("Failed to create request: %s", err)
+
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	for key, value := range params {
+		query.Add(key, value)
+	}
+	req.URL.RawQuery = query.Encode()
+
+	for key, value := range r.headers {
+		req.Header.Set(key, value)
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	var attempt int
+	for {
+		attempt += 1
+
+		response, err := r.httpClientDo(r.client, req)
+		if err != nil {
+			r.logger.Printf("Failed to send request: %s %s %s", method, url, err)
+
+			return nil, err
+		}
+		defer response.Body.Close()
+
+		responseBody, err := r.ioReadAll(response.Body)
+		if err != nil {
+			r.logger.Printf("Failed to read request response: %s", err)
+
+			return nil, err
+		}
+
+		if DEBUG {
+			r.logger.Printf("Fetch request: method=%s, url=%s, code=%d\n", method, req.URL.String(), response.StatusCode)
+		}
+
+		switch response.StatusCode {
+		case 429, 500, 502, 503, 504:
+			if attempt >= r.retry {
+				return nil, fmt.Errorf("request error %d", response.StatusCode)
+			}
+
+			if r.delay > 0 {
+				r.logger.Printf("Retrying request attempt %d/%d, delaying for %d seconds", attempt, r.retry, r.delay)
+
+				time.Sleep(r.delay)
+			} else {
+				r.logger.Printf("Retrying request attempt %d/%d", attempt, r.retry)
+			}
+
+			continue
+
+		default:
+			if response.StatusCode < 200 || response.StatusCode > 299 {
+				return nil, fmt.Errorf("request error %d", response.StatusCode)
+			}
+		}
+
+		return responseBody, nil
+	}
 }

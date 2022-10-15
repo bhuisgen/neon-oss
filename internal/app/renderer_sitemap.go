@@ -17,18 +17,16 @@ import (
 
 // sitemapRenderer implements the sitemap renderer
 type sitemapRenderer struct {
-	Renderer
-	next Renderer
-
-	config  *SitemapRendererConfig
-	logger  *log.Logger
-	cache   *cache
-	fetcher *fetcher
+	config     *SitemapRendererConfig
+	logger     *log.Logger
+	bufferPool BufferPool
+	cache      Cache
+	fetcher    Fetcher
+	next       Renderer
 }
 
 // SitemapRendererConfig implements the sitemap renderer configuration
 type SitemapRendererConfig struct {
-	Enable   bool
 	Root     string
 	Cache    bool
 	CacheTTL int
@@ -98,19 +96,18 @@ const (
 )
 
 // CreateSitemapRenderer creates a new sitemap renderer
-func CreateSitemapRenderer(config *SitemapRendererConfig, fetcher *fetcher) (*sitemapRenderer, error) {
-	logger := log.New(os.Stderr, fmt.Sprint(sitemapLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-
+func CreateSitemapRenderer(config *SitemapRendererConfig, fetcher Fetcher) (*sitemapRenderer, error) {
 	return &sitemapRenderer{
-		config:  config,
-		logger:  logger,
-		cache:   NewCache(),
-		fetcher: fetcher,
+		config:     config,
+		logger:     log.New(os.Stderr, fmt.Sprint(sitemapLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		bufferPool: newBufferPool(),
+		cache:      newCache(),
+		fetcher:    fetcher,
 	}, nil
 }
 
-// handle implements the renderer handler
-func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+// Handle implements the renderer
+func (r *sitemapRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	var routeIndex int = -1
 	for index, route := range r.config.Routes {
 		if route.Path != req.URL.Path {
@@ -122,7 +119,7 @@ func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request, info 
 		break
 	}
 	if routeIndex == -1 {
-		r.next.handle(w, req, info)
+		r.next.Handle(w, req, info)
 
 		return
 	}
@@ -132,7 +129,7 @@ func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request, info 
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
 
-		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, result.Status)
+		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, http.StatusInternalServerError)
 
 		return
 	}
@@ -144,8 +141,8 @@ func (r *sitemapRenderer) handle(w http.ResponseWriter, req *http.Request, info 
 		result.Cache)
 }
 
-// setNext configures the next renderer
-func (r *sitemapRenderer) setNext(renderer Renderer) {
+// Next configures the next renderer
+func (r *sitemapRenderer) Next(renderer Renderer) {
 	r.next = renderer
 }
 
@@ -199,9 +196,8 @@ func (r *sitemapRenderer) render(routeIndex int, req *http.Request) (*Render, er
 
 // sitemapIndex generates a sitemap index
 func sitemapIndex(s *[]SitemapIndexEntry, r *sitemapRenderer, req *http.Request) ([]byte, bool, error) {
-	var body = bufferPool.Get().(*bytes.Buffer)
-	defer bufferPool.Put(body)
-	body.Reset()
+	body := r.bufferPool.Get()
+	defer r.bufferPool.Put(body)
 
 	body.WriteString("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\n")
 	body.WriteString("<sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n")
@@ -239,13 +235,12 @@ func sitemapIndexStatic(static *SitemapIndexEntryStatic, r *sitemapRenderer, req
 
 // sitemap generates a sitemap
 func sitemap(s *[]SitemapEntry, r *sitemapRenderer, req *http.Request) ([]byte, bool, error) {
-	var body = bufferPool.Get().(*bytes.Buffer)
-	defer bufferPool.Put(body)
-	body.Reset()
+	body := r.bufferPool.Get()
+	defer r.bufferPool.Put(body)
 
 	body.WriteString("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\n")
 	body.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n")
-	body.WriteString("	 xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n")
+	body.WriteString("   xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n")
 
 	var valid bool = true
 	var state bool

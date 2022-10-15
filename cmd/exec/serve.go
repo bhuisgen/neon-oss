@@ -70,16 +70,28 @@ func (c *serveCommand) Execute() error {
 		return err
 	}
 
-	var servers []*app.Server
+	var servers []app.Server
 
-	fetcher := app.NewFetcher(config.Fetcher)
-	loader := app.NewLoader(config.Loader, fetcher)
+	fetcher, err := app.CreateFetcher(config.Fetcher)
+	if err != nil {
+		fmt.Printf("Failed to create fetcher: %s\n", err)
+		return err
+	}
+
+	var loader app.Loader
+	if config.Loader != nil {
+		loader, err = app.CreateLoader(config.Loader, fetcher)
+		if err != nil {
+			fmt.Printf("Failed to create loader: %s\n", err)
+			return err
+		}
+	}
 
 	for _, configServer := range config.Server {
 		var renderers []app.Renderer
 
-		if configServer.Rewrite.Enable {
-			rewrite, err := app.CreateRewriteRenderer(&configServer.Rewrite)
+		if configServer.Renderer.Rewrite != nil {
+			rewrite, err := app.CreateRewriteRenderer(configServer.Renderer.Rewrite)
 			if err != nil {
 				fmt.Printf("Failed to create server: %s\n", err)
 				return err
@@ -87,8 +99,8 @@ func (c *serveCommand) Execute() error {
 			renderers = append(renderers, rewrite)
 		}
 
-		if configServer.Header.Enable {
-			header, err := app.CreateHeaderRenderer(&configServer.Header)
+		if configServer.Renderer.Header != nil {
+			header, err := app.CreateHeaderRenderer(configServer.Renderer.Header)
 			if err != nil {
 				fmt.Printf("Failed to create server: %s\n", err)
 				return err
@@ -97,8 +109,8 @@ func (c *serveCommand) Execute() error {
 			renderers = append(renderers, header)
 		}
 
-		if configServer.Static.Enable {
-			static, err := app.CreateStaticRenderer(&configServer.Static)
+		if configServer.Renderer.Static != nil {
+			static, err := app.CreateStaticRenderer(configServer.Renderer.Static)
 			if err != nil {
 				fmt.Printf("Failed to create server: %s\n", err)
 				return err
@@ -106,8 +118,8 @@ func (c *serveCommand) Execute() error {
 			renderers = append(renderers, static)
 		}
 
-		if configServer.Robots.Enable {
-			robots, err := app.CreateRobotsRenderer(&configServer.Robots, loader)
+		if configServer.Renderer.Robots != nil {
+			robots, err := app.CreateRobotsRenderer(configServer.Renderer.Robots)
 			if err != nil {
 				fmt.Printf("Failed to create server: %s\n", err)
 				return err
@@ -115,8 +127,8 @@ func (c *serveCommand) Execute() error {
 			renderers = append(renderers, robots)
 		}
 
-		if configServer.Sitemap.Enable {
-			sitemap, err := app.CreateSitemapRenderer(&configServer.Sitemap, fetcher)
+		if configServer.Renderer.Sitemap != nil {
+			sitemap, err := app.CreateSitemapRenderer(configServer.Renderer.Sitemap, fetcher)
 			if err != nil {
 				fmt.Printf("Failed to create server: %s\n", err)
 				return err
@@ -124,8 +136,8 @@ func (c *serveCommand) Execute() error {
 			renderers = append(renderers, sitemap)
 		}
 
-		if configServer.Index.Enable {
-			index, err := app.CreateIndexRenderer(&configServer.Index, fetcher)
+		if configServer.Renderer.Index != nil {
+			index, err := app.CreateIndexRenderer(configServer.Renderer.Index, fetcher)
 			if err != nil {
 				fmt.Printf("Failed to create index renderer: %s\n", err)
 				return err
@@ -133,8 +145,8 @@ func (c *serveCommand) Execute() error {
 			renderers = append(renderers, index)
 		}
 
-		if configServer.Default.Enable {
-			d, err := app.CreateDefaultRenderer(&configServer.Default)
+		if configServer.Renderer.Default != nil {
+			d, err := app.CreateDefaultRenderer(configServer.Renderer.Default)
 			if err != nil {
 				fmt.Printf("Failed to create default renderer: %s\n", err)
 				return err
@@ -158,8 +170,8 @@ func (c *serveCommand) Execute() error {
 		servers = append(servers, server)
 	}
 
-	if _, ok := os.LookupEnv("DEBUG"); ok {
-		app.NewMonitor(300)
+	if app.DEBUG {
+		app.NewMonitor(&app.MonitorConfig{Delay: 300})
 	}
 
 	log.Printf("%s version %s, commit %s\n", app.Name, app.Version, app.Commit)
@@ -169,15 +181,22 @@ func (c *serveCommand) Execute() error {
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	loader.Start()
 	for _, server := range servers {
 		server.Start()
+	}
+
+	if loader != nil {
+		loader.Start()
 	}
 
 	<-exit
 	signal.Stop(exit)
 
 	log.Println("Stopping instance")
+
+	if loader != nil {
+		loader.Stop()
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer func() {

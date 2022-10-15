@@ -14,17 +14,15 @@ import (
 
 // defaultRenderer implements the default renderer
 type defaultRenderer struct {
-	Render
-	next Renderer
-
-	config *DefaultRendererConfig
-	logger *log.Logger
-	cache  *cache
+	config     *DefaultRendererConfig
+	logger     *log.Logger
+	cache      Cache
+	next       Renderer
+	osReadFile func(name string) ([]byte, error)
 }
 
 // DefaultRendererConfig implements the default renderer configuration
 type DefaultRendererConfig struct {
-	Enable     bool
 	File       string
 	StatusCode int
 	Cache      bool
@@ -35,25 +33,29 @@ const (
 	defaultLogger string = "server[default]"
 )
 
+// defaultOsReadFile redirects to os.ReadFile
+func defaultOsReadFile(name string) ([]byte, error) {
+	return os.ReadFile(name)
+}
+
 // CreateDefaultRenderer creates a new default renderer
 func CreateDefaultRenderer(config *DefaultRendererConfig) (*defaultRenderer, error) {
-	logger := log.New(os.Stderr, fmt.Sprint(defaultLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-
 	return &defaultRenderer{
-		config: config,
-		logger: logger,
-		cache:  NewCache(),
+		config:     config,
+		logger:     log.New(os.Stderr, fmt.Sprint(defaultLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		cache:      newCache(),
+		osReadFile: defaultOsReadFile,
 	}, nil
 }
 
-// handle implements the default renderer
-func (r *defaultRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+// Handle implements the renderer
+func (r *defaultRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	result, err := r.render(req)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
 
-		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, result.Status)
+		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, http.StatusInternalServerError)
 
 		return
 	}
@@ -65,8 +67,8 @@ func (r *defaultRenderer) handle(w http.ResponseWriter, req *http.Request, info 
 		result.Cache)
 }
 
-// setNext configures the default renderer
-func (r *defaultRenderer) setNext(renderer Renderer) {
+// Next configures the next renderer
+func (r *defaultRenderer) Next(renderer Renderer) {
 	r.next = renderer
 }
 
@@ -103,7 +105,7 @@ func (r *defaultRenderer) render(req *http.Request) (*Render, error) {
 
 // defaultFile generates a default file
 func defaultFile(r *defaultRenderer, req *http.Request) ([]byte, error) {
-	body, err := os.ReadFile(r.config.File)
+	body, err := r.osReadFile(r.config.File)
 	if err != nil {
 		r.logger.Printf("Failed to read default file '%s': %s", r.config.File, err)
 

@@ -15,18 +15,15 @@ import (
 
 // rewriteRenderer implements the rewrite renderer
 type rewriteRenderer struct {
-	Renderer
-	next Renderer
-
 	config  *RewriteRendererConfig
 	logger  *log.Logger
 	regexps []*regexp.Regexp
+	next    Renderer
 }
 
 // RewriteRendererConfig implements the rewrite renderer configuration
 type RewriteRendererConfig struct {
-	Enable bool
-	Rules  []RewriteRule
+	Rules []RewriteRule
 }
 
 // RewriteRule implements a rewrite rule
@@ -45,60 +42,58 @@ const (
 
 // CreateRewriteRenderer creates a new rewrite renderer
 func CreateRewriteRenderer(config *RewriteRendererConfig) (*rewriteRenderer, error) {
-	logger := log.New(os.Stderr, fmt.Sprint(rewriteLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-
-	regexps := []*regexp.Regexp{}
-	for _, rule := range config.Rules {
-		r, err := regexp.Compile(rule.Path)
-		if err != nil {
-			return nil, err
-		}
-
-		regexps = append(regexps, r)
+	r := rewriteRenderer{
+		config:  config,
+		logger:  log.New(os.Stderr, fmt.Sprint(rewriteLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		regexps: []*regexp.Regexp{},
 	}
 
-	return &rewriteRenderer{
-		config:  config,
-		logger:  logger,
-		regexps: regexps,
-	}, nil
+	err := r.initialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
 }
 
-// handle implements the rewrite handler
-func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+// initialize initializes the renderer
+func (r *rewriteRenderer) initialize() error {
+	for _, rule := range r.config.Rules {
+		re, err := regexp.Compile(rule.Path)
+		if err != nil {
+			return err
+		}
+		r.regexps = append(r.regexps, re)
+	}
+
+	return nil
+}
+
+// Handle implements the renderer
+func (r *rewriteRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+	var rewrite bool
+	var path string = req.URL.Path
+	var status int = http.StatusFound
+	var redirect bool
 	for index, regexp := range r.regexps {
-		if regexp.MatchString(req.URL.Path) {
-			stop := false
-			status := http.StatusFound
+		if regexp.MatchString(path) {
+			rewrite = true
+			path = r.config.Rules[index].Replacement
+
+			if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+				redirect = true
+			}
 
 			if r.config.Rules[index].Flag != nil {
 				switch *r.config.Rules[index].Flag {
 				case rewriteRuleFlagRedirect:
-					stop = true
 					status = http.StatusFound
+					redirect = true
 				case rewriteRuleFlagPermanent:
-					stop = true
 					status = http.StatusMovedPermanently
-				}
-				if strings.HasPrefix(r.config.Rules[index].Replacement, "http://") ||
-					strings.HasPrefix(r.config.Rules[index].Replacement, "https://") {
-					stop = true
+					redirect = true
 				}
 			}
-
-			if stop {
-				http.Redirect(w, req, r.config.Rules[index].Replacement, status)
-
-				r.logger.Printf("Rewrite processed (url=%s, status=%d, target=%s)", req.URL.Path, status,
-					r.config.Rules[index].Replacement)
-
-				return
-			}
-
-			url := req.URL.Path
-			req.URL.Path = r.config.Rules[index].Replacement
-
-			r.logger.Printf("Rewrite processed (url=%s, status=%d, target=%s)", url, status, req.URL.Path)
 
 			if r.config.Rules[index].Last {
 				break
@@ -106,10 +101,24 @@ func (r *rewriteRenderer) handle(w http.ResponseWriter, req *http.Request, info 
 		}
 	}
 
-	r.next.handle(w, req, info)
+	if rewrite {
+		if redirect {
+			http.Redirect(w, req, path, status)
+
+			r.logger.Printf("Redirect processed (url=%s, status=%d, target=%s)", req.URL.Path, status, path)
+
+			return
+		}
+
+		req.URL.Path = path
+
+		r.logger.Printf("Rewrite processed (url=%s)", req.URL.Path)
+	}
+
+	r.next.Handle(w, req, info)
 }
 
-// setNext configures the next renderer
-func (r *rewriteRenderer) setNext(renderer Renderer) {
+// Next configures the next renderer
+func (r *rewriteRenderer) Next(renderer Renderer) {
 	r.next = renderer
 }

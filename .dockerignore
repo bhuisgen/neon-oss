@@ -1,4 +1,7 @@
-.vscode/
-data
-config.yaml
-neon
+/.vscode
+/data
+/Makefile
+/neon
+/neon.yaml
+/share
+/vendor

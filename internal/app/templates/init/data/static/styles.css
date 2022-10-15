@@ -6,21 +6,21 @@ html {
 @font-face {
   font-family: Rubik;
   font-weight: 300;
-  src: url(./assets/fonts/Rubik-VariableFont_wght.ttf) format("truetype");
+  src: url(Rubik-VariableFont_wght.ttf) format("truetype");
   font-display: swap;
 }
 
 @font-face {
   font-family: Rubik;
   font-weight: 400;
-  src: url(./assets/fonts/Rubik-VariableFont_wght.ttf) format("truetype");
+  src: url(Rubik-VariableFont_wght.ttf) format("truetype");
   font-display: swap;
 }
 
 @font-face {
   font-family: Rubik;
   font-weight: 500;
-  src: url(./assets/fonts/Rubik-VariableFont_wght.ttf) format("truetype");
+  src: url(Rubik-VariableFont_wght.ttf) format("truetype");
   font-display: swap;
 }
 

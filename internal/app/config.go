@@ -5,29 +5,84 @@
 package app
 
 import (
-	_ "embed"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
+	"log"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
-	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Config implements the configuration for the instance
-type Config struct {
+// config implements the configuration for the instance
+type config struct {
 	Server  []*ServerConfig
 	Fetcher *FetcherConfig
 	Loader  *LoaderConfig
+	parser  configParser
+	osStat  func(name string) (fs.FileInfo, error)
+}
+
+const (
+	configDefaultFile                    string = "neon.yaml"
+	configDefaultServerListenAddr        string = "localhost"
+	configDefaultServerListenPort        int    = 8080
+	configDefaultServerReadTimeout       int    = 60
+	configDefaultServerWriteTimeout      int    = 60
+	configDefaultServerAccessLog         bool   = false
+	configDefaultServerRewriteRuleLast   bool   = false
+	configDefaultServerHeaderRuleLast    bool   = false
+	configDefaultServerStaticIndex       bool   = false
+	configDefaultServerRobotsPath        string = "/robots.txt"
+	configDefaultServerRobotsCache       bool   = false
+	configDefaultServerRobotsCacheTTL    int    = 60
+	configDefaultServerSitemapCache      bool   = false
+	configDefaultServerSitemapCacheTTL   int    = 60
+	configDefaultServerIndexEnv          string = "production"
+	configDefaultServerIndexContainer    string = "root"
+	configDefaultServerIndexState        string = "state"
+	configDefaultServerIndexTimeout      int    = 4
+	configDefaultServerIndexCache        bool   = false
+	configDefaultServerIndexCacheTTL     int    = 60
+	configDefaultServerIndexRuleLast     bool   = false
+	configDefaultServerDefaultStatusCode int    = 200
+	configDefaultServerDefaultCache      bool   = false
+	configDefaultServerDefaultCacheTTL   int    = 60
+	configDefaultFetcherRequestTimeout   int    = 60
+	configDefaultFetcherRequestRetry     int    = 3
+	configDefaultFetcherRequestDelay     int    = 1
+	configDefaultLoaderExecStartup       int    = 15
+	configDefaultLoaderExecInterval      int    = 900
+	configDefaultLoaderExecWorkers       int    = 1
+)
+
+// newConfig creates a new config instance
+func newConfig(parser configParser) *config {
+	return &config{
+		parser: parser,
+		osStat: os.Stat,
+	}
+}
+
+// configParser
+type configParser interface {
+	parse([]byte, *config) error
+}
+
+// configParserYAML implements the YAML configuration parser
+type configParserYAML struct {
+	yamlUnmarshal func(in []byte, out interface{}) (err error)
 }
 
 // yamlConfig implements the configuration for the parser
 type yamlConfig struct {
 	Server  []yamlConfigServer `yaml:"server"`
-	Fetcher yamlConfigFetcher  `yaml:"fetcher,omitempty"`
-	Loader  yamlConfigLoader   `yaml:"loader,omitempty"`
+	Fetcher yamlConfigFetcher  `yaml:"fetcher"`
+	Loader  *yamlConfigLoader  `yaml:"loader,omitempty"`
 }
 
 // yamlConfigServer implements the server configuration for the parser
@@ -43,9 +98,8 @@ type yamlConfigServer struct {
 	AccessLog     *bool   `yaml:"access_log,omitempty"`
 	AccessLogFile *string `yaml:"access_log_file,omitempty"`
 
-	Rewrite struct {
-		Enable *bool `yaml:"enable"`
-		Rules  []struct {
+	Rewrite *struct {
+		Rules []struct {
 			Path        string  `yaml:"path"`
 			Replacement string  `yaml:"replacement"`
 			Flag        *string `yaml:"flag,omitempty"`
@@ -53,9 +107,8 @@ type yamlConfigServer struct {
 		} `yaml:"rules"`
 	} `yaml:"rewrite,omitempty"`
 
-	Header struct {
-		Enable *bool `yaml:"enable"`
-		Rules  []struct {
+	Header *struct {
+		Rules []struct {
 			Path   string            `yaml:"path"`
 			Set    map[string]string `yaml:"set,omitempty"`
 			Add    map[string]string `yaml:"add,omitempty"`
@@ -64,14 +117,12 @@ type yamlConfigServer struct {
 		} `yaml:"rules"`
 	} `yaml:"header,omitempty"`
 
-	Static struct {
-		Enable *bool  `yaml:"enable"`
-		Dir    string `yaml:"dir"`
-		Index  *bool  `yaml:"index,omitempty"`
+	Static *struct {
+		Dir   string `yaml:"dir"`
+		Index *bool  `yaml:"index,omitempty"`
 	} `yaml:"static,omitempty"`
 
-	Robots struct {
-		Enable   *bool    `yaml:"enable"`
+	Robots *struct {
 		Path     *string  `yaml:"path,omitempty"`
 		Hosts    []string `yaml:"hosts,omitempty"`
 		Sitemaps []string `yaml:"sitemaps,omitempty"`
@@ -79,8 +130,7 @@ type yamlConfigServer struct {
 		CacheTTL *int     `yaml:"cache_ttl,omitempty"`
 	} `yaml:"robots,omitempty"`
 
-	Sitemap struct {
-		Enable   *bool  `yaml:"enable"`
+	Sitemap *struct {
 		Root     string `yaml:"root"`
 		Cache    *bool  `yaml:"cache,omitempty"`
 		CacheTTL *int   `yaml:"cache_ttl,omitempty"`
@@ -115,10 +165,9 @@ type yamlConfigServer struct {
 		} `yaml:"routes"`
 	} `yaml:"sitemap,omitempty"`
 
-	Index struct {
-		Enable    *bool   `yaml:"enable"`
+	Index *struct {
 		HTML      string  `yaml:"html"`
-		Bundle    *string `yaml:"bundle"`
+		Bundle    *string `yaml:"bundle,omitempty"`
 		Env       *string `yaml:"env,omitempty"`
 		Container *string `yaml:"container,omitempty"`
 		State     *string `yaml:"state,omitempty"`
@@ -136,8 +185,7 @@ type yamlConfigServer struct {
 		} `yaml:"rules"`
 	} `yaml:"index,omitempty"`
 
-	Default struct {
-		Enable     *bool  `yaml:"enable"`
+	Default *struct {
 		File       string `yaml:"file"`
 		StatusCode *int   `yaml:"status_code,omitempty"`
 		Cache      *bool  `yaml:"cache,omitempty"`
@@ -200,75 +248,20 @@ type yamlConfigLoader struct {
 	} `yaml:"rules"`
 }
 
-const (
-	configFile                           string = "config.yaml"
-	configDefaultServerListenAddr        string = "localhost"
-	configDefaultServerListenPort        int    = 8080
-	configDefaultServerReadTimeout       int    = 60
-	configDefaultServerWriteTimeout      int    = 60
-	configDefaultServerAccessLog         bool   = false
-	configDefaultServerRewriteEnable     bool   = false
-	configDefaultServerRewriteRuleLast   bool   = false
-	configDefaultServerHeaderEnable      bool   = false
-	configDefaultServerHeaderRuleLast    bool   = false
-	configDefaultServerStaticEnable      bool   = false
-	configDefaultServerStaticIndex       bool   = false
-	configDefaultServerRobotsEnable      bool   = false
-	configDefaultServerRobotsPath        string = "/robots.txt"
-	configDefaultServerRobotsCache       bool   = false
-	configDefaultServerRobotsCacheTTL    int    = 60
-	configDefaultServerSitemapEnable     bool   = false
-	configDefaultServerSitemapCache      bool   = false
-	configDefaultServerSitemapCacheTTL   int    = 60
-	configDefaultServerIndexEnable       bool   = false
-	configDefaultServerIndexEnv          string = "production"
-	configDefaultServerIndexContainer    string = "root"
-	configDefaultServerIndexState        string = "state"
-	configDefaultServerIndexTimeout      int    = 4
-	configDefaultServerIndexCache        bool   = false
-	configDefaultServerIndexCacheTTL     int    = 60
-	configDefaultServerIndexRuleLast     bool   = false
-	configDefaultServerDefaultEnable     bool   = false
-	configDefaultServerDefaultStatusCode int    = 200
-	configDefaultServerDefaultCache      bool   = false
-	configDefaultServerDefaultCacheTTL   int    = 60
-	configDefaultFetcherRequestTimeout   int    = 60
-	configDefaultFetcherRequestRetry     int    = 3
-	configDefaultFetcherRequestDelay     int    = 1
-	configDefaultLoaderExecStartup       int    = 15
-	configDefaultLoaderExecInterval      int    = 900
-	configDefaultLoaderExecWorkers       int    = 1
-)
-
-// LoadConfig loads the configuration settings
-func LoadConfig() (*Config, error) {
-	file, ok := os.LookupEnv("CONFIG_FILE")
-	if !ok {
-		file = configFile
+// newConfigParserYAML creates a new YAML config parser instance
+func newConfigParserYAML() *configParserYAML {
+	return &configParserYAML{
+		yamlUnmarshal: yaml.Unmarshal,
 	}
-
-	yamlFile, err := os.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	var y yamlConfig
-	err = yaml.Unmarshal(yamlFile, &y)
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := parseConfig(&y)
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
 }
 
-// parseConfig parses the configuration
-func parseConfig(y *yamlConfig) (*Config, error) {
-	c := Config{}
+// parse parses the YAML data
+func (p *configParserYAML) parse(data []byte, c *config) error {
+	var y yamlConfig
+	err := p.yamlUnmarshal(data, &y)
+	if err != nil {
+		return err
+	}
 
 	for index, yamlConfigServer := range y.Server {
 		serverConfig := ServerConfig{}
@@ -277,8 +270,8 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 			serverConfig.ListenAddr = *yamlConfigServer.ListenAddr
 		} else {
 			listenAddr := configDefaultServerListenAddr
-			if v, ok := os.LookupEnv("LISTEN_ADDR"); ok && index == 0 {
-				listenAddr = v
+			if index == 0 && LISTEN_ADDR != "" {
+				listenAddr = LISTEN_ADDR
 			}
 			serverConfig.ListenAddr = listenAddr
 		}
@@ -286,10 +279,8 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 			serverConfig.ListenPort = *yamlConfigServer.ListenPort
 		} else {
 			listenPort := configDefaultServerListenPort
-			if v, ok := os.LookupEnv("LISTEN_PORT"); ok && index == 0 {
-				if vInt, err := strconv.ParseInt(v, 10, 0); err == nil {
-					listenPort = int(vInt)
-				}
+			if index == 0 && LISTEN_PORT != 0 {
+				listenPort = LISTEN_PORT
 			}
 			serverConfig.ListenPort = listenPort
 		}
@@ -324,195 +315,188 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 			serverConfig.AccessLogFile = yamlConfigServer.AccessLogFile
 		}
 
-		if yamlConfigServer.Rewrite.Enable != nil {
-			serverConfig.Rewrite.Enable = *yamlConfigServer.Rewrite.Enable
-		} else {
-			serverConfig.Rewrite.Enable = configDefaultServerRewriteEnable
-		}
-		for _, rewriteRule := range yamlConfigServer.Rewrite.Rules {
-			rule := RewriteRule{
-				Path:        rewriteRule.Path,
-				Replacement: rewriteRule.Replacement,
-			}
-			if rewriteRule.Flag != nil {
-				rule.Flag = rewriteRule.Flag
-			}
-			serverConfig.Rewrite.Rules = append(serverConfig.Rewrite.Rules, rule)
-		}
+		serverConfig.Renderer = &ServerRendererConfig{}
 
-		if yamlConfigServer.Header.Enable != nil {
-			serverConfig.Header.Enable = *yamlConfigServer.Header.Enable
-		} else {
-			serverConfig.Header.Enable = configDefaultServerHeaderEnable
-		}
-		for _, headerRule := range yamlConfigServer.Header.Rules {
-			rule := HeaderRule{
-				Path:   headerRule.Path,
-				Set:    headerRule.Set,
-				Add:    headerRule.Add,
-				Remove: headerRule.Remove,
-			}
-			if headerRule.Last != nil {
-				rule.Last = *headerRule.Last
-			} else {
-				rule.Last = configDefaultServerHeaderRuleLast
-			}
-			serverConfig.Header.Rules = append(serverConfig.Header.Rules, rule)
-		}
-
-		if yamlConfigServer.Static.Enable != nil {
-			serverConfig.Static.Enable = *yamlConfigServer.Static.Enable
-		} else {
-			serverConfig.Static.Enable = configDefaultServerStaticEnable
-		}
-		serverConfig.Static.Dir = yamlConfigServer.Static.Dir
-		if yamlConfigServer.Static.Index != nil {
-			serverConfig.Static.Index = *yamlConfigServer.Static.Index
-		} else {
-			serverConfig.Static.Index = configDefaultServerStaticIndex
-		}
-
-		if yamlConfigServer.Robots.Enable != nil {
-			serverConfig.Robots.Enable = *yamlConfigServer.Robots.Enable
-		} else {
-			serverConfig.Robots.Enable = configDefaultServerRobotsEnable
-		}
-		if yamlConfigServer.Robots.Path != nil {
-			serverConfig.Robots.Path = *yamlConfigServer.Robots.Path
-		} else {
-			serverConfig.Robots.Path = configDefaultServerRobotsPath
-		}
-		serverConfig.Robots.Hosts = yamlConfigServer.Robots.Hosts
-		serverConfig.Robots.Sitemaps = yamlConfigServer.Robots.Sitemaps
-		if yamlConfigServer.Robots.Cache != nil {
-			serverConfig.Robots.Cache = *yamlConfigServer.Robots.Cache
-		} else {
-			serverConfig.Robots.Cache = configDefaultServerRobotsCache
-		}
-		if yamlConfigServer.Robots.CacheTTL != nil {
-			serverConfig.Robots.CacheTTL = *yamlConfigServer.Robots.CacheTTL
-		} else {
-			serverConfig.Robots.CacheTTL = configDefaultServerRobotsCacheTTL
-		}
-
-		if yamlConfigServer.Sitemap.Enable != nil {
-			serverConfig.Sitemap.Enable = *yamlConfigServer.Sitemap.Enable
-		} else {
-			serverConfig.Sitemap.Enable = configDefaultServerSitemapEnable
-		}
-		serverConfig.Sitemap.Root = yamlConfigServer.Sitemap.Root
-		if yamlConfigServer.Sitemap.Cache != nil {
-			serverConfig.Sitemap.Cache = *yamlConfigServer.Sitemap.Cache
-		} else {
-			serverConfig.Sitemap.Cache = configDefaultServerSitemapCache
-		}
-		if yamlConfigServer.Sitemap.CacheTTL != nil {
-			serverConfig.Sitemap.CacheTTL = *yamlConfigServer.Sitemap.CacheTTL
-		} else {
-			serverConfig.Sitemap.CacheTTL = configDefaultServerSitemapCacheTTL
-		}
-		for _, sitemapRoute := range yamlConfigServer.Sitemap.Routes {
-			route := SitemapRoute{
-				Path: sitemapRoute.Path,
-				Kind: sitemapRoute.Kind,
-			}
-			for _, sitemapIndexEntry := range sitemapRoute.SitemapIndex {
-				route.SitemapIndex = append(route.SitemapIndex, SitemapIndexEntry{
-					Name:   sitemapIndexEntry.Name,
-					Type:   sitemapIndexEntry.Type,
-					Static: SitemapIndexEntryStatic(sitemapIndexEntry.Static),
-				})
-			}
-			for _, sitemapEntry := range sitemapRoute.Sitemap {
-				route.Sitemap = append(route.Sitemap, SitemapEntry{
-					Name:   sitemapEntry.Name,
-					Type:   sitemapEntry.Type,
-					Static: SitemapEntryStatic(sitemapEntry.Static),
-					List:   SitemapEntryList(sitemapEntry.List),
-				})
-			}
-			serverConfig.Sitemap.Routes = append(serverConfig.Sitemap.Routes, route)
-		}
-
-		if yamlConfigServer.Index.Enable != nil {
-			serverConfig.Index.Enable = *yamlConfigServer.Index.Enable
-		} else {
-			serverConfig.Index.Enable = configDefaultServerIndexEnable
-		}
-		serverConfig.Index.HTML = yamlConfigServer.Index.HTML
-		serverConfig.Index.Bundle = yamlConfigServer.Index.Bundle
-		if yamlConfigServer.Index.Env != nil {
-			serverConfig.Index.Env = *yamlConfigServer.Index.Env
-		} else {
-			serverConfig.Index.Env = configDefaultServerIndexEnv
-		}
-		if yamlConfigServer.Index.Container != nil {
-			serverConfig.Index.Container = *yamlConfigServer.Index.Container
-		} else {
-			serverConfig.Index.Container = configDefaultServerIndexContainer
-		}
-		if yamlConfigServer.Index.State != nil {
-			serverConfig.Index.State = *yamlConfigServer.Index.State
-		} else {
-			serverConfig.Index.State = configDefaultServerIndexState
-		}
-		if yamlConfigServer.Index.Timeout != nil {
-			serverConfig.Index.Timeout = *yamlConfigServer.Index.Timeout
-		} else {
-			serverConfig.Index.Timeout = configDefaultServerIndexTimeout
-		}
-		if yamlConfigServer.Index.Cache != nil {
-			serverConfig.Index.Cache = *yamlConfigServer.Index.Cache
-		} else {
-			serverConfig.Index.Cache = configDefaultServerIndexCache
-		}
-		if yamlConfigServer.Index.CacheTTL != nil {
-			serverConfig.Index.CacheTTL = *yamlConfigServer.Index.CacheTTL
-		} else {
-			serverConfig.Index.CacheTTL = configDefaultServerIndexCacheTTL
-		}
-		for _, indexRule := range yamlConfigServer.Index.Rules {
-			rule := IndexRule{
-				Path: indexRule.Path,
-			}
-			if indexRule.Last != nil {
-				rule.Last = *indexRule.Last
-			} else {
-				rule.Last = configDefaultServerIndexRuleLast
-			}
-			for _, indexRuleStateEntry := range indexRule.State {
-				entry := IndexRuleStateEntry{
-					Key:      indexRuleStateEntry.Key,
-					Resource: indexRuleStateEntry.Resource,
+		if yamlConfigServer.Rewrite != nil {
+			rewriteRendererConfig := RewriteRendererConfig{}
+			for _, rewriteRule := range yamlConfigServer.Rewrite.Rules {
+				rule := RewriteRule{
+					Path:        rewriteRule.Path,
+					Replacement: rewriteRule.Replacement,
 				}
-				if indexRuleStateEntry.Export != nil {
-					entry.Export = indexRuleStateEntry.Export
+				if rewriteRule.Flag != nil {
+					rule.Flag = rewriteRule.Flag
 				}
-				rule.State = append(rule.State, entry)
+				rewriteRendererConfig.Rules = append(rewriteRendererConfig.Rules, rule)
 			}
-			serverConfig.Index.Rules = append(serverConfig.Index.Rules, rule)
+			serverConfig.Renderer.Rewrite = &rewriteRendererConfig
 		}
 
-		if yamlConfigServer.Default.Enable != nil {
-			serverConfig.Default.Enable = *yamlConfigServer.Default.Enable
-		} else {
-			serverConfig.Default.Enable = configDefaultServerDefaultEnable
+		if yamlConfigServer.Header != nil {
+			headerRendererConfig := HeaderRendererConfig{}
+			for _, headerRule := range yamlConfigServer.Header.Rules {
+				rule := HeaderRule{
+					Path: headerRule.Path,
+					Set:  headerRule.Set,
+				}
+				if headerRule.Last != nil {
+					rule.Last = *headerRule.Last
+				} else {
+					rule.Last = configDefaultServerHeaderRuleLast
+				}
+				headerRendererConfig.Rules = append(headerRendererConfig.Rules, rule)
+			}
+			serverConfig.Renderer.Header = &headerRendererConfig
 		}
-		serverConfig.Default.File = yamlConfigServer.Default.File
-		if yamlConfigServer.Default.StatusCode != nil {
-			serverConfig.Default.StatusCode = *yamlConfigServer.Default.StatusCode
-		} else {
-			serverConfig.Default.StatusCode = configDefaultServerDefaultStatusCode
+
+		if yamlConfigServer.Static != nil {
+			staticRendererConfig := StaticRendererConfig{}
+			staticRendererConfig.Dir = yamlConfigServer.Static.Dir
+			if yamlConfigServer.Static.Index != nil {
+				staticRendererConfig.Index = *yamlConfigServer.Static.Index
+			} else {
+				staticRendererConfig.Index = configDefaultServerStaticIndex
+			}
+			serverConfig.Renderer.Static = &staticRendererConfig
 		}
-		if yamlConfigServer.Default.Cache != nil {
-			serverConfig.Default.Cache = *yamlConfigServer.Default.Cache
-		} else {
-			serverConfig.Default.Cache = configDefaultServerDefaultCache
+
+		if yamlConfigServer.Robots != nil {
+			robotsRendererConfig := RobotsRendererConfig{}
+			if yamlConfigServer.Robots.Path != nil {
+				robotsRendererConfig.Path = *yamlConfigServer.Robots.Path
+			} else {
+				robotsRendererConfig.Path = configDefaultServerRobotsPath
+			}
+			robotsRendererConfig.Hosts = yamlConfigServer.Robots.Hosts
+			robotsRendererConfig.Sitemaps = yamlConfigServer.Robots.Sitemaps
+			if yamlConfigServer.Robots.Cache != nil {
+				robotsRendererConfig.Cache = *yamlConfigServer.Robots.Cache
+			} else {
+				robotsRendererConfig.Cache = configDefaultServerRobotsCache
+			}
+			if yamlConfigServer.Robots.CacheTTL != nil {
+				robotsRendererConfig.CacheTTL = *yamlConfigServer.Robots.CacheTTL
+			} else {
+				robotsRendererConfig.CacheTTL = configDefaultServerRobotsCacheTTL
+			}
+			serverConfig.Renderer.Robots = &robotsRendererConfig
 		}
-		if yamlConfigServer.Default.CacheTTL != nil {
-			serverConfig.Default.CacheTTL = *yamlConfigServer.Default.CacheTTL
-		} else {
-			serverConfig.Default.CacheTTL = configDefaultServerDefaultCacheTTL
+
+		if yamlConfigServer.Sitemap != nil {
+			sitemapRendererConfig := SitemapRendererConfig{}
+			sitemapRendererConfig.Root = yamlConfigServer.Sitemap.Root
+			if yamlConfigServer.Sitemap.Cache != nil {
+				sitemapRendererConfig.Cache = *yamlConfigServer.Sitemap.Cache
+			} else {
+				sitemapRendererConfig.Cache = configDefaultServerSitemapCache
+			}
+			if yamlConfigServer.Sitemap.CacheTTL != nil {
+				sitemapRendererConfig.CacheTTL = *yamlConfigServer.Sitemap.CacheTTL
+			} else {
+				sitemapRendererConfig.CacheTTL = configDefaultServerSitemapCacheTTL
+			}
+			for _, sitemapRoute := range yamlConfigServer.Sitemap.Routes {
+				route := SitemapRoute{
+					Path: sitemapRoute.Path,
+					Kind: sitemapRoute.Kind,
+				}
+				for _, sitemapIndexEntry := range sitemapRoute.SitemapIndex {
+					route.SitemapIndex = append(route.SitemapIndex, SitemapIndexEntry{
+						Name:   sitemapIndexEntry.Name,
+						Type:   sitemapIndexEntry.Type,
+						Static: SitemapIndexEntryStatic(sitemapIndexEntry.Static),
+					})
+				}
+				for _, sitemapEntry := range sitemapRoute.Sitemap {
+					route.Sitemap = append(route.Sitemap, SitemapEntry{
+						Name:   sitemapEntry.Name,
+						Type:   sitemapEntry.Type,
+						Static: SitemapEntryStatic(sitemapEntry.Static),
+						List:   SitemapEntryList(sitemapEntry.List),
+					})
+				}
+				sitemapRendererConfig.Routes = append(sitemapRendererConfig.Routes, route)
+			}
+			serverConfig.Renderer.Sitemap = &sitemapRendererConfig
+		}
+
+		if yamlConfigServer.Index != nil {
+			indexRendererConfig := IndexRendererConfig{}
+			indexRendererConfig.HTML = yamlConfigServer.Index.HTML
+			indexRendererConfig.Bundle = yamlConfigServer.Index.Bundle
+			if yamlConfigServer.Index.Env != nil {
+				indexRendererConfig.Env = *yamlConfigServer.Index.Env
+			} else {
+				indexRendererConfig.Env = configDefaultServerIndexEnv
+			}
+			if yamlConfigServer.Index.Container != nil {
+				indexRendererConfig.Container = *yamlConfigServer.Index.Container
+			} else {
+				indexRendererConfig.Container = configDefaultServerIndexContainer
+			}
+			if yamlConfigServer.Index.State != nil {
+				indexRendererConfig.State = *yamlConfigServer.Index.State
+			} else {
+				indexRendererConfig.State = configDefaultServerIndexState
+			}
+			if yamlConfigServer.Index.Timeout != nil {
+				indexRendererConfig.Timeout = *yamlConfigServer.Index.Timeout
+			} else {
+				indexRendererConfig.Timeout = configDefaultServerIndexTimeout
+			}
+			if yamlConfigServer.Index.Cache != nil {
+				indexRendererConfig.Cache = *yamlConfigServer.Index.Cache
+			} else {
+				indexRendererConfig.Cache = configDefaultServerIndexCache
+			}
+			if yamlConfigServer.Index.CacheTTL != nil {
+				indexRendererConfig.CacheTTL = *yamlConfigServer.Index.CacheTTL
+			} else {
+				indexRendererConfig.CacheTTL = configDefaultServerIndexCacheTTL
+			}
+			for _, indexRule := range yamlConfigServer.Index.Rules {
+				rule := IndexRule{
+					Path: indexRule.Path,
+				}
+				for _, indexRuleStateEntry := range indexRule.State {
+					entry := IndexRuleStateEntry{
+						Key:      indexRuleStateEntry.Key,
+						Resource: indexRuleStateEntry.Resource,
+					}
+					if indexRuleStateEntry.Export != nil {
+						entry.Export = indexRuleStateEntry.Export
+					}
+					rule.State = append(rule.State, entry)
+				}
+				if indexRule.Last != nil {
+					rule.Last = *indexRule.Last
+				} else {
+					rule.Last = configDefaultServerIndexRuleLast
+				}
+				indexRendererConfig.Rules = append(indexRendererConfig.Rules, rule)
+			}
+			serverConfig.Renderer.Index = &indexRendererConfig
+		}
+
+		if yamlConfigServer.Default != nil {
+			defaultRendererConfig := DefaultRendererConfig{}
+			defaultRendererConfig.File = yamlConfigServer.Default.File
+			if yamlConfigServer.Default.StatusCode != nil {
+				defaultRendererConfig.StatusCode = *yamlConfigServer.Default.StatusCode
+			} else {
+				defaultRendererConfig.StatusCode = configDefaultServerDefaultStatusCode
+			}
+			if yamlConfigServer.Default.Cache != nil {
+				defaultRendererConfig.Cache = *yamlConfigServer.Default.Cache
+			} else {
+				defaultRendererConfig.Cache = configDefaultServerDefaultCache
+			}
+			if yamlConfigServer.Default.CacheTTL != nil {
+				defaultRendererConfig.CacheTTL = *yamlConfigServer.Default.CacheTTL
+			} else {
+				defaultRendererConfig.CacheTTL = configDefaultServerDefaultCacheTTL
+			}
+			serverConfig.Renderer.Default = &defaultRendererConfig
 		}
 
 		c.Server = append(c.Server, &serverConfig)
@@ -556,46 +540,68 @@ func parseConfig(y *yamlConfig) (*Config, error) {
 			Headers: template.Headers,
 		})
 	}
-
 	c.Fetcher = &fetcherConfig
 
-	loaderConfig := LoaderConfig{}
-	if y.Loader.ExecStartup != nil {
-		loaderConfig.ExecStartup = *y.Loader.ExecStartup
-	} else {
-		loaderConfig.ExecStartup = configDefaultLoaderExecStartup
-	}
-	if y.Loader.ExecInterval != nil {
-		loaderConfig.ExecInterval = *y.Loader.ExecInterval
-	} else {
-		loaderConfig.ExecInterval = configDefaultLoaderExecInterval
-	}
-	if y.Loader.ExecWorkers != nil {
-		loaderConfig.ExecWorkers = *y.Loader.ExecWorkers
-	} else {
-		loaderConfig.ExecWorkers = configDefaultLoaderExecWorkers
-	}
-	for _, rule := range y.Loader.Rules {
-		loaderConfig.Rules = append(loaderConfig.Rules, LoaderRule{
-			Name:   rule.Name,
-			Type:   rule.Type,
-			Static: LoaderRuleStatic(rule.Static),
-			Single: LoaderRuleSingle(rule.Single),
-			List:   LoaderRuleList(rule.List),
-		})
+	if y.Loader != nil {
+		loaderConfig := LoaderConfig{}
+		if y.Loader.ExecStartup != nil {
+			loaderConfig.ExecStartup = *y.Loader.ExecStartup
+		} else {
+			loaderConfig.ExecStartup = configDefaultLoaderExecStartup
+		}
+		if y.Loader.ExecInterval != nil {
+			loaderConfig.ExecInterval = *y.Loader.ExecInterval
+		} else {
+			loaderConfig.ExecInterval = configDefaultLoaderExecInterval
+		}
+		if y.Loader.ExecWorkers != nil {
+			loaderConfig.ExecWorkers = *y.Loader.ExecWorkers
+		} else {
+			loaderConfig.ExecWorkers = configDefaultLoaderExecWorkers
+		}
+		for _, rule := range y.Loader.Rules {
+			loaderConfig.Rules = append(loaderConfig.Rules, LoaderRule{
+				Name:   rule.Name,
+				Type:   rule.Type,
+				Static: LoaderRuleStatic(rule.Static),
+				Single: LoaderRuleSingle(rule.Single),
+				List:   LoaderRuleList(rule.List),
+			})
+		}
+		c.Loader = &loaderConfig
 	}
 
-	c.Loader = &loaderConfig
+	return nil
+}
 
-	return &c, nil
+// LoadConfig loads the configuration
+func LoadConfig() (*config, error) {
+	c := newConfig(newConfigParserYAML())
+
+	name := configDefaultFile
+	if CONFIG_FILE != "" {
+		name = CONFIG_FILE
+	}
+
+	data, err := os.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.parser.parse(data, c)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 // TestConfig validates the configuration
-func TestConfig(c *Config) ([]string, error) {
+func TestConfig(c *config) ([]string, error) {
 	var report []string
 
 	if c.Server == nil {
-		report = append(report, fmt.Sprintf("server: at least one server must be defined"))
+		report = append(report, "server: at least one server must be defined")
 	}
 	for _, server := range c.Server {
 		if server.TLS {
@@ -604,12 +610,9 @@ func TestConfig(c *Config) ([]string, error) {
 					report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "tls_ca_file"))
 				}
 				if *server.TLSCertFile != "" {
-					tlsCAFile, err := os.Open(*server.TLSCAFile)
-					if err != nil {
+					tlsCAFileInfo, err := c.osStat(*server.TLSCAFile)
+					if err != nil || tlsCAFileInfo.IsDir() {
 						report = append(report, fmt.Sprintf("server: option '%s', failed to open file", "tls_ca_file"))
-					}
-					if tlsCAFile != nil {
-						tlsCAFile.Close()
 					}
 				}
 			}
@@ -620,12 +623,9 @@ func TestConfig(c *Config) ([]string, error) {
 				report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "tls_cert_file"))
 			}
 			if server.TLSCertFile != nil && *server.TLSCertFile != "" {
-				tlsCertFile, err := os.Open(*server.TLSCertFile)
-				if err != nil {
+				tlsCertFileInfo, err := c.osStat(*server.TLSCertFile)
+				if err != nil || tlsCertFileInfo.IsDir() {
 					report = append(report, fmt.Sprintf("server: option '%s', failed to open file", "tls_cert_file"))
-				}
-				if tlsCertFile != nil {
-					tlsCertFile.Close()
 				}
 			}
 			if server.TLSKeyFile == nil {
@@ -635,12 +635,9 @@ func TestConfig(c *Config) ([]string, error) {
 				report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "tls_key_file"))
 			}
 			if server.TLSKeyFile != nil && *server.TLSKeyFile != "" {
-				tlsKeyFile, err := os.Open(*server.TLSKeyFile)
-				if err != nil {
+				tlsKeyFileFile, err := c.osStat(*server.TLSKeyFile)
+				if err != nil || tlsKeyFileFile.IsDir() {
 					report = append(report, fmt.Sprintf("server: option '%s', failed to open file", "tls_key_file"))
-				}
-				if tlsKeyFile != nil {
-					tlsKeyFile.Close()
 				}
 			}
 		}
@@ -655,18 +652,15 @@ func TestConfig(c *Config) ([]string, error) {
 				report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "access_log_file"))
 			}
 			if *server.AccessLogFile != "" {
-				accessLogFile, err := os.Open(*server.AccessLogFile)
-				if err != nil {
+				accessLogFileInfo, err := c.osStat(*server.AccessLogFile)
+				if (err != nil && errors.Is(err, os.ErrNotExist)) || accessLogFileInfo.IsDir() {
 					report = append(report, fmt.Sprintf("server: option '%s', failed to open file", "access_log_file"))
-				}
-				if accessLogFile != nil {
-					accessLogFile.Close()
 				}
 			}
 		}
 
-		if server.Rewrite.Enable {
-			for _, rule := range server.Rewrite.Rules {
+		if server.Renderer.Rewrite != nil {
+			for _, rule := range server.Renderer.Rewrite.Rules {
 				if rule.Path == "" {
 					report = append(report, fmt.Sprintf("rewrite: rule option '%s', invalid/missing value", "path"))
 				}
@@ -676,11 +670,14 @@ func TestConfig(c *Config) ([]string, error) {
 						report = append(report, fmt.Sprintf("rewrite: rule option '%s', invalid regular expression", "path"))
 					}
 				}
+				if rule.Replacement == "" {
+					report = append(report, fmt.Sprintf("rewrite: rule option '%s', invalid/missing value", "replacement"))
+				}
 			}
 		}
 
-		if server.Header.Enable {
-			for _, rule := range server.Header.Rules {
+		if server.Renderer.Header != nil {
+			for _, rule := range server.Renderer.Header.Rules {
 				if rule.Path == "" {
 					report = append(report, fmt.Sprintf("header: rule option '%s', invalid/missing value", "path"))
 				}
@@ -693,57 +690,49 @@ func TestConfig(c *Config) ([]string, error) {
 			}
 		}
 
-		if server.Static.Enable {
-			if server.Static.Dir == "" {
+		if server.Renderer.Static != nil {
+			if server.Renderer.Static.Dir == "" {
 				report = append(report, fmt.Sprintf("static: option '%s', invalid/missing value", "dir"))
 			}
-			if server.Static.Dir != "" {
-				dir, err := os.Stat(server.Static.Dir)
-				if err != nil {
-					report = append(report, fmt.Sprintf("static: option '%s', failed to stat directory", "dir"))
-				}
-				if dir != nil && !dir.IsDir() {
+			if server.Renderer.Static.Dir != "" {
+				dir, err := c.osStat(server.Renderer.Static.Dir)
+				if err != nil || !dir.IsDir() {
 					report = append(report, fmt.Sprintf("static: option '%s', failed to open directory", "dir"))
 				}
 			}
 		}
 
-		if server.Robots.Enable {
-			if server.Robots.Path == "" {
-				report = append(report, fmt.Sprintf("robots: rule option '%s', invalid/missing value", "path"))
+		if server.Renderer.Robots != nil {
+			if server.Renderer.Robots.Path == "" {
+				report = append(report, fmt.Sprintf("robots: option '%s', invalid/missing value", "path"))
 			}
-			if server.Robots.CacheTTL < 0 {
+			if server.Renderer.Robots.CacheTTL < 0 {
 				report = append(report, fmt.Sprintf("robots: option '%s', invalid/missing value", "cache_ttl"))
 			}
 		}
 
-		if server.Sitemap.Enable {
-			if server.Sitemap.Root == "" {
-				report = append(report, fmt.Sprintf("sitemap: rule option '%s', invalid/missing value", "root"))
+		if server.Renderer.Sitemap != nil {
+			if server.Renderer.Sitemap.Root == "" {
+				report = append(report, fmt.Sprintf("sitemap: option '%s', invalid/missing value", "root"))
 			}
-			if server.Sitemap.CacheTTL < 0 {
+			if server.Renderer.Sitemap.CacheTTL < 0 {
 				report = append(report, fmt.Sprintf("sitemap: option '%s', invalid/missing value", "cache_ttl"))
 			}
-			for _, route := range server.Sitemap.Routes {
+			for _, route := range server.Renderer.Sitemap.Routes {
 				if route.Path == "" {
 					report = append(report, fmt.Sprintf("sitemap: route option '%s', invalid/missing value", "path"))
 				}
-				if route.Kind == "" {
-					report = append(report, fmt.Sprintf("sitemap: route option '%s', invalid/missing value", "kind"))
+				validKind := false
+				for _, k := range []string{
+					sitemapKindSitemapIndex,
+					sitemapKindSitemap,
+				} {
+					if k == route.Kind {
+						validKind = true
+					}
 				}
-				if route.Kind != "" {
-					validKind := false
-					for _, k := range []string{
-						sitemapKindSitemapIndex,
-						sitemapKindSitemap,
-					} {
-						if k == route.Kind {
-							validKind = true
-						}
-					}
-					if !validKind {
-						report = append(report, fmt.Sprintf("sitemap: route option '%s', invalid kind", "kind"))
-					}
+				if !validKind {
+					report = append(report, fmt.Sprintf("sitemap: route option '%s', invalid/missing value", "kind"))
 				}
 				if route.Kind == sitemapKindSitemapIndex {
 					for _, entry := range route.SitemapIndex {
@@ -777,24 +766,18 @@ func TestConfig(c *Config) ([]string, error) {
 							report = append(report,
 								fmt.Sprintf("sitemap: sitemap entry option '%s', invalid/missing value", "name"))
 						}
-						if entry.Type == "" {
+						validType := false
+						for _, t := range []string{
+							sitemapEntrySitemapTypeStatic,
+							sitemapEntrySitemapTypeList,
+						} {
+							if t == entry.Type {
+								validType = true
+							}
+						}
+						if !validType {
 							report = append(report,
 								fmt.Sprintf("sitemap: sitemap entry option '%s', invalid/missing value", "type"))
-						}
-						if entry.Type != "" {
-							validType := false
-							for _, t := range []string{
-								sitemapEntrySitemapTypeStatic,
-								sitemapEntrySitemapTypeList,
-							} {
-								if t == entry.Type {
-									validType = true
-								}
-							}
-							if !validType {
-								report = append(report,
-									fmt.Sprintf("sitemap: sitemap entry option '%s', invalid type", "type"))
-							}
 						}
 						if entry.Type == sitemapEntrySitemapTypeStatic {
 							if entry.Static.Loc == "" {
@@ -805,28 +788,26 @@ func TestConfig(c *Config) ([]string, error) {
 								report = append(report,
 									fmt.Sprintf("sitemap: sitemap static entry option '%s', invalid/missing value", "lastmod"))
 							}
-							if entry.Static.Changefreq != nil && *entry.Static.Changefreq == "" {
-								report = append(report,
-									fmt.Sprintf("sitemap: sitemap static entry option '%s', invalid/missing value", "changefreq"))
-							}
-							if entry.Static.Changefreq != nil && *entry.Static.Changefreq != "" {
+							if entry.Static.Changefreq != nil {
 								validChangefreq := false
-								for _, c := range []string{
-									sitemapChangefreqAlways,
-									sitemapChangefreqHourly,
-									sitemapChangefreqDaily,
-									sitemapChangefreqWeekly,
-									sitemapChangefreqMonthly,
-									sitemapChangefreqYearly,
-									sitemapChangefreqNever,
-								} {
-									if c == *entry.Static.Changefreq {
-										validChangefreq = true
+								if entry.Static.Changefreq != nil {
+									for _, c := range []string{
+										sitemapChangefreqAlways,
+										sitemapChangefreqHourly,
+										sitemapChangefreqDaily,
+										sitemapChangefreqWeekly,
+										sitemapChangefreqMonthly,
+										sitemapChangefreqYearly,
+										sitemapChangefreqNever,
+									} {
+										if c == *entry.Static.Changefreq {
+											validChangefreq = true
+										}
 									}
 								}
 								if !validChangefreq {
 									report = append(report,
-										fmt.Sprintf("sitemap: sitemap static entry option '%s', invalid changefreq", "changefreq"))
+										fmt.Sprintf("sitemap: sitemap static entry option '%s', invalid/missing value", "changefreq"))
 								}
 							}
 							if entry.Static.Priority != nil && (*entry.Static.Priority < 0.0 || *entry.Static.Priority > 1.0) {
@@ -866,28 +847,26 @@ func TestConfig(c *Config) ([]string, error) {
 									fmt.Sprintf("sitemap: sitemap list entry option '%s', invalid/missing value",
 										"resource_payload_item_lastmod"))
 							}
-							if entry.List.Changefreq != nil && *entry.List.Changefreq == "" {
-								report = append(report,
-									fmt.Sprintf("sitemap: sitemap list entry option '%s', invalid/missing value", "changefreq"))
-							}
-							if entry.List.Changefreq != nil && *entry.List.Changefreq != "" {
+							if entry.List.Changefreq != nil {
 								validChangefreq := false
-								for _, c := range []string{
-									sitemapChangefreqAlways,
-									sitemapChangefreqHourly,
-									sitemapChangefreqDaily,
-									sitemapChangefreqWeekly,
-									sitemapChangefreqMonthly,
-									sitemapChangefreqYearly,
-									sitemapChangefreqNever,
-								} {
-									if c == *entry.List.Changefreq {
-										validChangefreq = true
+								if entry.List.Changefreq != nil {
+									for _, c := range []string{
+										sitemapChangefreqAlways,
+										sitemapChangefreqHourly,
+										sitemapChangefreqDaily,
+										sitemapChangefreqWeekly,
+										sitemapChangefreqMonthly,
+										sitemapChangefreqYearly,
+										sitemapChangefreqNever,
+									} {
+										if c == *entry.List.Changefreq {
+											validChangefreq = true
+										}
 									}
 								}
 								if !validChangefreq {
 									report = append(report,
-										fmt.Sprintf("sitemap: sitemap list entry option '%s', invalid changefreq", "changefreq"))
+										fmt.Sprintf("sitemap: sitemap list entry option '%s', invalid/missing value", "changefreq"))
 								}
 							}
 							if entry.List.Priority != nil && (*entry.List.Priority < 0.0 || *entry.List.Priority > 1.0) {
@@ -900,49 +879,43 @@ func TestConfig(c *Config) ([]string, error) {
 			}
 		}
 
-		if server.Index.Enable {
-			if server.Index.HTML == "" {
+		if server.Renderer.Index != nil {
+			if server.Renderer.Index.HTML == "" {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "html"))
 			}
-			if server.Index.HTML != "" {
-				htmlFile, err := os.Open(server.Index.HTML)
-				if err != nil {
+			if server.Renderer.Index.HTML != "" {
+				htmlFileInfo, err := c.osStat(server.Renderer.Index.HTML)
+				if err != nil || htmlFileInfo.IsDir() {
 					report = append(report, fmt.Sprintf("index: option '%s', failed to open file", "html"))
 				}
-				if htmlFile != nil {
-					htmlFile.Close()
-				}
 			}
-			if server.Index.Bundle != nil {
-				if *server.Index.Bundle == "" {
+			if server.Renderer.Index.Bundle != nil {
+				if *server.Renderer.Index.Bundle == "" {
 					report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "bundle"))
 				}
-				if *server.Index.Bundle != "" {
-					bundleFile, err := os.Open(*server.Index.Bundle)
-					if err != nil {
+				if *server.Renderer.Index.Bundle != "" {
+					bundleFileInfo, err := c.osStat(*server.Renderer.Index.Bundle)
+					if err != nil || bundleFileInfo.IsDir() {
 						report = append(report, fmt.Sprintf("index: option '%s', failed to open file", "bundle"))
-					}
-					if bundleFile != nil {
-						bundleFile.Close()
 					}
 				}
 			}
-			if server.Index.Env == "" {
+			if server.Renderer.Index.Env == "" {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "env"))
 			}
-			if server.Index.Container == "" {
+			if server.Renderer.Index.Container == "" {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "container"))
 			}
-			if server.Index.State == "" {
+			if server.Renderer.Index.State == "" {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "state"))
 			}
-			if server.Index.Timeout < 0 {
+			if server.Renderer.Index.Timeout < 0 {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "timeout"))
 			}
-			if server.Index.CacheTTL < 0 {
+			if server.Renderer.Index.CacheTTL < 0 {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "cache_ttl"))
 			}
-			for _, rule := range server.Index.Rules {
+			for _, rule := range server.Renderer.Index.Rules {
 				if rule.Path == "" {
 					report = append(report, fmt.Sprintf("index: rule option '%s', invalid/missing value", "path"))
 				}
@@ -963,23 +936,20 @@ func TestConfig(c *Config) ([]string, error) {
 			}
 		}
 
-		if server.Default.Enable {
-			if server.Default.File == "" {
+		if server.Renderer.Default != nil {
+			if server.Renderer.Default.File == "" {
 				report = append(report, fmt.Sprintf("default: option '%s', invalid/missing value", "file"))
 			}
-			if server.Default.File != "" {
-				defaultFile, err := os.Open(server.Default.File)
-				if err != nil {
+			if server.Renderer.Default.File != "" {
+				defaultFileInfo, err := c.osStat(server.Renderer.Default.File)
+				if err != nil || defaultFileInfo.IsDir() {
 					report = append(report, fmt.Sprintf("default: option '%s', failed to open file", "file"))
 				}
-				if defaultFile != nil {
-					defaultFile.Close()
-				}
 			}
-			if server.Default.StatusCode < 100 || server.Default.StatusCode > 599 {
+			if server.Renderer.Default.StatusCode < 100 || server.Renderer.Default.StatusCode > 599 {
 				report = append(report, fmt.Sprintf("default: option '%s', invalid/missing value", "status_code"))
 			}
-			if server.Default.CacheTTL < 0 {
+			if server.Renderer.Default.CacheTTL < 0 {
 				report = append(report, fmt.Sprintf("default: option '%s', invalid/missing value", "cache_ttl"))
 			}
 		}
@@ -991,12 +961,9 @@ func TestConfig(c *Config) ([]string, error) {
 				report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_tls_ca_file"))
 			}
 			if *c.Fetcher.RequestTLSCAFile != "" {
-				requestTLSCAFile, err := os.Open(*c.Fetcher.RequestTLSCAFile)
-				if err != nil {
+				requestTLSCAFileInfo, err := c.osStat(*c.Fetcher.RequestTLSCAFile)
+				if err != nil || requestTLSCAFileInfo.IsDir() {
 					report = append(report, fmt.Sprintf("fetcher: option '%s', failed to open file", "request_tls_ca_file"))
-				}
-				if requestTLSCAFile != nil {
-					requestTLSCAFile.Close()
 				}
 			}
 		}
@@ -1005,12 +972,9 @@ func TestConfig(c *Config) ([]string, error) {
 				report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_tls_cert_file"))
 			}
 			if *c.Fetcher.RequestTLSCertFile != "" {
-				requestTLSCertFile, err := os.Open(*c.Fetcher.RequestTLSCertFile)
-				if err != nil {
+				requestTLSCertFileInfo, err := c.osStat(*c.Fetcher.RequestTLSCertFile)
+				if err != nil || requestTLSCertFileInfo.IsDir() {
 					report = append(report, fmt.Sprintf("fetcher: option '%s', failed to open file", "request_tls_cert_file"))
-				}
-				if requestTLSCertFile != nil {
-					requestTLSCertFile.Close()
 				}
 			}
 		}
@@ -1019,12 +983,9 @@ func TestConfig(c *Config) ([]string, error) {
 				report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_tls_key_file"))
 			}
 			if *c.Fetcher.RequestTLSKeyFile != "" {
-				requestTLSKeyFile, err := os.Open(*c.Fetcher.RequestTLSKeyFile)
-				if err != nil {
+				requestTLSKeyFileInfo, err := c.osStat(*c.Fetcher.RequestTLSKeyFile)
+				if err != nil || requestTLSKeyFileInfo.IsDir() {
 					report = append(report, fmt.Sprintf("fetcher: option '%s', failed to open file", "request_tls_key_file"))
-				}
-				if requestTLSKeyFile != nil {
-					requestTLSKeyFile.Close()
 				}
 			}
 		}
@@ -1073,7 +1034,7 @@ func TestConfig(c *Config) ([]string, error) {
 				}
 			}
 		}
-		for _, template := range c.Fetcher.Resources {
+		for _, template := range c.Fetcher.Templates {
 			if template.Name == "" {
 				report = append(report, fmt.Sprintf("fetcher: template option '%s', invalid/missing value", "name"))
 			}
@@ -1142,7 +1103,7 @@ func TestConfig(c *Config) ([]string, error) {
 				if !validType {
 					report = append(report, fmt.Sprintf("loader: rule option '%s', invalid type", "type"))
 				}
-				if rule.Type == loaderTypeSingle {
+				if rule.Type == loaderTypeStatic {
 					if rule.Static.Resource == "" {
 						report = append(report, fmt.Sprintf("loader: static rule option '%s', invalid/missing value", "resource"))
 					}
@@ -1216,44 +1177,17 @@ func TestConfig(c *Config) ([]string, error) {
 	return nil, nil
 }
 
-//go:embed templates/init/config.yaml
-var template_config []byte
-
-//go:embed templates/init/data/index.html
-var template_data_html []byte
-
-//go:embed templates/init/data/bundle.js
-var template_data_bundle []byte
-
-//go:embed templates/init/data/static/styles.css
-var template_data_static_styles []byte
-
-//go:embed templates/init/data/static/manifest.json
-var template_data_static_manifest []byte
-
-//go:embed templates/init/data/static/Rubik-VariableFont_wght.ttf
-var template_data_static_font_rubik []byte
-
-//go:embed templates/init/data/static/favicon.ico
-var template_data_static_favicon []byte
-
-//go:embed templates/init/data/static/icon192.png
-var template_data_static_icon192 []byte
-
-//go:embed templates/init/data/static/icon512.png
-var template_data_static_icon512 []byte
-
-//go:embed templates/init/data/static/logo.png
-var template_data_static_logo []byte
+//go:embed templates/init/*
+var template_init embed.FS
 
 // GenerateConfig creates a default configuration file
 func GenerateConfig() error {
-	file, ok := os.LookupEnv("CONFIG_FILE")
-	if !ok {
-		file = configFile
+	name := configDefaultFile
+	if CONFIG_FILE != "" {
+		name = CONFIG_FILE
 	}
 
-	_, err := os.Stat(file)
+	_, err := os.Stat(name)
 	if err == nil {
 		return errors.New("configuration file already exists")
 	}
@@ -1263,43 +1197,40 @@ func GenerateConfig() error {
 		return errors.New("data directory already exists")
 	}
 
-	err = os.WriteFile(file, template_config, 0640)
-	if err != nil {
-		return errors.New("failed to generate files")
-	}
-
-	err = os.MkdirAll("data/static", 0755)
-	if err != nil {
-		return errors.New("failed to generate data directory")
-	}
-
-	err = os.WriteFile("data/index.html", template_data_html, 0644)
-	if err != nil {
-		return errors.New("failed to generate HTML file")
-	}
-
-	err = os.WriteFile("data/bundle.js", template_data_bundle, 0644)
-	if err != nil {
-		return errors.New("failed to generate bundle file")
-	}
-
-	files := map[string][]byte{
-		"data/index.html":                         template_data_html,
-		"data/bundle.js":                          template_data_bundle,
-		"data/static/styles.css":                  template_data_static_styles,
-		"data/static/manifest.json":               template_data_static_manifest,
-		"data/static/Rubik-VariableFont_wght.ttf": template_data_static_font_rubik,
-		"data/static/favicon.ico":                 template_data_static_favicon,
-		"data/static/icon192.png":                 template_data_static_icon192,
-		"data/static/icon512.png":                 template_data_static_icon512,
-		"data/static/logo.png":                    template_data_static_logo,
-	}
-
-	for name, template := range files {
-		err = os.WriteFile(name, template, 0644)
+	err = fs.WalkDir(template_init, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return errors.New("failed to write file")
+			return err
 		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		data, err := fs.ReadFile(template_init, path)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+
+		dst, err := filepath.Rel("templates/init", path)
+		if err != nil {
+			return err
+		}
+
+		err = os.MkdirAll(filepath.Dir(dst), 0755)
+		if err != nil {
+			return err
+		}
+
+		err = os.WriteFile(dst, data, 0644)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errors.New("failed to copy templates files")
 	}
 
 	return nil

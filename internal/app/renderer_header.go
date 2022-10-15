@@ -14,27 +14,22 @@ import (
 
 // headerRenderer implements the header renderer
 type headerRenderer struct {
-	Renderer
-	next Renderer
-
 	config  *HeaderRendererConfig
 	logger  *log.Logger
 	regexps []*regexp.Regexp
+	next    Renderer
 }
 
 // HeaderRendererConfig implements the header renderer configuration
 type HeaderRendererConfig struct {
-	Enable bool
-	Rules  []HeaderRule
+	Rules []HeaderRule
 }
 
 // HeaderRule implements a header rule
 type HeaderRule struct {
-	Path   string
-	Set    map[string]string
-	Add    map[string]string
-	Remove []string
-	Last   bool
+	Path string
+	Set  map[string]string
+	Last bool
 }
 
 const (
@@ -43,37 +38,41 @@ const (
 
 // CreateHeaderRenderer creates a new header renderer
 func CreateHeaderRenderer(config *HeaderRendererConfig) (*headerRenderer, error) {
-	logger := log.New(os.Stderr, fmt.Sprint(headerLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-
-	regexps := []*regexp.Regexp{}
-	for _, rule := range config.Rules {
-		r, err := regexp.Compile(rule.Path)
-		if err != nil {
-			return nil, err
-		}
-
-		regexps = append(regexps, r)
+	r := headerRenderer{
+		config:  config,
+		logger:  log.New(os.Stderr, fmt.Sprint(headerLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		regexps: []*regexp.Regexp{},
 	}
 
-	return &headerRenderer{
-		config:  config,
-		logger:  logger,
-		regexps: regexps,
-	}, nil
+	err := r.initialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
 }
 
-// handle implements the header handler
-func (r *headerRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+// initialize initializes the renderer
+func (r *headerRenderer) initialize() error {
+	for _, rule := range r.config.Rules {
+		re, err := regexp.Compile(rule.Path)
+		if err != nil {
+			return err
+		}
+		r.regexps = append(r.regexps, re)
+	}
+
+	return nil
+}
+
+// Handle implements the renderer
+func (r *headerRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+	var header bool
 	for index, regexp := range r.regexps {
 		if regexp.MatchString(req.URL.Path) {
+			header = true
 			for k, v := range r.config.Rules[index].Set {
 				w.Header().Set(k, v)
-			}
-			for k, v := range r.config.Rules[index].Add {
-				w.Header().Add(k, v)
-			}
-			for _, k := range r.config.Rules[index].Remove {
-				w.Header().Del(k)
 			}
 			if r.config.Rules[index].Last {
 				break
@@ -81,10 +80,14 @@ func (r *headerRenderer) handle(w http.ResponseWriter, req *http.Request, info *
 		}
 	}
 
-	r.next.handle(w, req, info)
+	if header {
+		r.logger.Printf("Header processed (url=%s)", req.URL.Path)
+	}
+
+	r.next.Handle(w, req, info)
 }
 
-// setNext configures the next renderer
-func (r *headerRenderer) setNext(renderer Renderer) {
+// Next configures the next renderer
+func (r *headerRenderer) Next(renderer Renderer) {
 	r.next = renderer
 }

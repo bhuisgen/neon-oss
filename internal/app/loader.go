@@ -15,15 +15,23 @@ import (
 	"time"
 )
 
-// loader implements the resources loader
+// loader implements a loader
 type loader struct {
-	config  *LoaderConfig
-	logger  *log.Logger
-	stop    chan struct{}
-	fetcher *fetcher
+	config   *LoaderConfig
+	logger   *log.Logger
+	executor LoaderExecutor
+	stop     chan struct{}
 }
 
-// LoaderConfig implements the resources loader configuration
+// loaderExecutor implements a loader executor
+type loaderExecutor struct {
+	config        *LoaderConfig
+	logger        *log.Logger
+	fetcher       Fetcher
+	jsonUnmarshal func(data []byte, v any) error
+}
+
+// LoaderConfig implements the loader configuration
 type LoaderConfig struct {
 	ExecStartup  int
 	ExecInterval int
@@ -72,51 +80,65 @@ const (
 	loaderTypeList   string = "list"
 )
 
-// NewLoader creates a new loader
-func NewLoader(config *LoaderConfig, fetcher *fetcher) *loader {
+// loaderJsonUnmarshal redirects to json.Unmarshal
+func loaderJsonUnmarshal(data []byte, v any) error {
+	return json.Unmarshal(data, v)
+}
+
+// CreateLoader creates a new loader instance
+func CreateLoader(config *LoaderConfig, fetcher Fetcher) (*loader, error) {
 	logger := log.New(os.Stderr, fmt.Sprint(loaderLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return &loader{
-		config:  config,
-		logger:  logger,
-		stop:    make(chan struct{}),
-		fetcher: fetcher,
-	}
+		config: config,
+		logger: logger,
+		executor: loaderExecutor{
+			config:        config,
+			logger:        logger,
+			fetcher:       fetcher,
+			jsonUnmarshal: loaderJsonUnmarshal,
+		},
+		stop: make(chan struct{}),
+	}, nil
 }
 
 // Start starts the loader
-func (l *loader) Start() {
+func (l *loader) Start() error {
 	if l.config.ExecInterval > 0 {
-		l.execute()
+		l.executor.execute(l.stop)
 	}
+
+	return nil
 }
 
 // Start stops the loader
-func (l *loader) Stop() {
+func (l *loader) Stop() error {
 	if l.config.ExecInterval > 0 {
 		l.stop <- struct{}{}
 	}
+
+	return nil
 }
 
 // execute loads all resources data
-func (l *loader) execute() {
+func (e loaderExecutor) execute(stop <-chan struct{}) {
 	startup := true
-	ticker := time.NewTicker(time.Duration(l.config.ExecStartup) * time.Second)
+	ticker := time.NewTicker(time.Duration(e.config.ExecStartup) * time.Second)
 
 	go func() {
 		ctx := context.Background()
 
 		worker := func(ctx context.Context, id int, jobs <-chan int, results chan<- error) {
 			for ruleIndex := range jobs {
-				rule := l.config.Rules[ruleIndex]
+				rule := e.config.Rules[ruleIndex]
 				var err error
 				switch rule.Type {
 				case loaderTypeStatic:
-					err = l.loadStatic(ctx, &rule.Static)
+					err = e.loadStatic(ctx, &rule.Static)
 				case loaderTypeSingle:
-					err = l.loadSingle(ctx, &rule.Single)
+					err = e.loadSingle(ctx, &rule.Single)
 				case loaderTypeList:
-					err = l.loadList(ctx, &rule.List)
+					err = e.loadList(ctx, &rule.List)
 				}
 
 				results <- err
@@ -130,18 +152,18 @@ func (l *loader) execute() {
 					startup = false
 
 					ticker.Stop()
-					ticker = time.NewTicker(time.Duration(l.config.ExecInterval) * time.Second)
+					ticker = time.NewTicker(time.Duration(e.config.ExecInterval) * time.Second)
 				}
 
-				jobsCount := len(l.config.Rules)
+				jobsCount := len(e.config.Rules)
 				jobs := make(chan int, jobsCount)
 				results := make(chan error, jobsCount)
 
-				for w := 1; w <= l.config.ExecWorkers; w++ {
+				for w := 1; w <= e.config.ExecWorkers; w++ {
 					go worker(ctx, w, jobs, results)
 				}
 
-				for ruleIndex := range l.config.Rules {
+				for ruleIndex := range e.config.Rules {
 					jobs <- ruleIndex
 				}
 
@@ -163,9 +185,9 @@ func (l *loader) execute() {
 					}
 				}
 
-				l.logger.Printf("Results: success=%d, failure=%d, total=%d", success, failure, jobsCount)
+				e.logger.Printf("Results: success=%d, failure=%d, total=%d", success, failure, jobsCount)
 
-			case <-l.stop:
+			case <-stop:
 				ticker.Stop()
 
 				return
@@ -175,8 +197,8 @@ func (l *loader) execute() {
 }
 
 // loadStatic loads a static resource
-func (l *loader) loadStatic(ctx context.Context, rule *LoaderRuleStatic) error {
-	err := l.fetcher.Fetch(ctx, rule.Resource)
+func (e loaderExecutor) loadStatic(ctx context.Context, rule *LoaderRuleStatic) error {
+	err := e.fetcher.Fetch(ctx, rule.Resource)
 	if err != nil {
 		return err
 	}
@@ -185,19 +207,19 @@ func (l *loader) loadStatic(ctx context.Context, rule *LoaderRuleStatic) error {
 }
 
 // loadSingle loads a single resource
-func (l *loader) loadSingle(ctx context.Context, rule *LoaderRuleSingle) error {
-	err := l.fetcher.Fetch(ctx, rule.Resource)
+func (e loaderExecutor) loadSingle(ctx context.Context, rule *LoaderRuleSingle) error {
+	err := e.fetcher.Fetch(ctx, rule.Resource)
 	if err != nil {
 		return err
 	}
 
-	response, err := l.fetcher.Get(rule.Resource)
+	response, err := e.fetcher.Get(rule.Resource)
 	if err != nil {
 		return err
 	}
 
 	var payload interface{}
-	err = json.Unmarshal(response, &payload)
+	err = e.jsonUnmarshal(response, &payload)
 	if err != nil {
 		return err
 	}
@@ -206,13 +228,13 @@ func (l *loader) loadSingle(ctx context.Context, rule *LoaderRuleSingle) error {
 	item := responseData.(map[string]interface{})
 	mItem := make(map[string]string)
 	for k, v := range item {
-		switch v.(type) {
+		switch value := v.(type) {
 		case string:
-			mItem[k] = v.(string)
-		case int64:
-			mItem[k] = strconv.FormatInt(v.(int64), 10)
+			mItem[k] = value
+		case float64:
+			mItem[k] = strconv.FormatFloat(value, 'f', -1, 64)
 		case bool:
-			mItem[k] = strconv.FormatBool(v.(bool))
+			mItem[k] = strconv.FormatBool(value)
 		}
 	}
 
@@ -231,16 +253,16 @@ func (l *loader) loadSingle(ctx context.Context, rule *LoaderRuleSingle) error {
 		rHeaders[rHeaderKey] = rHeaderValue
 	}
 
-	r, err := l.fetcher.CreateResourceFromTemplate(rule.ItemTemplate, rKey, rParams, rHeaders)
+	r, err := e.fetcher.CreateResourceFromTemplate(rule.ItemTemplate, rKey, rParams, rHeaders)
 	if err != nil {
 		return err
 	}
 
-	if !l.fetcher.Exists(r.Name) {
-		l.fetcher.Register(r)
+	if !e.fetcher.Exists(r.Name) {
+		e.fetcher.Register(r)
 	}
 
-	err = l.fetcher.Fetch(ctx, r.Name)
+	err = e.fetcher.Fetch(ctx, r.Name)
 	if err != nil {
 		return err
 	}
@@ -249,19 +271,19 @@ func (l *loader) loadSingle(ctx context.Context, rule *LoaderRuleSingle) error {
 }
 
 // loadList loads a list resource
-func (l *loader) loadList(ctx context.Context, rule *LoaderRuleList) error {
-	err := l.fetcher.Fetch(ctx, rule.Resource)
+func (e loaderExecutor) loadList(ctx context.Context, rule *LoaderRuleList) error {
+	err := e.fetcher.Fetch(ctx, rule.Resource)
 	if err != nil {
 		return err
 	}
 
-	response, err := l.fetcher.Get(rule.Resource)
+	response, err := e.fetcher.Get(rule.Resource)
 	if err != nil {
 		return err
 	}
 
 	var payload interface{}
-	err = json.Unmarshal(response, &payload)
+	err = e.jsonUnmarshal(response, &payload)
 	if err != nil {
 		return err
 	}
@@ -271,13 +293,13 @@ func (l *loader) loadList(ctx context.Context, rule *LoaderRuleList) error {
 		item := data.(map[string]interface{})
 		mItem := make(map[string]string)
 		for k, v := range item {
-			switch v.(type) {
+			switch value := v.(type) {
 			case string:
-				mItem[k] = v.(string)
-			case int64:
-				mItem[k] = strconv.FormatInt(v.(int64), 10)
+				mItem[k] = value
+			case float64:
+				mItem[k] = strconv.FormatFloat(value, 'f', -1, 64)
 			case bool:
-				mItem[k] = strconv.FormatBool(v.(bool))
+				mItem[k] = strconv.FormatBool(value)
 			}
 		}
 
@@ -296,16 +318,16 @@ func (l *loader) loadList(ctx context.Context, rule *LoaderRuleList) error {
 			rHeaders[rHeaderKey] = rHeaderValue
 		}
 
-		r, err := l.fetcher.CreateResourceFromTemplate(rule.ItemTemplate, rKey, rParams, rHeaders)
+		r, err := e.fetcher.CreateResourceFromTemplate(rule.ItemTemplate, rKey, rParams, rHeaders)
 		if err != nil {
 			return err
 		}
 
-		if !l.fetcher.Exists(r.Name) {
-			l.fetcher.Register(r)
+		if !e.fetcher.Exists(r.Name) {
+			e.fetcher.Register(r)
 		}
 
-		err = l.fetcher.Fetch(ctx, r.Name)
+		err = e.fetcher.Fetch(ctx, r.Name)
 		if err != nil {
 			return err
 		}

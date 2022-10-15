@@ -5,21 +5,33 @@
 package middlewares
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"runtime/debug"
 )
 
+// RecoverConfig implements the configuration of the recover middleware
+type RecoverConfig struct {
+	Writer io.Writer
+	Debug  bool
+}
+
 // Recover is a middleware who catch all errors and recovers them
-func Recover(next http.Handler) http.Handler {
+func Recover(config *RecoverConfig, next http.Handler) http.Handler {
+	logger := log.New(os.Stderr, "", log.LstdFlags|log.Lmsgprefix)
+	if config.Writer != nil {
+		logger.SetOutput(config.Writer)
+	}
+
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			err := recover()
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				if _, ok := os.LookupEnv("DEBUG"); ok {
-					log.Print(err, debug.Stack())
+				if config.Debug {
+					logger.Printf("%s, %s", err, debug.Stack())
 				}
 			}
 		}()

@@ -5,18 +5,15 @@ server:
     access_log: true
 
     header:
-      enable: true
       rules:
         - path: \.(woff|woff2|eot|ttf|svg|mp4|webm|jpg|jpeg|png|gif|ico|css|js)$
           set:
             Cache-Control: max-age=31536000
 
     static:
-      enable: true
       dir: data/static
 
     index:
-      enable: true
       html: data/index.html
       bundle: data/bundle.js
       rules:
@@ -27,14 +24,12 @@ server:
         #       export: true
 
     robots:
-      enable: true
       hosts:
         - localhost:8080
       sitemaps:
         - http://localhost:8080/sitemap.xml
 
     sitemap:
-      enable: true
       root: http://localhost:8080
       routes:
         - path: /sitemap.xml
@@ -47,21 +42,21 @@ server:
                 changefreq: always
                 priority: 1.0
 
-fetcher:
-  request_headers:
-    Content-Type: application/json
-    # Authorization: "Bearer: your_secret_token"
-  request_timeout: 15
-  resources:
-    # - name: config
-    #   method: GET
-    #   url: http://config-service:8080/config.json
+# fetcher:
+#   request_headers:
+#     Content-Type: application/json
+#     # Authorization: "Bearer: your_secret_token"
+#   request_timeout: 15
+#   resources:
+#     # - name: config
+#     #   method: GET
+#     #   url: http://config-service:8080/config.json
 
-loader:
-  exec_startup: 15
-  exec_interval: 300
-  rules:
-    # - name: load-config
-    #   type: static
-    #   static:
-    #     resource: config
+# loader:
+#   exec_startup: 15
+#   exec_interval: 300
+#   rules:
+#     # - name: load-config
+#     #   type: static
+#     #   static:
+#     #     resource: config

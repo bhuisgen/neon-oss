@@ -5,55 +5,50 @@
 package app
 
 import (
-	"runtime"
 	"sync"
-	"sync/atomic"
 )
 
-// vmPool implements a pool of VMs
-type vmPool struct {
-	pool        sync.Pool
-	count       int32
-	maxVMs      int32
-	maxSpareVMs int32
-	vms         chan struct{}
+// VMPool
+type VMPool interface {
+	Get() VM
+	Put(v VM)
 }
 
-// NewVMPool creates a new pool
-func NewVMPool() *vmPool {
+// vmPool implements a VM pool
+type vmPool struct {
+	pool sync.Pool
+	vms  chan struct{}
+}
+
+// newVMPool creates a new VM pool
+func newVMPool(max int32) *vmPool {
+	if max < 1 {
+		max = 1
+	}
+
 	return &vmPool{
 		pool: sync.Pool{
 			New: func() interface{} {
-				return NewVM()
+				return newVM()
 			},
 		},
-		count:       0,
-		maxVMs:      10,
-		maxSpareVMs: int32(runtime.NumCPU()),
-		vms:         make(chan struct{}, 10),
+		vms: make(chan struct{}, max),
 	}
 }
 
-// Get retrieves a VM from the pool
-func (p *vmPool) Get() *vm {
+// Get selects a VM from the pool
+func (p *vmPool) Get() VM {
 	p.vms <- struct{}{}
 
-	vm := p.pool.Get().(*vm)
-
-	atomic.AddInt32(&p.count, 1)
+	vm := p.pool.Get().(VM)
 
 	return vm
 }
 
-// Put releases a VM to the pool
-func (p *vmPool) Put(v *vm) {
+// Put adds a VM to the pool
+func (p *vmPool) Put(v VM) {
 	<-p.vms
 
-	if atomic.LoadInt32(&p.count) > p.maxSpareVMs {
-		v.Close()
-
-		return
-	}
-
+	v.Reset()
 	p.pool.Put(v)
 }

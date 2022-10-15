@@ -8,30 +8,44 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 )
 
+// indexResourceResult implements the results of a resource
+type indexResourceResult struct {
+	Loading  bool   `json:"loading"`
+	Error    string `json:"error"`
+	Response string `json:"response"`
+}
+
 // indexRenderer implements the index renderer
 type indexRenderer struct {
-	Renderer
-	next Renderer
-
-	config  *IndexRendererConfig
-	logger  *log.Logger
-	regexps []*regexp.Regexp
-	vmPool  *vmPool
-	cache   *cache
-	fetcher *fetcher
+	config      *IndexRendererConfig
+	logger      *log.Logger
+	regexps     []*regexp.Regexp
+	html        *[]byte
+	htmlInfo    *time.Time
+	bundle      *string
+	bundleInfo  *time.Time
+	bufferPool  BufferPool
+	vmPool      VMPool
+	cache       Cache
+	fetcher     Fetcher
+	next        Renderer
+	osStat      func(name string) (fs.FileInfo, error)
+	osReadFile  func(name string) ([]byte, error)
+	jsonMarshal func(v any) ([]byte, error)
 }
 
 // IndexRendererConfig implements the index renderer configuration
 type IndexRendererConfig struct {
-	Enable    bool
 	HTML      string
 	Bundle    *string
 	Env       string
@@ -72,38 +86,65 @@ const (
 	indexLogger string = "server[index]"
 )
 
-// CreateIndexRenderer creates a new index renderer
-func CreateIndexRenderer(config *IndexRendererConfig, fetcher *fetcher) (*indexRenderer, error) {
-	logger := log.New(os.Stderr, fmt.Sprint(indexLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-
-	regexps := []*regexp.Regexp{}
-	for _, rule := range config.Rules {
-		r, err := regexp.Compile(rule.Path)
-		if err != nil {
-			return nil, err
-		}
-
-		regexps = append(regexps, r)
-	}
-
-	return &indexRenderer{
-		config:  config,
-		logger:  logger,
-		regexps: regexps,
-		vmPool:  NewVMPool(),
-		cache:   NewCache(),
-		fetcher: fetcher,
-	}, nil
+// indexOsStat redirects to os.Stat
+func indexOsStat(name string) (fs.FileInfo, error) {
+	return os.Stat(name)
 }
 
-// handle implements the renderer handler
-func (r *indexRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+// indexOsReadFile redirects to os.ReadFile
+func indexOsReadFile(name string) ([]byte, error) {
+	return os.ReadFile(name)
+}
+
+// indexJsonMarshal redirects to json.Marshal
+func indexJsonMarshal(v any) ([]byte, error) {
+	return json.Marshal(v)
+}
+
+// CreateIndexRenderer creates a new index renderer
+func CreateIndexRenderer(config *IndexRendererConfig, fetcher Fetcher) (*indexRenderer, error) {
+	r := indexRenderer{
+		config:      config,
+		logger:      log.New(os.Stderr, fmt.Sprint(indexLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		regexps:     []*regexp.Regexp{},
+		bufferPool:  newBufferPool(),
+		vmPool:      newVMPool(int32(runtime.NumCPU())),
+		cache:       newCache(),
+		fetcher:     fetcher,
+		osStat:      indexOsStat,
+		osReadFile:  indexOsReadFile,
+		jsonMarshal: indexJsonMarshal,
+	}
+
+	err := r.initialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
+}
+
+// initialize initializes the renderer
+func (r *indexRenderer) initialize() error {
+	for _, rule := range r.config.Rules {
+		re, err := regexp.Compile(rule.Path)
+		if err != nil {
+			return err
+		}
+		r.regexps = append(r.regexps, re)
+	}
+
+	return nil
+}
+
+// Handle implements the renderer
+func (r *indexRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	result, err := r.render(req, info)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
 
-		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, result.Status)
+		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, http.StatusInternalServerError)
 
 		return
 	}
@@ -124,8 +165,8 @@ func (r *indexRenderer) handle(w http.ResponseWriter, req *http.Request, info *S
 		result.Cache)
 }
 
-// setNext configures the next renderer
-func (r *indexRenderer) setNext(renderer Renderer) {
+// Next configures the next renderer
+func (r *indexRenderer) Next(renderer Renderer) {
 	r.next = renderer
 }
 
@@ -141,161 +182,171 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 	}
 
 	var valid bool = true
-	var mServerState map[string]ResourceResult
+	var mServerState map[string]indexResourceResult
 	var serverState *string
-	var mClientState map[string]ResourceResult
+	var mClientState map[string]indexResourceResult
 	var clientState *string
+	var vmResult *vmResult
+	if r.config.Bundle != nil {
+		for index, rule := range r.config.Rules {
+			if DEBUG {
+				r.logger.Printf("Index: id=%s, rule=%d, phase=check, path=%s", req.Context().Value(ContextKeyID{}).(string),
+					index+1, req.URL.Path)
+			}
 
-	for index, rule := range r.config.Rules {
-		if _, ok := os.LookupEnv("DEBUG"); ok {
-			r.logger.Printf("Index: id=%s, rule=%d, phase=check, path=%s", req.Context().Value(ContextKeyID{}).(string),
-				index+1, req.URL.Path)
-		}
+			m := r.regexps[index].FindStringSubmatch(req.URL.Path)
+			if m == nil {
+				continue
+			}
 
-		m := r.regexps[index].FindStringSubmatch(req.URL.Path)
-		if m == nil {
-			continue
-		}
+			if DEBUG {
+				r.logger.Printf("Index: id=%s, rule=%d, phase=match, path=%s", req.Context().Value(ContextKeyID{}).(string),
+					index+1, req.URL.Path)
+			}
 
-		if _, ok := os.LookupEnv("DEBUG"); ok {
-			r.logger.Printf("Index: id=%s, rule=%d, phase=match, path=%s", req.Context().Value(ContextKeyID{}).(string),
-				index+1, req.URL.Path)
-		}
-
-		var params map[string]string
-		if len(m) > 1 {
-			params = make(map[string]string)
-			for i, value := range m {
-				if i > 0 {
-					params[fmt.Sprint(i)] = value
+			var params map[string]string
+			if len(m) > 1 {
+				params = make(map[string]string)
+				for i, value := range m {
+					if i > 0 {
+						params[fmt.Sprint(i)] = value
+					}
+				}
+				for i, name := range r.regexps[index].SubexpNames() {
+					if i != 0 && name != "" {
+						params[name] = m[i]
+					}
 				}
 			}
-			for i, name := range r.regexps[index].SubexpNames() {
-				if i != 0 && name != "" {
-					params[name] = m[i]
+
+			if DEBUG {
+				r.logger.Printf("Index: id=%s, rule=%d, phase=params, path=%s, params=%s",
+					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, params)
+			}
+
+			for _, entry := range rule.State {
+				if mServerState == nil {
+					mServerState = make(map[string]indexResourceResult)
 				}
-			}
-		}
-
-		if _, ok := os.LookupEnv("DEBUG"); ok {
-			r.logger.Printf("Index: id=%s, rule=%d, phase=params, path=%s, params=%s",
-				req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, params)
-		}
-
-		for _, entry := range rule.State {
-			if mServerState == nil {
-				mServerState = make(map[string]ResourceResult)
-			}
-			if mClientState == nil && entry.Export != nil && *entry.Export {
-				mClientState = make(map[string]ResourceResult)
-			}
-
-			if _, ok := os.LookupEnv("DEBUG"); ok {
-				r.logger.Printf("Index: id=%s, rule=%d, phase=state1, path=%s, state_key=%s, state_resource=%s",
-					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, entry.Key, entry.Resource)
-			}
-
-			stateKey := replaceIndexRouteParameters(entry.Key, params)
-			resourceKey := replaceIndexRouteParameters(entry.Resource, params)
-
-			if _, ok := os.LookupEnv("DEBUG"); ok {
-				r.logger.Printf("Index: id=%s, rule=%d, phase=state2, path=%s, state_key=%s, state_resource=%s",
-					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, stateKey, resourceKey)
-			}
-
-			var resourceResult ResourceResult
-			response, err := r.fetcher.Get(resourceKey)
-			if err != nil {
-				if r.fetcher.Exists(resourceKey) {
-					resourceResult.Loading = true
-				} else {
-					resourceResult.Error = "unknown resource"
+				if mClientState == nil && entry.Export != nil && *entry.Export {
+					mClientState = make(map[string]indexResourceResult)
 				}
+
+				if DEBUG {
+					r.logger.Printf("Index: id=%s, rule=%d, phase=state1, path=%s, state_key=%s, state_resource=%s",
+						req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, entry.Key, entry.Resource)
+				}
+
+				stateKey := replaceIndexRouteParameters(entry.Key, params)
+				resourceKey := replaceIndexRouteParameters(entry.Resource, params)
+
+				if DEBUG {
+					r.logger.Printf("Index: id=%s, rule=%d, phase=state2, path=%s, state_key=%s, state_resource=%s",
+						req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, stateKey, resourceKey)
+				}
+
+				var resourceResult indexResourceResult
+				response, err := r.fetcher.Get(resourceKey)
+				if err != nil {
+					if r.fetcher.Exists(resourceKey) {
+						resourceResult.Loading = true
+					} else {
+						resourceResult.Error = "unknown resource"
+					}
+
+					mServerState[stateKey] = resourceResult
+					if entry.Export != nil && *entry.Export {
+						mClientState[stateKey] = resourceResult
+					}
+
+					valid = false
+
+					continue
+				}
+
+				resourceResult.Response = string(response)
 
 				mServerState[stateKey] = resourceResult
 				if entry.Export != nil && *entry.Export {
 					mClientState[stateKey] = resourceResult
 				}
-
-				valid = false
-
-				continue
 			}
 
-			resourceResult.Response = string(response)
+			if mServerState != nil {
+				buf, err := r.jsonMarshal(mServerState)
+				if err != nil {
+					r.logger.Printf("Failed to marshal server state: %s", err)
 
-			mServerState[stateKey] = resourceResult
-			if entry.Export != nil && *entry.Export {
-				mClientState[stateKey] = resourceResult
+					return nil, err
+				}
+
+				s := string(buf)
+				serverState = &s
+			}
+
+			if mClientState != nil {
+				buf, err := r.jsonMarshal(mClientState)
+				if err != nil {
+					r.logger.Printf("Failed to marshal client state: %s", err)
+
+					return nil, err
+				}
+
+				s := string(buf)
+				clientState = &s
+			}
+
+			if r.config.Rules[index].Last {
+				if DEBUG {
+					r.logger.Printf("Index: id=%s, rule=%d, phase=last, path=%s", req.Context().Value(ContextKeyID{}).(string),
+						index+1, req.URL.Path)
+				}
+
+				break
 			}
 		}
 
-		if mServerState != nil {
-			buf, err := json.Marshal(mServerState)
-			if err != nil {
-				r.logger.Printf("Failed to marshal server state: %s", err)
-
-				return nil, err
+		if DEBUG {
+			if serverState != nil {
+				r.logger.Printf("Index: id=%s, path=%s, server_state=%s", req.Context().Value(ContextKeyID{}).(string),
+					req.URL.Path, *serverState)
 			}
-
-			s := string(buf)
-			serverState = &s
-		}
-
-		if mClientState != nil {
-			buf, err := json.Marshal(mClientState)
-			if err != nil {
-				r.logger.Printf("Failed to marshal client state: %s", err)
-
-				return nil, err
+			if clientState != nil {
+				r.logger.Printf("Index: id=%s, path=%s, client_state=%s", req.Context().Value(ContextKeyID{}).(string),
+					req.URL.Path, *clientState)
 			}
-
-			s := string(buf)
-			clientState = &s
 		}
 
-		if r.config.Rules[index].Last {
-			if _, ok := os.LookupEnv("DEBUG"); ok {
-				r.logger.Printf("Index: id=%s, rule=%d, phase=last, path=%s", req.Context().Value(ContextKeyID{}).(string),
-					index+1, req.URL.Path)
-			}
-
-			break
-		}
-	}
-
-	if _, ok := os.LookupEnv("DEBUG"); ok {
-		if serverState != nil {
-			r.logger.Printf("Index: id=%s, path=%s, server_state=%s", req.Context().Value(ContextKeyID{}).(string),
-				req.URL.Path, *serverState)
-		}
-		if clientState != nil {
-			r.logger.Printf("Index: id=%s, path=%s, client_state=%s", req.Context().Value(ContextKeyID{}).(string),
-				req.URL.Path, *clientState)
-		}
-	}
-
-	var vmResult *vmResult
-	if r.config.Bundle != nil {
-		var bundle string
-		buf, err := os.ReadFile(*r.config.Bundle)
+		bundleInfo, err := r.osStat(*r.config.Bundle)
 		if err != nil {
-			r.logger.Printf("Failed to read bundle file '%s': %s", *r.config.Bundle, err)
+			r.logger.Printf("Failed to stat bundle file '%s': %s", *r.config.Bundle, err)
 
 			return nil, err
 		}
-		bundle = string(buf)
+		if r.bundle == nil || r.bundleInfo == nil || bundleInfo.ModTime().After(*r.bundleInfo) {
+			buf, err := r.osReadFile(*r.config.Bundle)
+			if err != nil {
+				r.logger.Printf("Failed to read bundle file '%s': %s", *r.config.Bundle, err)
+
+				return nil, err
+			}
+			b := string(buf)
+			r.bundle = &b
+			i := bundleInfo.ModTime()
+			r.bundleInfo = &i
+		}
 
 		var vm = r.vmPool.Get()
 		defer r.vmPool.Put(vm)
-		vm.Reset()
 
 		err = vm.Configure(r.config.Env, info, req, serverState)
 		if err != nil {
 			r.logger.Printf("Failed to configure VM: %s", err)
+
+			return nil, err
 		}
 
-		vmResult, err = vm.Execute(*r.config.Bundle, bundle, r.config.Timeout)
+		vmResult, err = vm.Execute(*r.config.Bundle, *r.bundle, time.Duration(r.config.Timeout)*time.Second)
 		if err != nil {
 			r.logger.Printf("Failed to execute VM: %s", err)
 
@@ -307,19 +358,32 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 				Redirect:       true,
 				RedirectTarget: vmResult.RedirectURL,
 				RedirectStatus: vmResult.RedirectStatus,
+				Headers:        vmResult.Headers,
 			}, nil
 		}
 	}
 
-	html, err := os.ReadFile(r.config.HTML)
+	htmlInfo, err := r.osStat(r.config.HTML)
 	if err != nil {
-		r.logger.Printf("Failed to read HTML file '%s': %s", r.config.HTML, err)
+		r.logger.Printf("Failed to stat html file '%s': %s", r.config.HTML, err)
 
 		return nil, err
 	}
+	if r.html == nil || r.htmlInfo == nil || htmlInfo.ModTime().After(*r.htmlInfo) {
+		buf, err := r.osReadFile(r.config.HTML)
+		if err != nil {
+			r.logger.Printf("Failed to read HTML file '%s': %s", r.config.HTML, err)
+
+			return nil, err
+		}
+
+		r.html = &buf
+		i := htmlInfo.ModTime()
+		r.htmlInfo = &i
+	}
 
 	page := indexPage{
-		HTML: &html,
+		HTML: r.html,
 	}
 	if vmResult != nil {
 		page.Render = &vmResult.Render
@@ -329,7 +393,6 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 		page.Scripts = vmResult.Scripts
 		page.State = clientState
 	}
-
 	body, err := index(&page, r, req)
 	if err != nil {
 		r.logger.Printf("Failed to generate index: %s", err)
@@ -350,6 +413,9 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 		Valid:  valid,
 		Status: status,
 	}
+	if vmResult != nil {
+		result.Headers = vmResult.Headers
+	}
 	if result.Valid && r.config.Cache {
 		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
 		result.Cache = true
@@ -364,59 +430,6 @@ func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error)
 
 	body = *page.HTML
 
-	if page.Title != nil && *page.Title != "" {
-		body = bytes.Replace(body,
-			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<title>%s</title></head>", *page.Title)),
-			1)
-	}
-
-	for id, attributes := range page.Metas {
-		var buf = bufferPool.Get().(*bytes.Buffer)
-		defer bufferPool.Put(buf)
-		buf.Reset()
-
-		for k, v := range attributes {
-			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
-		}
-		body = bytes.Replace(body,
-			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<meta id=\"%s\" name=\"%s\"%s/></head>", id, id, buf.String())),
-			1)
-	}
-
-	for id, attributes := range page.Links {
-		var buf = bufferPool.Get().(*bytes.Buffer)
-		defer bufferPool.Put(buf)
-		buf.Reset()
-
-		for k, v := range attributes {
-			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
-		}
-		body = bytes.Replace(body,
-			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<link id=\"%s\"%s/></head>", id, buf.String())),
-			1)
-	}
-
-	for id, attributes := range page.Scripts {
-		var buf = bufferPool.Get().(*bytes.Buffer)
-		defer bufferPool.Put(buf)
-		buf.Reset()
-
-		var content string = ""
-		for k, v := range attributes {
-			if k == "children" {
-				content = v
-			}
-			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
-		}
-		body = bytes.Replace(body,
-			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<script id=\"%s\"%s>%s</script></head>", id, buf.String(), content)),
-			1)
-	}
-
 	if page.Render != nil {
 		body = bytes.Replace(body,
 			[]byte(fmt.Sprintf("<div id=\"%s\"></div>", r.config.Container)),
@@ -428,6 +441,57 @@ func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error)
 		body = bytes.Replace(body,
 			[]byte("</body>"),
 			[]byte(fmt.Sprintf("<script id=\"%s\" type=\"application/json\">%s</script></body>", r.config.State, *page.State)),
+			1)
+	}
+
+	if page.Title != nil && *page.Title != "" {
+		body = bytes.Replace(body,
+			[]byte("</head>"),
+			[]byte(fmt.Sprintf("<title>%s</title></head>", *page.Title)),
+			1)
+	}
+
+	for id, attributes := range page.Metas {
+		buf := r.bufferPool.Get()
+		defer r.bufferPool.Put(buf)
+
+		for k, v := range attributes {
+			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
+		}
+		body = bytes.Replace(body,
+			[]byte("</head>"),
+			[]byte(fmt.Sprintf("<meta id=\"%s\" name=\"%s\"%s/></head>", id, id, buf.String())),
+			1)
+	}
+
+	for id, attributes := range page.Links {
+		buf := r.bufferPool.Get()
+		defer r.bufferPool.Put(buf)
+
+		for k, v := range attributes {
+			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
+		}
+		body = bytes.Replace(body,
+			[]byte("</head>"),
+			[]byte(fmt.Sprintf("<link id=\"%s\"%s/></head>", id, buf.String())),
+			1)
+	}
+
+	for id, attributes := range page.Scripts {
+		buf := r.bufferPool.Get()
+		defer r.bufferPool.Put(buf)
+
+		var content string = ""
+		for k, v := range attributes {
+			if k == "children" {
+				content = v
+				continue
+			}
+			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
+		}
+		body = bytes.Replace(body,
+			[]byte("</head>"),
+			[]byte(fmt.Sprintf("<script id=\"%s\"%s>%s</script></head>", id, buf.String(), content)),
 			1)
 	}
 

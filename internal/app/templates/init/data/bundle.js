@@ -12,19 +12,19 @@
   </div>
 </main>
 `;
-  server.render(root, 200);
-  server.setTitle("Neon");
-  server.setMeta("name", { "itemprop": "name", "content": "Neon" });
-  server.setMeta("description", { "name": "description", "content": "Neon Status App" });
-  server.setMeta("copyright", { "name": "copyright", "content": "Boris HUISGEN" });
-  server.setMeta("generator", { "name": "generator", "content": `neon (engine='server', date='${new Date().toUTCString()}')` });
-  server.setLink("canonical", { "rel": "canonical", "href": `http://${server.addr()}:${server.port()}${server.requestPath()}` });
-  server.setScript("schema-json-ld", {
+  response.render(root, 200);
+  response.setTitle("Neon");
+  response.setMeta("name", { "itemprop": "name", "content": "Neon" });
+  response.setMeta("description", { "name": "description", "content": "Neon Status App" });
+  response.setMeta("copyright", { "name": "copyright", "content": "Boris HUISGEN" });
+  response.setMeta("generator", { "name": "generator", "content": `neon (engine='server', date='${new Date().toUTCString()}')` });
+  response.setLink("canonical", { "rel": "canonical", "href": `http://${server.addr()}:${server.port()}${request.path()}` });
+  response.setScript("schema-json-ld", {
     "type": "application/ld+json",
     "children": JSON.stringify({
       "@context": "http://schema.org",
       "@type": "WebSite",
-      url: `http://${server.addr()}:${server.port()}${server.requestPath()}`,
+      url: `http://${server.addr()}:${server.port()}${request.path()}`,
       name: "Neon",
       inLanguage: "en-US",
       description: "Neon Status App",

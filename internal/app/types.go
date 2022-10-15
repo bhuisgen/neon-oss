@@ -4,45 +4,70 @@
 
 package app
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
+
+// Fetcher
+type Fetcher interface {
+	Fetch(ctx context.Context, name string) error
+	Exists(name string) bool
+	Get(name string) ([]byte, error)
+	Register(r *Resource)
+	Unregister(name string)
+	CreateResourceFromTemplate(template string, resource string, params map[string]string,
+		headers map[string]string) (*Resource, error)
+}
+
+// Loader
+type Loader interface {
+	Start() error
+	Stop() error
+}
+
+// LoaderExecutor
+type LoaderExecutor interface {
+	execute(stop <-chan struct{})
+}
 
 // Renderer
 type Renderer interface {
-	handle(http.ResponseWriter, *http.Request, *ServerInfo)
-	setNext(Renderer)
+	Handle(w http.ResponseWriter, r *http.Request, info *ServerInfo)
+	Next(next Renderer)
+}
+
+// Server
+type Server interface {
+	Start() error
+	Stop(ctx context.Context) error
 }
 
 // Render
 type Render struct {
-	Body           []byte `json:"body"`
-	Valid          bool   `json:"valid"`
-	Status         int    `json:"status"`
-	Redirect       bool   `json:"redirect"`
-	RedirectTarget string `json:"redirectTarget"`
-	RedirectStatus int    `json:"redirectStatus"`
-	Cache          bool   `json:"cache"`
+	Body           []byte
+	Valid          bool
+	Status         int
+	Redirect       bool
+	RedirectTarget string
+	RedirectStatus int
+	Headers        map[string]string
+	Cache          bool
 }
 
 // Resource
 type Resource struct {
-	Name    string            `json:"name"`
-	Method  string            `json:"method"`
-	URL     string            `json:"url"`
-	Params  map[string]string `json:"params"`
-	Headers map[string]string `json:"headers"`
-	TTL     int64             `json:"ttl"`
-}
-
-// ResourceResult
-type ResourceResult struct {
-	Loading  bool   `json:"loading"`
-	Error    string `json:"error"`
-	Response string `json:"response"`
+	Name    string
+	Method  string
+	URL     string
+	Params  map[string]string
+	Headers map[string]string
+	TTL     int64
 }
 
 // ServerInfo
 type ServerInfo struct {
-	Addr    string `json:"addr"`
-	Port    int    `json:"port"`
-	Version string `json:"version"`
+	Addr    string
+	Port    int
+	Version string
 }

@@ -5,7 +5,6 @@
 package app
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,17 +14,15 @@ import (
 
 // robotsRenderer implements the robots renderer
 type robotsRenderer struct {
-	Renderer
-	next Renderer
-
-	config *RobotsRendererConfig
-	logger *log.Logger
-	cache  *cache
+	config     *RobotsRendererConfig
+	logger     *log.Logger
+	bufferPool BufferPool
+	cache      Cache
+	next       Renderer
 }
 
 // RobotsRendererConfig implements the robots renderer configuration
 type RobotsRendererConfig struct {
-	Enable   bool
 	Path     string
 	Hosts    []string
 	Sitemaps []string
@@ -38,20 +35,19 @@ const (
 )
 
 // CreateRobotsRenderer creates a new robots renderer
-func CreateRobotsRenderer(config *RobotsRendererConfig, loader *loader) (*robotsRenderer, error) {
-	logger := log.New(os.Stderr, fmt.Sprint(robotsLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-
+func CreateRobotsRenderer(config *RobotsRendererConfig) (*robotsRenderer, error) {
 	return &robotsRenderer{
-		config: config,
-		logger: logger,
-		cache:  NewCache(),
+		config:     config,
+		logger:     log.New(os.Stderr, fmt.Sprint(robotsLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		bufferPool: newBufferPool(),
+		cache:      newCache(),
 	}, nil
 }
 
-// handle implements the renderer handler
-func (r *robotsRenderer) handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+// Handle implements the renderer
+func (r *robotsRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
 	if req.URL.Path != r.config.Path {
-		r.next.handle(w, req, info)
+		r.next.Handle(w, req, info)
 
 		return
 	}
@@ -61,7 +57,7 @@ func (r *robotsRenderer) handle(w http.ResponseWriter, req *http.Request, info *
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
 
-		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, result.Status)
+		r.logger.Printf("Render error (url=%s, status=%d)", req.URL.Path, http.StatusInternalServerError)
 
 		return
 	}
@@ -73,8 +69,8 @@ func (r *robotsRenderer) handle(w http.ResponseWriter, req *http.Request, info *
 		result.Cache)
 }
 
-// setNext configures the next renderer
-func (r *robotsRenderer) setNext(renderer Renderer) {
+// Next configures the next renderer
+func (r *robotsRenderer) Next(renderer Renderer) {
 	r.next = renderer
 }
 
@@ -111,9 +107,8 @@ func (r *robotsRenderer) render(req *http.Request) (*Render, error) {
 
 // robots generates the robots.txt content
 func robots(r *robotsRenderer, req *http.Request) ([]byte, error) {
-	var body = bufferPool.Get().(*bytes.Buffer)
-	defer bufferPool.Put(body)
-	body.Reset()
+	body := r.bufferPool.Get()
+	defer r.bufferPool.Put(body)
 
 	var check bool
 	for _, host := range r.config.Hosts {

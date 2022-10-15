@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/bhuisgen/neon/internal/app"
 )
@@ -61,6 +62,32 @@ func main() {
 	args := flag.Args()
 	if len(args) < 1 {
 		flag.Usage()
+	}
+
+	if v, ok := os.LookupEnv("DEBUG"); ok {
+		if v != "0" {
+			app.DEBUG = true
+		}
+	}
+	if v, ok := os.LookupEnv("CONFIG_FILE"); ok {
+		s, err := os.Stat(v)
+		if err != nil {
+			fmt.Printf("Invalid value for environment variable CONFIG_FILE: %s\n", err)
+			os.Exit(1)
+		}
+		if s.IsDir() {
+			fmt.Printf("Invalid value for environment variable CONFIG_FILE: file is a directory\n")
+			os.Exit(1)
+		}
+		app.CONFIG_FILE = v
+	}
+	if v, ok := os.LookupEnv("LISTEN_PORT"); ok {
+		port, err := strconv.ParseInt(v, 10, 0)
+		if err != nil {
+			fmt.Printf("Invalid value for environment variable LISTEN_PORT: %s\n", err)
+			os.Exit(1)
+		}
+		app.LISTEN_PORT = int(port)
 	}
 
 	for _, c := range commands {
