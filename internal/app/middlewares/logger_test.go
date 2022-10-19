@@ -17,7 +17,7 @@ func TestLogger(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://test", nil)
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
-	logger := Logger(&LoggerConfig{Log: true, Writer: ioutil.Discard}, next)
+	logger := Logger(&LoggerConfig{Enable: true, Writer: ioutil.Discard}, next)
 	logger.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusOK {
@@ -30,7 +30,7 @@ func TestLoggerDisabled(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://test", nil)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	logger := Logger(&LoggerConfig{Log: false}, next)
+	logger := Logger(&LoggerConfig{Enable: false}, next)
 	logger.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusOK {
@@ -46,7 +46,7 @@ func TestLoggerStatus(t *testing.T) {
 		w.WriteHeader(http.StatusAccepted)
 		w.WriteHeader(http.StatusAlreadyReported)
 	})
-	logger := Logger(&LoggerConfig{Log: true, Writer: io.Discard}, next)
+	logger := Logger(&LoggerConfig{Enable: true, Writer: io.Discard}, next)
 	logger.ServeHTTP(rr, req)
 
 	if status := rr.Code; status != http.StatusAccepted {

@@ -75,8 +75,8 @@ func TestVMClose(t *testing.T) {
 				processObject:               tt.fields.processObject,
 				envObject:                   tt.fields.envObject,
 				serverObject:                tt.fields.serverObject,
-				requestObject:               tt.fields.requestObject,
-				responseObject:              tt.fields.responseObject,
+				serverRequestObject:         tt.fields.requestObject,
+				serverResponseObject:        tt.fields.responseObject,
 				context:                     tt.fields.context,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       tt.fields.v8NewFunctionTemplate,
@@ -118,8 +118,8 @@ func TestVMReset(t *testing.T) {
 				processObject:               tt.fields.processObject,
 				envObject:                   tt.fields.envObject,
 				serverObject:                tt.fields.serverObject,
-				requestObject:               tt.fields.requestObject,
-				responseObject:              tt.fields.responseObject,
+				serverRequestObject:         tt.fields.requestObject,
+				serverResponseObject:        tt.fields.responseObject,
 				context:                     tt.fields.context,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       tt.fields.v8NewFunctionTemplate,
@@ -402,8 +402,8 @@ func TestVMConfigure(t *testing.T) {
 				processObject:               tt.fields.processObject,
 				envObject:                   tt.fields.envObject,
 				serverObject:                tt.fields.serverObject,
-				requestObject:               tt.fields.requestObject,
-				responseObject:              tt.fields.responseObject,
+				serverRequestObject:         tt.fields.requestObject,
+				serverResponseObject:        tt.fields.responseObject,
 				context:                     tt.fields.context,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       tt.fields.v8NewFunctionTemplate,
@@ -524,8 +524,8 @@ func TestVMExecute(t *testing.T) {
 				processObject:               tt.fields.processObject,
 				envObject:                   tt.fields.envObject,
 				serverObject:                tt.fields.serverObject,
-				requestObject:               tt.fields.requestObject,
-				responseObject:              tt.fields.responseObject,
+				serverRequestObject:         tt.fields.requestObject,
+				serverResponseObject:        tt.fields.responseObject,
 				context:                     tt.fields.context,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       tt.fields.v8NewFunctionTemplate,
@@ -608,8 +608,8 @@ func TestVMExecute_Debug(t *testing.T) {
 				processObject:               v8go.NewObjectTemplate(isolate),
 				envObject:                   v8go.NewObjectTemplate(isolate),
 				serverObject:                v8go.NewObjectTemplate(isolate),
-				requestObject:               v8go.NewObjectTemplate(isolate),
-				responseObject:              v8go.NewObjectTemplate(isolate),
+				serverRequestObject:         v8go.NewObjectTemplate(isolate),
+				serverResponseObject:        v8go.NewObjectTemplate(isolate),
 				context:                     context,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       vmV8NewFunctionTemplate,
@@ -735,7 +735,7 @@ func TestVM_APIServer(t *testing.T) {
 	}
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s:%d", info.Addr, info.Port), nil)
 	if err != nil {
-		t.Errorf("failed create request: %s", err)
+		t.Errorf("failed to create request: %s", err)
 	}
 
 	type args struct {
@@ -808,7 +808,7 @@ func TestVM_APIServer(t *testing.T) {
 	}
 }
 
-func TestVM_APIRequest(t *testing.T) {
+func TestVM_APIServerRequest(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -825,7 +825,7 @@ func TestVM_APIRequest(t *testing.T) {
 	}
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s:%d", info.Addr, info.Port), nil)
 	if err != nil {
-		t.Errorf("failed create request: %s", err)
+		t.Errorf("failed to create request: %s", err)
 	}
 
 	type args struct {
@@ -846,7 +846,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "method",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.method(); })();`,
+				source:  `(() => { serverRequest.method(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -858,7 +858,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "proto",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.proto(); })();`,
+				source:  `(() => { serverRequest.proto(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -870,7 +870,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "proto major",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.protoMajor(); })();`,
+				source:  `(() => { serverRequest.protoMajor(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -882,7 +882,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "proto minor",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.protoMinor(); })();`,
+				source:  `(() => { serverRequest.protoMinor(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -894,7 +894,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "remote addr",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.remoteAddr(); })();`,
+				source:  `(() => { serverRequest.remoteAddr(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -906,7 +906,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "host",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.host(); })();`,
+				source:  `(() => { serverRequest.host(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -918,7 +918,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "path",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.path(); })();`,
+				source:  `(() => { serverRequest.path(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -930,7 +930,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "query",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.query(); })();`,
+				source:  `(() => { serverRequest.query(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -942,7 +942,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "header",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.headers(); })();`,
+				source:  `(() => { serverRequest.headers(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -954,7 +954,7 @@ func TestVM_APIRequest(t *testing.T) {
 			name: "state",
 			args: args{
 				name:    "test",
-				source:  `(() => { request.state(); })();`,
+				source:  `(() => { serverRequest.state(); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -982,7 +982,7 @@ func TestVM_APIRequest(t *testing.T) {
 	}
 }
 
-func TestVM_APIResponse(t *testing.T) {
+func TestVM_APIServerResponse(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -999,7 +999,7 @@ func TestVM_APIResponse(t *testing.T) {
 	}
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s:%d", info.Addr, info.Port), nil)
 	if err != nil {
-		t.Errorf("failed create request: %s", err)
+		t.Errorf("failed to create request: %s", err)
 	}
 
 	type args struct {
@@ -1020,7 +1020,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "render without status code",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.render("test"); })();`,
+				source:  `(() => { serverResponse.render("test"); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1035,7 +1035,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "render with status code",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.render("test", 200); })();`,
+				source:  `(() => { serverResponse.render("test", 200); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1050,7 +1050,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "render with invalid status code",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.render("test", 9999); })();`,
+				source:  `(() => { serverResponse.render("test", 9999); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1065,7 +1065,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "redirect without status code",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.redirect("http://test"); })();`,
+				source:  `(() => { serverResponse.redirect("http://test"); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1081,7 +1081,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "redirect with status code",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.redirect("http://test", 303); })();`,
+				source:  `(() => { serverResponse.redirect("http://test", 303); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1097,7 +1097,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "redirect with invalid status code",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.redirect("http://test", 999); })();`,
+				source:  `(() => { serverResponse.redirect("http://test", 999); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1113,7 +1113,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "set header",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.setHeader("key", "value"); })();`,
+				source:  `(() => { serverResponse.setHeader("key", "value"); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1129,7 +1129,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "set title",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.setTitle("test"); })();`,
+				source:  `(() => { serverResponse.setTitle("test"); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1143,7 +1143,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "set meta",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.setMeta("test", {"name": "test"}); })();`,
+				source:  `(() => { serverResponse.setMeta("test", {"name": "test"}); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1159,7 +1159,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "set link",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.setLink("test", {"href": "/test"}); })();`,
+				source:  `(() => { serverResponse.setLink("test", {"href": "/test"}); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
@@ -1175,7 +1175,7 @@ func TestVM_APIResponse(t *testing.T) {
 			name: "set script",
 			args: args{
 				name:    "test",
-				source:  `(() => { response.setScript("test", {"type": "test", "children": ""}); })();`,
+				source:  `(() => { serverResponse.setScript("test", {"type": "test", "children": ""}); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,

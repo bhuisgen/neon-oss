@@ -25,11 +25,11 @@ export interface Server {
 }
 
 /**
- * Request interface
+ * ServerRequest interface
  *
- * @interface Request
+ * @interface ServerRequest
  */
-export interface Request {
+export interface ServerRequest {
   /**
    * Returns the request method.
    */
@@ -82,11 +82,11 @@ export interface Request {
 }
 
 /**
- * Server interface
+ * ServerResponse interface
  *
- * @interface Response
+ * @interface ServerResponse
  */
-export interface Response {
+export interface ServerResponse {
   /**
    * Renders the response to the client.
    *

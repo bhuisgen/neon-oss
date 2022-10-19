@@ -95,14 +95,6 @@ func (t testIndexRendererFetcher) CreateResourceFromTemplate(template string, re
 	return t.createResourceFromTemplateResource, nil
 }
 
-type testIndexRendererNextRenderer struct{}
-
-func (r testIndexRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
-}
-
-func (r testIndexRendererNextRenderer) Next(renderer Renderer) {
-}
-
 type testIndexRendererResponseWriter struct {
 	header http.Header
 }
@@ -161,6 +153,7 @@ func TestIndexRendererInitialize(t *testing.T) {
 		cache       Cache
 		fetcher     Fetcher
 		next        Renderer
+		osStat      func(name string) (fs.FileInfo, error)
 		osReadFile  func(name string) ([]byte, error)
 		jsonMarshal func(v any) ([]byte, error)
 	}
@@ -245,7 +238,7 @@ func TestIndexRendererInitialize(t *testing.T) {
 }
 
 func TestIndexRendererHandle(t *testing.T) {
-	ctx := context.WithValue(context.Background(), ContextKeyID{}, "test")
+	ctx := context.WithValue(context.Background(), ServerHandlerContextKeyRequestID{}, "test")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/test", nil)
 	if err != nil {
 		t.Error("failed to create request")
@@ -261,7 +254,6 @@ func TestIndexRendererHandle(t *testing.T) {
 		bundleInfo  *time.Time
 		bufferPool  BufferPool
 		vmPool      VMPool
-		vmCache     *vmCache
 		cache       Cache
 		fetcher     Fetcher
 		next        Renderer
@@ -289,7 +281,7 @@ func TestIndexRendererHandle(t *testing.T) {
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
-				vmPool:     newVMPool(1, 1, 1),
+				vmPool:     newVMPool(1),
 				cache:      newCache(),
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testIndexRendererFileInfo{}, nil
@@ -299,7 +291,7 @@ func TestIndexRendererHandle(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -323,7 +315,7 @@ func TestIndexRendererHandle(t *testing.T) {
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
-				vmPool:     newVMPool(1, 1, 1),
+				vmPool:     newVMPool(1),
 				cache:      newCache(),
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testIndexRendererFileInfo{}, nil
@@ -357,7 +349,7 @@ func TestIndexRendererHandle(t *testing.T) {
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
-				vmPool:     newVMPool(1, 1, 1),
+				vmPool:     newVMPool(1),
 				cache:      newCache(),
 				fetcher:    testIndexRendererFetcher{},
 				osStat: func(name string) (fs.FileInfo, error) {
@@ -368,7 +360,7 @@ func TestIndexRendererHandle(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	response.redirect("http://external", 302); })();`), nil
+						return []byte(`(() => { serverResponse.redirect("http://external", 302); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -395,7 +387,6 @@ func TestIndexRendererHandle(t *testing.T) {
 				bundleInfo:  tt.fields.bundleInfo,
 				bufferPool:  tt.fields.bufferPool,
 				vmPool:      tt.fields.vmPool,
-				vmCache:     tt.fields.vmCache,
 				cache:       tt.fields.cache,
 				fetcher:     tt.fields.fetcher,
 				next:        tt.fields.next,
@@ -419,7 +410,6 @@ func TestIndexRendererNext(t *testing.T) {
 		bundleInfo  *time.Time
 		bufferPool  BufferPool
 		vmPool      VMPool
-		vmCache     *vmCache
 		cache       Cache
 		fetcher     Fetcher
 		next        Renderer
@@ -451,7 +441,6 @@ func TestIndexRendererNext(t *testing.T) {
 				bundleInfo:  tt.fields.bundleInfo,
 				bufferPool:  tt.fields.bufferPool,
 				vmPool:      tt.fields.vmPool,
-				vmCache:     tt.fields.vmCache,
 				cache:       tt.fields.cache,
 				fetcher:     tt.fields.fetcher,
 				next:        tt.fields.next,
@@ -469,7 +458,7 @@ func TestIndexRendererRender(t *testing.T) {
 		t.SkipNow()
 	}
 
-	ctx := context.WithValue(context.Background(), ContextKeyID{}, "test")
+	ctx := context.WithValue(context.Background(), ServerHandlerContextKeyRequestID{}, "test")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/test", nil)
 	if err != nil {
 		t.Error("failed to create request")
@@ -507,6 +496,7 @@ func TestIndexRendererRender(t *testing.T) {
 		cache       Cache
 		fetcher     Fetcher
 		next        Renderer
+		osStat      func(name string) (fs.FileInfo, error)
 		osReadFile  func(name string) ([]byte, error)
 		jsonMarshal func(v any) ([]byte, error)
 	}
@@ -612,7 +602,7 @@ func TestIndexRendererRender(t *testing.T) {
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
-				vmPool:     newVMPool(1, 1, 1),
+				vmPool:     newVMPool(1),
 				cache:      newCache(),
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testIndexRendererFileInfo{}, nil
@@ -622,7 +612,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -686,7 +676,7 @@ func TestIndexRendererRender(t *testing.T) {
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
-				vmPool:     newVMPool(1, 1, 1),
+				vmPool:     newVMPool(1),
 				cache:      newCache(),
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testIndexRendererFileInfo{}, nil
@@ -750,44 +740,7 @@ func TestIndexRendererRender(t *testing.T) {
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
-				vmPool:     newVMPool(1, 1, 1),
-				cache:      newCache(),
-				osStat: func(name string) (fs.FileInfo, error) {
-					return testIndexRendererFileInfo{}, nil
-				},
-				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
-						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
-					}
-					if name == "data/bundle.js" {
-						return []byte(`(() => {	while(true){} })();`), nil
-					}
-					return []byte{}, nil
-				},
-				jsonMarshal: func(v any) ([]byte, error) {
-					return []byte{}, nil
-				},
-			},
-			args: args{
-				req:  req,
-				info: &ServerInfo{},
-			},
-			wantErr: true,
-		},
-		{
-			name: "error vm execute with cache",
-			fields: fields{
-				config: &IndexRendererConfig{
-					HTML:            "data/index.html",
-					Bundle:          stringPtr("data/bundle.js"),
-					BundleCodeCache: true,
-					Cache:           true,
-					CacheTTL:        60,
-					Timeout:         1,
-				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				vmPool:     newVMPool(1, 1, 1),
+				vmPool:     newVMPool(1),
 				cache:      newCache(),
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testIndexRendererFileInfo{}, nil
@@ -832,7 +785,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -866,7 +819,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	response.redirect("http://external", 302); })();`), nil
+						return []byte(`(() => { serverResponse.redirect("http://external", 302); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -918,7 +871,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -970,7 +923,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1022,7 +975,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1073,7 +1026,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1123,7 +1076,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1175,7 +1128,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1211,7 +1164,7 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1246,7 +1199,8 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); response.setTitle("title"); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
+							` serverResponse.setTitle("title"); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1281,7 +1235,8 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); response.setMeta("test", {"name": "test"}); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
+							` serverResponse.setMeta("test", {"name": "test"}); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1316,7 +1271,8 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); response.setLink("test", {"href": "test", "rel": "test"}); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
+							` serverResponse.setLink("test", {"href": "test", "rel": "test"}); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1351,7 +1307,8 @@ func TestIndexRendererRender(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); response.setScript("test", {"type": "test", "children": "content"}); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
+							` serverResponse.setScript("test", {"type": "test", "children": "content"}); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1402,7 +1359,7 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 	defer func() {
 		DEBUG = false
 	}()
-	ctx := context.WithValue(context.Background(), ContextKeyID{}, "test")
+	ctx := context.WithValue(context.Background(), ServerHandlerContextKeyRequestID{}, "test")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/test", nil)
 	if err != nil {
 		t.Error("failed to create request")
@@ -1483,7 +1440,7 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
-						return []byte(`(() => {	var root = "<p>test</p>"; response.render(root, 200); })();`), nil
+						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
 				},

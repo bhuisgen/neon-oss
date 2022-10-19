@@ -31,8 +31,8 @@ type vm struct {
 	processObject               *v8go.ObjectTemplate
 	envObject                   *v8go.ObjectTemplate
 	serverObject                *v8go.ObjectTemplate
-	requestObject               *v8go.ObjectTemplate
-	responseObject              *v8go.ObjectTemplate
+	serverRequestObject         *v8go.ObjectTemplate
+	serverResponseObject        *v8go.ObjectTemplate
 	context                     *v8go.Context
 	data                        *vmData
 	v8NewFunctionTemplate       func(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate
@@ -72,128 +72,134 @@ func vmV8ObjectTemplateNewInstance(template *v8go.ObjectTemplate, context *v8go.
 
 // newVM creates a new VM
 func newVM() *vm {
-	logger := log.New(os.Stderr, fmt.Sprint(vmLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 	isolate := v8go.NewIsolate()
-	processObject := v8go.NewObjectTemplate(isolate)
-	envObject := v8go.NewObjectTemplate(isolate)
-	serverObject := v8go.NewObjectTemplate(isolate)
-	requestObject := v8go.NewObjectTemplate(isolate)
-	responseObject := v8go.NewObjectTemplate(isolate)
-	context := v8go.NewContext(isolate)
 
 	v := vm{
-		logger:                      logger,
+		logger:                      log.New(os.Stderr, fmt.Sprint(vmLogger, ": "), log.LstdFlags|log.Lmsgprefix),
 		isolate:                     isolate,
-		processObject:               processObject,
-		envObject:                   envObject,
-		serverObject:                serverObject,
-		requestObject:               requestObject,
-		responseObject:              responseObject,
-		context:                     context,
+		processObject:               v8go.NewObjectTemplate(isolate),
+		envObject:                   v8go.NewObjectTemplate(isolate),
+		serverObject:                v8go.NewObjectTemplate(isolate),
+		serverRequestObject:         v8go.NewObjectTemplate(isolate),
+		serverResponseObject:        v8go.NewObjectTemplate(isolate),
+		context:                     v8go.NewContext(isolate),
 		data:                        &vmData{},
 		v8NewFunctionTemplate:       vmV8NewFunctionTemplate,
 		v8ObjectTemplateNewInstance: vmV8ObjectTemplateNewInstance,
 	}
 
-	serverObject.Set("addr", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+	v.serverObject.Set("addr", v.v8NewFunctionTemplate(v.isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 		value, _ := v8go.NewValue(v.isolate, v.data.server.Addr)
 		return value
 	}))
 
-	serverObject.Set("port", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+	v.serverObject.Set("port", v.v8NewFunctionTemplate(v.isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 		value, _ := v8go.NewValue(v.isolate, int32(v.data.server.Port))
 		return value
 	}))
 
-	serverObject.Set("version", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.NewValue(v.isolate, v.data.server.Version)
-		return value
-	}))
+	v.serverObject.Set("version", v.v8NewFunctionTemplate(v.isolate,
 
-	requestObject.Set("method", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.NewValue(v.isolate, v.data.req.Method)
-		return value
-	}))
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.server.Version)
+			return value
+		}))
 
-	requestObject.Set("proto", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.NewValue(v.isolate, v.data.req.Proto)
-		return value
-	}))
+	v.serverRequestObject.Set("method", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.Method)
+			return value
+		}))
 
-	requestObject.Set("protoMajor", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.NewValue(v.isolate, v.data.req.ProtoMajor)
-		return value
-	}))
+	v.serverRequestObject.Set("proto", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.Proto)
+			return value
+		}))
 
-	requestObject.Set("protoMinor", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.NewValue(v.isolate, v.data.req.ProtoMinor)
-		return value
-	}))
+	v.serverRequestObject.Set("protoMajor", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.ProtoMajor)
+			return value
+		}))
 
-	requestObject.Set("remoteAddr", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.NewValue(v.isolate, v.data.req.RemoteAddr)
-		return value
-	}))
+	v.serverRequestObject.Set("protoMinor", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.ProtoMinor)
+			return value
+		}))
 
-	requestObject.Set("host", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.NewValue(v.isolate, v.data.req.Host)
-		return value
-	}))
+	v.serverRequestObject.Set("remoteAddr", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.RemoteAddr)
+			return value
+		}))
 
-	requestObject.Set("path", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.NewValue(v.isolate, v.data.req.URL.Path)
-		return value
-	}))
+	v.serverRequestObject.Set("host", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.Host)
+			return value
+		}))
 
-	requestObject.Set("query", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		var value *v8go.Value
-		q := v.data.req.URL.Query()
-		data, err := json.Marshal(&q)
-		if err != nil {
-			value, _ = v8go.JSONParse(v.context, "{}")
-		} else {
-			value, _ = v8go.JSONParse(v.context, string(data))
-		}
-		return value
-	}))
+	v.serverRequestObject.Set("path", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.NewValue(v.isolate, v.data.req.URL.Path)
+			return value
+		}))
 
-	requestObject.Set("headers", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		var value *v8go.Value
-		h := v.data.req.Header
-		data, err := json.Marshal(&h)
-		if err != nil {
-			value, _ = v8go.JSONParse(v.context, "{}")
-		} else {
-			value, _ = v8go.JSONParse(v.context, string(data))
-		}
-		return value
-	}))
-
-	requestObject.Set("state", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		value, _ := v8go.JSONParse(v.context, *v.data.state)
-		return value
-	}))
-
-	responseObject.Set("render", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		args := info.Args()
-		if len(args) > 0 {
-			render := []byte(args[0].String())
-			v.data.render = &render
-
-			status := http.StatusOK
-			if len(args) > 1 {
-				code, err := strconv.Atoi(args[1].String())
-				if err != nil || code < 100 || code > 599 {
-					code = http.StatusInternalServerError
-				}
-				status = code
+	v.serverRequestObject.Set("query", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			var value *v8go.Value
+			q := v.data.req.URL.Query()
+			data, err := json.Marshal(&q)
+			if err != nil {
+				value, _ = v8go.JSONParse(v.context, "{}")
+			} else {
+				value, _ = v8go.JSONParse(v.context, string(data))
 			}
-			v.data.status = &status
-		}
-		return nil
-	}))
+			return value
+		}))
 
-	responseObject.Set("redirect", v.v8NewFunctionTemplate(isolate,
+	v.serverRequestObject.Set("headers", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			var value *v8go.Value
+			h := v.data.req.Header
+			data, err := json.Marshal(&h)
+			if err != nil {
+				value, _ = v8go.JSONParse(v.context, "{}")
+			} else {
+				value, _ = v8go.JSONParse(v.context, string(data))
+			}
+			return value
+		}))
+
+	v.serverRequestObject.Set("state", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			value, _ := v8go.JSONParse(v.context, *v.data.state)
+			return value
+		}))
+
+	v.serverResponseObject.Set("render", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			args := info.Args()
+			if len(args) > 0 {
+				render := []byte(args[0].String())
+				v.data.render = &render
+
+				status := http.StatusOK
+				if len(args) > 1 {
+					code, err := strconv.Atoi(args[1].String())
+					if err != nil || code < 100 || code > 599 {
+						code = http.StatusInternalServerError
+					}
+					status = code
+				}
+				v.data.status = &status
+			}
+			return nil
+		}))
+
+	v.serverResponseObject.Set("redirect", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) > 0 {
@@ -215,7 +221,7 @@ func newVM() *vm {
 			return nil
 		}))
 
-	responseObject.Set("setHeader", v.v8NewFunctionTemplate(isolate,
+	v.serverResponseObject.Set("setHeader", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) > 1 {
@@ -232,59 +238,63 @@ func newVM() *vm {
 			return nil
 		}))
 
-	responseObject.Set("setTitle", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		args := info.Args()
-		if len(args) > 0 {
-			title := args[0].String()
-			v.data.title = &title
-		}
-		return nil
-	}))
-
-	responseObject.Set("setMeta", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		args := info.Args()
-		if len(args) > 1 {
-			id := args[0].String()
-			data := args[1].Object()
-
-			if v.data.metas == nil {
-				v.data.metas = make(map[string]map[string]string)
+	v.serverResponseObject.Set("setTitle", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			args := info.Args()
+			if len(args) > 0 {
+				title := args[0].String()
+				v.data.title = &title
 			}
+			return nil
+		}))
 
-			v.data.metas[id] = make(map[string]string)
-			for _, attribute := range []string{"name", "itemprop", "content", "charset", "http-equiv", "scheme", "property"} {
-				if ok := data.Has(attribute); ok {
-					value, _ := data.Get(attribute)
-					v.data.metas[id][attribute] = value.String()
+	v.serverResponseObject.Set("setMeta", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			args := info.Args()
+			if len(args) > 1 {
+				id := args[0].String()
+				data := args[1].Object()
+
+				if v.data.metas == nil {
+					v.data.metas = make(map[string]map[string]string)
+				}
+
+				v.data.metas[id] = make(map[string]string)
+				for _, attribute := range []string{"name", "itemprop", "content", "charset", "http-equiv", "scheme",
+					"property"} {
+					if ok := data.Has(attribute); ok {
+						value, _ := data.Get(attribute)
+						v.data.metas[id][attribute] = value.String()
+					}
 				}
 			}
-		}
-		return nil
-	}))
+			return nil
+		}))
 
-	responseObject.Set("setLink", v.v8NewFunctionTemplate(isolate, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
-		args := info.Args()
-		if len(args) > 1 {
-			id := args[0].String()
-			data := args[1].Object()
+	v.serverResponseObject.Set("setLink", v.v8NewFunctionTemplate(v.isolate,
+		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+			args := info.Args()
+			if len(args) > 1 {
+				id := args[0].String()
+				data := args[1].Object()
 
-			if v.data.links == nil {
-				v.data.links = make(map[string]map[string]string)
-			}
+				if v.data.links == nil {
+					v.data.links = make(map[string]map[string]string)
+				}
 
-			v.data.links[id] = make(map[string]string)
-			for _, attribute := range []string{"rel", "href", "hreflang", "type", "sizes", "media", "as",
-				"crossorigin", "disabled", "importance", "integrity", "referrerpolicy", "title"} {
-				if ok := data.Has(attribute); ok {
-					value, _ := data.Get(attribute)
-					v.data.links[id][attribute] = value.String()
+				v.data.links[id] = make(map[string]string)
+				for _, attribute := range []string{"rel", "href", "hreflang", "type", "sizes", "media", "as",
+					"crossorigin", "disabled", "importance", "integrity", "referrerpolicy", "title"} {
+					if ok := data.Has(attribute); ok {
+						value, _ := data.Get(attribute)
+						v.data.links[id][attribute] = value.String()
+					}
 				}
 			}
-		}
-		return nil
-	}))
+			return nil
+		}))
 
-	responseObject.Set("setScript", v.v8NewFunctionTemplate(isolate,
+	v.serverResponseObject.Set("setScript", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) > 1 {
@@ -352,11 +362,11 @@ func (v *vm) Configure(envName string, info *ServerInfo, req *http.Request, stat
 	if err != nil {
 		return vmError{"failed to create server object instance"}
 	}
-	request, err := v.v8ObjectTemplateNewInstance(v.requestObject, v.context)
+	serverRequest, err := v.v8ObjectTemplateNewInstance(v.serverRequestObject, v.context)
 	if err != nil {
 		return vmError{"failed to create template object instance"}
 	}
-	response, err := v.v8ObjectTemplateNewInstance(v.responseObject, v.context)
+	serverResponse, err := v.v8ObjectTemplateNewInstance(v.serverResponseObject, v.context)
 	if err != nil {
 		return vmError{"failed to create response object instance"}
 	}
@@ -367,8 +377,8 @@ func (v *vm) Configure(envName string, info *ServerInfo, req *http.Request, stat
 	global := v.context.Global()
 	global.Set("process", process)
 	global.Set("server", server)
-	global.Set("request", request)
-	global.Set("response", response)
+	global.Set("serverRequest", serverRequest)
+	global.Set("serverResponse", serverResponse)
 
 	return nil
 }
@@ -393,9 +403,11 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 	case err := <-errors:
 		if DEBUG {
 			e := err.(*v8go.JSError)
-			v.logger.Printf(e.Message)
-			v.logger.Printf(e.Location)
-			v.logger.Printf(e.StackTrace)
+			if e.StackTrace != "" {
+				v.logger.Printf("javascript stack trace: %+v", e)
+			} else {
+				v.logger.Printf("javascript error: %v", e)
+			}
 		}
 		return nil, vmError{"execution error"}
 

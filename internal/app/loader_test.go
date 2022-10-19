@@ -175,7 +175,6 @@ func TestLoaderExecutorExecute(t *testing.T) {
 	type fields struct {
 		config        *LoaderConfig
 		logger        *log.Logger
-		failsafe      bool
 		fetcher       Fetcher
 		jsonUnmarshal func(data []byte, v any) error
 	}
@@ -217,10 +216,9 @@ func TestLoaderExecutorExecute(t *testing.T) {
 
 func TestLoaderExecutorLoadStatic(t *testing.T) {
 	type fields struct {
-		config   *LoaderConfig
-		logger   *log.Logger
-		failsafe bool
-		fetcher  Fetcher
+		config  *LoaderConfig
+		logger  *log.Logger
+		fetcher Fetcher
 	}
 	type args struct {
 		ctx  context.Context
@@ -279,7 +277,6 @@ func TestLoaderExecutorLoadSingle(t *testing.T) {
 	type fields struct {
 		config        *LoaderConfig
 		logger        *log.Logger
-		failsafe      bool
 		fetcher       Fetcher
 		jsonUnmarshal func(data []byte, v any) error
 	}
@@ -495,7 +492,6 @@ func TestLoaderExecutorLoadList(t *testing.T) {
 	type fields struct {
 		config        *LoaderConfig
 		logger        *log.Logger
-		failsafe      bool
 		fetcher       Fetcher
 		jsonUnmarshal func(data []byte, v any) error
 	}

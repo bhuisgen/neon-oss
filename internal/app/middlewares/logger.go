@@ -14,13 +14,13 @@ import (
 
 // LoggerConfig implements the configuration of the logger middleware
 type LoggerConfig struct {
-	Log    bool
+	Enable bool
 	Writer io.Writer
 }
 
 // Logger is a middleware to log all incoming requests
 func Logger(config *LoggerConfig, next http.Handler) http.Handler {
-	if !config.Log {
+	if !config.Enable {
 		return next
 	}
 
@@ -49,11 +49,11 @@ type loggerResponseWriter struct {
 }
 
 // WriteHeader sends an HTTP response header with the provided status code.
-func (rw *loggerResponseWriter) WriteHeader(code int) {
-	if rw.wroteHeader {
+func (w *loggerResponseWriter) WriteHeader(code int) {
+	if w.wroteHeader {
 		return
 	}
-	rw.status = code
-	rw.ResponseWriter.WriteHeader(code)
-	rw.wroteHeader = true
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+	w.wroteHeader = true
 }

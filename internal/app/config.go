@@ -14,17 +14,19 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 
 	"gopkg.in/yaml.v3"
 )
 
 // config implements the configuration for the instance
 type config struct {
-	Server  []*ServerConfig
-	Fetcher *FetcherConfig
-	Loader  *LoaderConfig
-	parser  configParser
-	osStat  func(name string) (fs.FileInfo, error)
+	Server     []*ServerConfig
+	Fetcher    *FetcherConfig
+	Loader     *LoaderConfig
+	parser     configParser
+	osStat     func(name string) (fs.FileInfo, error)
+	osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 }
 
 const (
@@ -33,6 +35,7 @@ const (
 	configDefaultServerListenPort        int    = 8080
 	configDefaultServerReadTimeout       int    = 60
 	configDefaultServerWriteTimeout      int    = 60
+	configDefaultServerCompress          int    = 0
 	configDefaultServerAccessLog         bool   = false
 	configDefaultServerRewriteRuleLast   bool   = false
 	configDefaultServerHeaderRuleLast    bool   = false
@@ -60,11 +63,22 @@ const (
 	configDefaultLoaderExecWorkers       int    = 1
 )
 
+// configOsStat redirects to os.Stat
+func configOsStat(name string) (fs.FileInfo, error) {
+	return os.Stat(name)
+}
+
+// configOsOpenFile redirects to os.OpenFile
+func configOsOpenFile(name string, flag int, perm fs.FileMode) (*os.File, error) {
+	return os.OpenFile(name, flag, perm)
+}
+
 // newConfig creates a new config instance
 func newConfig(parser configParser) *config {
 	return &config{
-		parser: parser,
-		osStat: os.Stat,
+		parser:     parser,
+		osStat:     configOsStat,
+		osOpenFile: configOsOpenFile,
 	}
 }
 
@@ -95,6 +109,7 @@ type yamlConfigServer struct {
 	TLSKeyFile    *string `yaml:"tls_key_file,omitempty"`
 	ReadTimeout   *int    `yaml:"read_timeout,omitempty"`
 	WriteTimeout  *int    `yaml:"write_timeout,omitempty"`
+	Compress      *int    `yaml:"compress,omitempty"`
 	AccessLog     *bool   `yaml:"access_log,omitempty"`
 	AccessLogFile *string `yaml:"access_log_file,omitempty"`
 
@@ -172,6 +187,7 @@ type yamlConfigServer struct {
 		Container *string `yaml:"container,omitempty"`
 		State     *string `yaml:"state,omitempty"`
 		Timeout   *int    `yaml:"timeout,omitempty"`
+		MaxVMs    *int    `yaml:"max_vms,omitempty"`
 		Cache     *bool   `yaml:"cache,omitempty"`
 		CacheTTL  *int    `yaml:"cache_ttl,omitempty"`
 		Rules     []struct {
@@ -305,6 +321,11 @@ func (p *configParserYAML) parse(data []byte, c *config) error {
 			serverConfig.WriteTimeout = *yamlConfigServer.WriteTimeout
 		} else {
 			serverConfig.WriteTimeout = configDefaultServerWriteTimeout
+		}
+		if yamlConfigServer.Compress != nil {
+			serverConfig.Compress = *yamlConfigServer.Compress
+		} else {
+			serverConfig.Compress = configDefaultServerCompress
 		}
 		if yamlConfigServer.AccessLog != nil {
 			serverConfig.AccessLog = *yamlConfigServer.AccessLog
@@ -443,6 +464,11 @@ func (p *configParserYAML) parse(data []byte, c *config) error {
 				indexRendererConfig.Timeout = *yamlConfigServer.Index.Timeout
 			} else {
 				indexRendererConfig.Timeout = configDefaultServerIndexTimeout
+			}
+			if yamlConfigServer.Index.MaxVMs != nil {
+				indexRendererConfig.MaxVMs = *yamlConfigServer.Index.MaxVMs
+			} else {
+				indexRendererConfig.MaxVMs = 2 * runtime.NumCPU()
 			}
 			if yamlConfigServer.Index.Cache != nil {
 				indexRendererConfig.Cache = *yamlConfigServer.Index.Cache
@@ -610,9 +636,11 @@ func TestConfig(c *config) ([]string, error) {
 					report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "tls_ca_file"))
 				}
 				if *server.TLSCertFile != "" {
-					tlsCAFileInfo, err := c.osStat(*server.TLSCAFile)
-					if err != nil || tlsCAFileInfo.IsDir() {
+					tlsCAFile, err := c.osOpenFile(*server.TLSCAFile, os.O_RDONLY, 0)
+					if err != nil {
 						report = append(report, fmt.Sprintf("server: option '%s', failed to open file", "tls_ca_file"))
+					} else {
+						tlsCAFile.Close()
 					}
 				}
 			}
@@ -623,9 +651,11 @@ func TestConfig(c *config) ([]string, error) {
 				report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "tls_cert_file"))
 			}
 			if server.TLSCertFile != nil && *server.TLSCertFile != "" {
-				tlsCertFileInfo, err := c.osStat(*server.TLSCertFile)
-				if err != nil || tlsCertFileInfo.IsDir() {
+				tlsCertFile, err := c.osOpenFile(*server.TLSCertFile, os.O_RDONLY, 0)
+				if err != nil {
 					report = append(report, fmt.Sprintf("server: option '%s', failed to open file", "tls_cert_file"))
+				} else {
+					tlsCertFile.Close()
 				}
 			}
 			if server.TLSKeyFile == nil {
@@ -635,9 +665,11 @@ func TestConfig(c *config) ([]string, error) {
 				report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "tls_key_file"))
 			}
 			if server.TLSKeyFile != nil && *server.TLSKeyFile != "" {
-				tlsKeyFileFile, err := c.osStat(*server.TLSKeyFile)
-				if err != nil || tlsKeyFileFile.IsDir() {
+				tlsKeyFileFile, err := c.osOpenFile(*server.TLSKeyFile, os.O_RDONLY, 0)
+				if err != nil {
 					report = append(report, fmt.Sprintf("server: option '%s', failed to open file", "tls_key_file"))
+				} else {
+					tlsKeyFileFile.Close()
 				}
 			}
 		}
@@ -647,14 +679,19 @@ func TestConfig(c *config) ([]string, error) {
 		if server.WriteTimeout < 0 {
 			report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "write_timeout"))
 		}
+		if server.Compress < -2 || server.Compress > 9 {
+			report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "compress"))
+		}
 		if server.AccessLogFile != nil {
 			if *server.AccessLogFile == "" {
 				report = append(report, fmt.Sprintf("server: option '%s', invalid/missing value", "access_log_file"))
 			}
 			if *server.AccessLogFile != "" {
-				accessLogFileInfo, err := c.osStat(*server.AccessLogFile)
-				if (err != nil && errors.Is(err, os.ErrNotExist)) || accessLogFileInfo.IsDir() {
+				accessLogFile, err := c.osOpenFile(*server.AccessLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+				if err != nil {
 					report = append(report, fmt.Sprintf("server: option '%s', failed to open file", "access_log_file"))
+				} else {
+					accessLogFile.Close()
 				}
 			}
 		}
@@ -695,8 +732,8 @@ func TestConfig(c *config) ([]string, error) {
 				report = append(report, fmt.Sprintf("static: option '%s', invalid/missing value", "dir"))
 			}
 			if server.Renderer.Static.Dir != "" {
-				dir, err := c.osStat(server.Renderer.Static.Dir)
-				if err != nil || !dir.IsDir() {
+				dirInfo, err := c.osStat(server.Renderer.Static.Dir)
+				if err != nil || !dirInfo.IsDir() {
 					report = append(report, fmt.Sprintf("static: option '%s', failed to open directory", "dir"))
 				}
 			}
@@ -884,9 +921,11 @@ func TestConfig(c *config) ([]string, error) {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "html"))
 			}
 			if server.Renderer.Index.HTML != "" {
-				htmlFileInfo, err := c.osStat(server.Renderer.Index.HTML)
-				if err != nil || htmlFileInfo.IsDir() {
+				htmlFile, err := c.osOpenFile(server.Renderer.Index.HTML, os.O_RDONLY, 0)
+				if err != nil {
 					report = append(report, fmt.Sprintf("index: option '%s', failed to open file", "html"))
+				} else {
+					htmlFile.Close()
 				}
 			}
 			if server.Renderer.Index.Bundle != nil {
@@ -894,9 +933,11 @@ func TestConfig(c *config) ([]string, error) {
 					report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "bundle"))
 				}
 				if *server.Renderer.Index.Bundle != "" {
-					bundleFileInfo, err := c.osStat(*server.Renderer.Index.Bundle)
-					if err != nil || bundleFileInfo.IsDir() {
+					bundleFile, err := c.osOpenFile(*server.Renderer.Index.Bundle, os.O_RDONLY, 0)
+					if err != nil {
 						report = append(report, fmt.Sprintf("index: option '%s', failed to open file", "bundle"))
+					} else {
+						bundleFile.Close()
 					}
 				}
 			}
@@ -911,6 +952,9 @@ func TestConfig(c *config) ([]string, error) {
 			}
 			if server.Renderer.Index.Timeout < 0 {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "timeout"))
+			}
+			if server.Renderer.Index.MaxVMs < 1 {
+				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "max_vms"))
 			}
 			if server.Renderer.Index.CacheTTL < 0 {
 				report = append(report, fmt.Sprintf("index: option '%s', invalid/missing value", "cache_ttl"))
@@ -941,9 +985,11 @@ func TestConfig(c *config) ([]string, error) {
 				report = append(report, fmt.Sprintf("default: option '%s', invalid/missing value", "file"))
 			}
 			if server.Renderer.Default.File != "" {
-				defaultFileInfo, err := c.osStat(server.Renderer.Default.File)
-				if err != nil || defaultFileInfo.IsDir() {
+				defaultFile, err := c.osOpenFile(server.Renderer.Default.File, os.O_RDONLY, 0)
+				if err != nil {
 					report = append(report, fmt.Sprintf("default: option '%s', failed to open file", "file"))
+				} else {
+					defaultFile.Close()
 				}
 			}
 			if server.Renderer.Default.StatusCode < 100 || server.Renderer.Default.StatusCode > 599 {
@@ -961,9 +1007,11 @@ func TestConfig(c *config) ([]string, error) {
 				report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_tls_ca_file"))
 			}
 			if *c.Fetcher.RequestTLSCAFile != "" {
-				requestTLSCAFileInfo, err := c.osStat(*c.Fetcher.RequestTLSCAFile)
-				if err != nil || requestTLSCAFileInfo.IsDir() {
+				requestTLSCAFile, err := c.osOpenFile(*c.Fetcher.RequestTLSCAFile, os.O_RDONLY, 0)
+				if err != nil {
 					report = append(report, fmt.Sprintf("fetcher: option '%s', failed to open file", "request_tls_ca_file"))
+				} else {
+					requestTLSCAFile.Close()
 				}
 			}
 		}
@@ -972,9 +1020,11 @@ func TestConfig(c *config) ([]string, error) {
 				report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_tls_cert_file"))
 			}
 			if *c.Fetcher.RequestTLSCertFile != "" {
-				requestTLSCertFileInfo, err := c.osStat(*c.Fetcher.RequestTLSCertFile)
-				if err != nil || requestTLSCertFileInfo.IsDir() {
+				requestTLSCertFile, err := c.osOpenFile(*c.Fetcher.RequestTLSCertFile, os.O_RDONLY, 0)
+				if err != nil {
 					report = append(report, fmt.Sprintf("fetcher: option '%s', failed to open file", "request_tls_cert_file"))
+				} else {
+					requestTLSCertFile.Close()
 				}
 			}
 		}
@@ -983,9 +1033,11 @@ func TestConfig(c *config) ([]string, error) {
 				report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_tls_key_file"))
 			}
 			if *c.Fetcher.RequestTLSKeyFile != "" {
-				requestTLSKeyFileInfo, err := c.osStat(*c.Fetcher.RequestTLSKeyFile)
-				if err != nil || requestTLSKeyFileInfo.IsDir() {
+				requestTLSKeyFile, err := c.osOpenFile(*c.Fetcher.RequestTLSKeyFile, os.O_RDONLY, 0)
+				if err != nil {
 					report = append(report, fmt.Sprintf("fetcher: option '%s', failed to open file", "request_tls_key_file"))
+				} else {
+					requestTLSKeyFile.Close()
 				}
 			}
 		}

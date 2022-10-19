@@ -12,6 +12,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,10 +25,10 @@ import (
 type server struct {
 	config                      *ServerConfig
 	logger                      *log.Logger
+	reopen                      chan os.Signal
 	httpServer                  *http.Server
 	renderer                    Renderer
 	info                        *ServerInfo
-	osCreate                    func(name string) (*os.File, error)
 	osReadFile                  func(name string) ([]byte, error)
 	httpServerListenAndServe    func(server *http.Server) error
 	httpServerListenAndServeTLS func(server *http.Server, certFile string, keyFile string) error
@@ -43,6 +45,7 @@ type ServerConfig struct {
 	TLSKeyFile    *string
 	ReadTimeout   int
 	WriteTimeout  int
+	Compress      int
 	AccessLog     bool
 	AccessLogFile *string
 	Renderer      *ServerRendererConfig
@@ -59,16 +62,9 @@ type ServerRendererConfig struct {
 	Default *DefaultRendererConfig
 }
 
-type ContextKeyID struct{}
-
 const (
 	serverLogger string = "server"
 )
-
-// serverOsCreate redirects to os.Create
-func serverOsCreate(name string) (*os.File, error) {
-	return os.Create(name)
-}
 
 // serverOsReadFile redirects to os.ReadFile
 func serverOsReadFile(name string) ([]byte, error) {
@@ -93,15 +89,14 @@ func httpServerShutdown(server *http.Server, context context.Context) error {
 // CreateServer creates a new server instance
 func CreateServer(config *ServerConfig, renderers ...Renderer) (*server, error) {
 	s := server{
-		config:   config,
-		logger:   log.New(os.Stderr, fmt.Sprint(serverLogger, ": "), log.LstdFlags|log.Lmsgprefix),
-		renderer: nil,
+		config: config,
+		logger: log.New(os.Stderr, fmt.Sprint(serverLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		reopen: make(chan os.Signal, 1),
 		info: &ServerInfo{
 			Addr:    config.ListenAddr,
 			Port:    config.ListenPort,
 			Version: Version,
 		},
-		osCreate:                    serverOsCreate,
 		osReadFile:                  serverOsReadFile,
 		httpServerListenAndServe:    serverHttpServerListenAndServe,
 		httpServerListenAndServeTLS: serverHttpListenAndServeTLS,
@@ -118,33 +113,51 @@ func CreateServer(config *ServerConfig, renderers ...Renderer) (*server, error) 
 
 // initialize initializes the server
 func (s *server) initialize(renderers ...Renderer) error {
-	var previous Renderer
-	for index, renderer := range renderers {
-		if index == 0 {
-			s.renderer = renderer
-			previous = renderer
-			continue
-		}
-
-		previous.Next(renderer)
-		previous = renderer
-	}
-
-	recoverConfig := middlewares.RecoverConfig{}
-
-	loggerConfig := middlewares.LoggerConfig{
-		Log: s.config.AccessLog,
-	}
+	var logFileWriter LogFileWriter
 	if s.config.AccessLogFile != nil {
-		logFile, err := s.osCreate(*s.config.AccessLogFile)
+		logFileWriter, err := CreateLogFileWriter(*s.config.AccessLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
 			return err
 		}
-		loggerConfig.Writer = logFile
+
+		signal.Notify(s.reopen, syscall.SIGUSR1)
+		go func() {
+			for {
+				<-s.reopen
+
+				s.logger.Print("Reopening access log file")
+
+				logFileWriter.Reopen()
+			}
+		}()
+	}
+
+	var previous Renderer
+	for index, renderer := range renderers {
+		if index == 0 {
+			previous = renderer
+			continue
+		}
+		previous.Next(renderer)
+		previous = renderer
+	}
+	s.renderer = renderers[0]
+
+	recoverConfig := middlewares.RecoverConfig{}
+	loggerConfig := middlewares.LoggerConfig{
+		Enable: s.config.AccessLog,
+		Writer: logFileWriter,
+	}
+	compressConfig := middlewares.CompressConfig{
+		Level: s.config.Compress,
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/", middlewares.Recover(&recoverConfig, middlewares.Logger(&loggerConfig, NewServerHandler(s))))
+	mux.Handle("/",
+		middlewares.Recover(&recoverConfig,
+			middlewares.Logger(&loggerConfig,
+				middlewares.Compress(&compressConfig,
+					NewServerHandler(s)))))
 
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", s.config.ListenAddr, s.config.ListenPort),
@@ -202,6 +215,8 @@ func (s *server) Start() error {
 
 // Stop stops the server instance
 func (s *server) Stop(ctx context.Context) error {
+	signal.Stop(s.reopen)
+
 	err := s.httpServerShutdown(s.httpServer, ctx)
 	if err != nil {
 		return err
@@ -215,6 +230,14 @@ type serverHandler struct {
 	server *server
 }
 
+// ServerHandlerContextKeyRequestID implements the context key for the X-Request-ID header
+type ServerHandlerContextKeyRequestID struct{}
+
+const (
+	serverHandlerServerHeader    string = "Server"
+	serverHandlerRequestIdHeader string = "X-Request-ID"
+)
+
 // NewServerHandler creates a new server handler
 func NewServerHandler(server *server) *serverHandler {
 	return &serverHandler{
@@ -226,11 +249,11 @@ func NewServerHandler(server *server) *serverHandler {
 func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New()
 
-	ctx := context.WithValue(r.Context(), ContextKeyID{}, id.String())
+	ctx := context.WithValue(r.Context(), ServerHandlerContextKeyRequestID{}, id.String())
 	r = r.WithContext(ctx)
 
-	w.Header().Set("Server", fmt.Sprint("neon/", Version))
-	w.Header().Set("X-Correlation-ID", id.String())
+	w.Header().Set(serverHandlerServerHeader, fmt.Sprint("neon/", Version))
+	w.Header().Set(serverHandlerRequestIdHeader, id.String())
 
 	h.server.renderer.Handle(w, r, h.server.info)
 }

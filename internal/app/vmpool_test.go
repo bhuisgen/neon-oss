@@ -5,10 +5,8 @@
 package app
 
 import (
-	"net/http"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestNewVMPool(t *testing.T) {
@@ -142,28 +140,5 @@ func TestVMPool_MaxVMs(t *testing.T) {
 
 	if put != true {
 		t.Error("failed to put vm")
-	}
-}
-
-func BenchmarkNewVMPool(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		p := newVMPool(4)
-
-		worker := func(wg *sync.WaitGroup) {
-			defer wg.Done()
-
-			vm := p.Get()
-			vm.Configure("test", &ServerInfo{}, &http.Request{}, nil)
-			vm.Execute("test", "(() => { const t = 2 + 2; })();", 4*time.Second)
-			p.Put(vm)
-		}
-
-		var wg sync.WaitGroup
-		for i := 0; i < 100; i++ {
-			wg.Add(1)
-			go worker(&wg)
-		}
-
-		wg.Wait()
 	}
 }

@@ -13,6 +13,14 @@ import (
 	"testing"
 )
 
+type testServerNextRenderer struct{}
+
+func (r testServerNextRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+}
+
+func (r testServerNextRenderer) Next(renderer Renderer) {
+}
+
 func TestCreateServer(t *testing.T) {
 	type args struct {
 		config    *ServerConfig
@@ -26,7 +34,8 @@ func TestCreateServer(t *testing.T) {
 		{
 			name: "default",
 			args: args{
-				config: &ServerConfig{},
+				config:    &ServerConfig{},
+				renderers: []Renderer{testServerNextRenderer{}},
 			},
 		},
 	}
@@ -42,41 +51,13 @@ func TestCreateServer(t *testing.T) {
 }
 
 func TestServerInitialize(t *testing.T) {
-	tlsCAFile := "ca.pem"
-	accessLogFile := "access.log"
-
-	serverOsCreateAccessLogFileSuccess := func(name string) (*os.File, error) {
-		if name == accessLogFile {
-			return nil, nil
-		}
-		return nil, errors.New("test error")
-	}
-	serverOsCreateAccessLogFileError := func(name string) (*os.File, error) {
-		if name == accessLogFile {
-			return nil, errors.New("test error")
-		}
-		return nil, errors.New("test error")
-	}
-	serverOsReadFileTLSCAFileSuccess := func(name string) ([]byte, error) {
-		if name == tlsCAFile {
-			return []byte{}, nil
-		}
-		return nil, errors.New("test error")
-	}
-	serverOsReadFileTLSCAFileError := func(name string) ([]byte, error) {
-		if name == tlsCAFile {
-			return nil, errors.New("test error")
-		}
-		return nil, errors.New("test error")
-	}
-
 	type fields struct {
 		config                      *ServerConfig
 		logger                      *log.Logger
+		reopen                      chan os.Signal
 		httpServer                  *http.Server
 		renderer                    Renderer
 		info                        *ServerInfo
-		osCreate                    func(name string) (*os.File, error)
 		osReadFile                  func(name string) ([]byte, error)
 		httpServerListenAndServe    func(server *http.Server) error
 		httpServerListenAndServeTLS func(server *http.Server, certFile string, keyFile string) error
@@ -103,18 +84,24 @@ func TestServerInitialize(t *testing.T) {
 		{
 			name: "access log",
 			fields: fields{
-				config:   &ServerConfig{AccessLog: true, AccessLogFile: &accessLogFile},
-				osCreate: serverOsCreateAccessLogFileSuccess,
+				config: &ServerConfig{
+					AccessLog:     true,
+					AccessLogFile: stringPtr(os.DevNull),
+				},
+				reopen: make(chan os.Signal, 1),
 			},
 			args: args{
 				renderers: []Renderer{&defaultRenderer{}, &errorRenderer{}},
 			},
 		},
 		{
-			name: "create access log file error",
+			name: "error create access log file",
 			fields: fields{
-				config:   &ServerConfig{AccessLog: true, AccessLogFile: &accessLogFile},
-				osCreate: serverOsCreateAccessLogFileError,
+				config: &ServerConfig{
+					AccessLog:     true,
+					AccessLogFile: stringPtr(""),
+				},
+				reopen: make(chan os.Signal, 1),
 			},
 			args: args{
 				renderers: []Renderer{&defaultRenderer{}, &errorRenderer{}},
@@ -122,10 +109,29 @@ func TestServerInitialize(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "compress",
+			fields: fields{
+				config: &ServerConfig{
+					Compress: 1,
+				},
+			},
+			args: args{
+				renderers: []Renderer{&defaultRenderer{}, &errorRenderer{}},
+			},
+		},
+		{
 			name: "tls",
 			fields: fields{
-				config:     &ServerConfig{TLS: true, TLSCAFile: &tlsCAFile},
-				osReadFile: serverOsReadFileTLSCAFileSuccess,
+				config: &ServerConfig{
+					TLS:       true,
+					TLSCAFile: stringPtr("ca.pem"),
+				},
+				osReadFile: func(name string) ([]byte, error) {
+					if name == "ca.pem" {
+						return []byte{}, nil
+					}
+					return nil, errors.New("test error")
+				},
 			},
 			args: args{
 				renderers: []Renderer{&defaultRenderer{}, &errorRenderer{}},
@@ -134,8 +140,16 @@ func TestServerInitialize(t *testing.T) {
 		{
 			name: "tls read file error",
 			fields: fields{
-				config:     &ServerConfig{TLS: true, TLSCAFile: &tlsCAFile},
-				osReadFile: serverOsReadFileTLSCAFileError,
+				config: &ServerConfig{
+					TLS:       true,
+					TLSCAFile: stringPtr("ca.pem"),
+				},
+				osReadFile: func(name string) ([]byte, error) {
+					if name == "ca.pem" {
+						return nil, errors.New("test error")
+					}
+					return nil, errors.New("test error")
+				},
 			},
 			args: args{
 				renderers: []Renderer{&defaultRenderer{}, &errorRenderer{}},
@@ -148,10 +162,10 @@ func TestServerInitialize(t *testing.T) {
 			s := &server{
 				config:                      tt.fields.config,
 				logger:                      tt.fields.logger,
+				reopen:                      tt.fields.reopen,
 				httpServer:                  tt.fields.httpServer,
 				renderer:                    tt.fields.renderer,
 				info:                        tt.fields.info,
-				osCreate:                    tt.fields.osCreate,
 				osReadFile:                  tt.fields.osReadFile,
 				httpServerListenAndServe:    tt.fields.httpServerListenAndServe,
 				httpServerListenAndServeTLS: tt.fields.httpServerListenAndServeTLS,
@@ -171,10 +185,10 @@ func TestServerStart(t *testing.T) {
 	type fields struct {
 		config                      *ServerConfig
 		logger                      *log.Logger
+		reopen                      chan os.Signal
 		httpServer                  *http.Server
 		renderer                    Renderer
 		info                        *ServerInfo
-		osCreate                    func(name string) (*os.File, error)
 		osReadFile                  func(name string) ([]byte, error)
 		httpServerListenAndServe    func(server *http.Server) error
 		httpServerListenAndServeTLS func(server *http.Server, certFile string, keyFile string) error
@@ -243,10 +257,10 @@ func TestServerStart(t *testing.T) {
 			s := &server{
 				config:                      tt.fields.config,
 				logger:                      tt.fields.logger,
+				reopen:                      tt.fields.reopen,
 				httpServer:                  tt.fields.httpServer,
 				renderer:                    tt.fields.renderer,
 				info:                        tt.fields.info,
-				osCreate:                    tt.fields.osCreate,
 				osReadFile:                  tt.fields.osReadFile,
 				httpServerListenAndServe:    tt.fields.httpServerListenAndServe,
 				httpServerListenAndServeTLS: tt.fields.httpServerListenAndServeTLS,
@@ -263,10 +277,10 @@ func TestServerStop(t *testing.T) {
 	type fields struct {
 		config                      *ServerConfig
 		logger                      *log.Logger
+		reopen                      chan os.Signal
 		httpServer                  *http.Server
 		renderer                    Renderer
 		info                        *ServerInfo
-		osCreate                    func(name string) (*os.File, error)
 		osReadFile                  func(name string) ([]byte, error)
 		httpServerListenAndServe    func(server *http.Server) error
 		httpServerListenAndServeTLS func(server *http.Server, certFile string, keyFile string) error
@@ -320,10 +334,10 @@ func TestServerStop(t *testing.T) {
 			s := &server{
 				config:                      tt.fields.config,
 				logger:                      tt.fields.logger,
+				reopen:                      tt.fields.reopen,
 				httpServer:                  tt.fields.httpServer,
 				renderer:                    tt.fields.renderer,
 				info:                        tt.fields.info,
-				osCreate:                    tt.fields.osCreate,
 				osReadFile:                  tt.fields.osReadFile,
 				httpServerListenAndServe:    tt.fields.httpServerListenAndServe,
 				httpServerListenAndServeTLS: tt.fields.httpServerListenAndServeTLS,
@@ -421,8 +435,8 @@ func TestServerHandlerServeHTTP(t *testing.T) {
 			if tt.args.w.Header().Get("Server") == "" {
 				t.Errorf("response header %s is missing", "Server")
 			}
-			if tt.args.w.Header().Get("X-Correlation-ID") == "" {
-				t.Errorf("response header %s is missing", "X-Correlation-ID")
+			if tt.args.w.Header().Get("X-Request-ID") == "" {
+				t.Errorf("response header %s is missing", "X-Request-ID")
 			}
 		})
 	}

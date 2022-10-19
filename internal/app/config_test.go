@@ -205,6 +205,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 									Container *string "yaml:\"container,omitempty\""
 									State     *string "yaml:\"state,omitempty\""
 									Timeout   *int    "yaml:\"timeout,omitempty\""
+									MaxVMs    *int    "yaml:\"max_vms,omitempty\""
 									Cache     *bool   "yaml:\"cache,omitempty\""
 									CacheTTL  *int    "yaml:\"cache_ttl,omitempty\""
 									Rules     []struct {
@@ -252,6 +253,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 								TLSKeyFile:    stringPtr("key.pem"),
 								ReadTimeout:   intPtr(60),
 								WriteTimeout:  intPtr(60),
+								Compress:      intPtr(1),
 								AccessLog:     boolPtr(true),
 								AccessLogFile: stringPtr("access.log"),
 								Rewrite: &struct {
@@ -485,6 +487,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 									Container *string "yaml:\"container,omitempty\""
 									State     *string "yaml:\"state,omitempty\""
 									Timeout   *int    "yaml:\"timeout,omitempty\""
+									MaxVMs    *int    "yaml:\"max_vms,omitempty\""
 									Cache     *bool   "yaml:\"cache,omitempty\""
 									CacheTTL  *int    "yaml:\"cache_ttl,omitempty\""
 									Rules     []struct {
@@ -502,6 +505,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 									Env:       stringPtr("test"),
 									Container: stringPtr("root"),
 									State:     stringPtr("state"),
+									MaxVMs:    intPtr(1),
 									Timeout:   intPtr(0),
 									Cache:     boolPtr(false),
 									CacheTTL:  intPtr(60),
@@ -825,6 +829,7 @@ func TestConfigParserYAMLParse_Env(t *testing.T) {
 									Container *string "yaml:\"container,omitempty\""
 									State     *string "yaml:\"state,omitempty\""
 									Timeout   *int    "yaml:\"timeout,omitempty\""
+									MaxVMs    *int    "yaml:\"max_vms,omitempty\""
 									Cache     *bool   "yaml:\"cache,omitempty\""
 									CacheTTL  *int    "yaml:\"cache_ttl,omitempty\""
 									Rules     []struct {
@@ -943,6 +948,25 @@ func TestTestConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "server open TLS files",
+			args: args{
+				c: &config{
+					Server: []*ServerConfig{
+						{
+							TLS:         true,
+							TLSCAFile:   stringPtr("ca.pem"),
+							TLSCertFile: stringPtr("cert.pem"),
+							TLSKeyFile:  stringPtr("key.pem"),
+							Renderer:    &ServerRendererConfig{},
+						},
+					},
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
+					},
+				},
+			},
+		},
+		{
 			name: "error server failed to open TLS files",
 			args: args{
 				c: &config{
@@ -955,33 +979,8 @@ func TestTestConfig(t *testing.T) {
 							Renderer:    &ServerRendererConfig{},
 						},
 					},
-					osStat: func(name string) (fs.FileInfo, error) {
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
 						return nil, errors.New("test error")
-					},
-				},
-			},
-			want: []string{
-				"server: option 'tls_ca_file', failed to open file",
-				"server: option 'tls_cert_file', failed to open file",
-				"server: option 'tls_key_file', failed to open file",
-			},
-			wantErr: true,
-		},
-		{
-			name: "error server TLS files are directories",
-			args: args{
-				c: &config{
-					Server: []*ServerConfig{
-						{
-							TLS:         true,
-							TLSCAFile:   stringPtr("ca/"),
-							TLSCertFile: stringPtr("cert/"),
-							TLSKeyFile:  stringPtr("key/"),
-							Renderer:    &ServerRendererConfig{},
-						},
-					},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: true}, nil
 					},
 				},
 			},
@@ -1003,14 +1002,41 @@ func TestTestConfig(t *testing.T) {
 							Renderer:     &ServerRendererConfig{},
 						},
 					},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return nil, errors.New("test error")
-					},
 				},
 			},
 			want: []string{
 				"server: option 'read_timeout', invalid/missing value",
 				"server: option 'write_timeout', invalid/missing value",
+			},
+			wantErr: true,
+		},
+		{
+			name: "server compress",
+			args: args{
+				c: &config{
+					Server: []*ServerConfig{
+						{
+							Compress: 1,
+							Renderer: &ServerRendererConfig{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "error server compress invalid value",
+			args: args{
+				c: &config{
+					Server: []*ServerConfig{
+						{
+							Compress: 10,
+							Renderer: &ServerRendererConfig{},
+						},
+					},
+				},
+			},
+			want: []string{
+				"server: option 'compress', invalid/missing value",
 			},
 			wantErr: true,
 		},
@@ -1036,18 +1062,35 @@ func TestTestConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "error server access log file is a directory",
+			name: "server access log file open",
 			args: args{
 				c: &config{
 					Server: []*ServerConfig{
 						{
 							AccessLog:     true,
-							AccessLogFile: stringPtr("dir/"),
+							AccessLogFile: stringPtr("access.log"),
 							Renderer:      &ServerRendererConfig{},
 						},
 					},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: true}, nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
+					},
+				},
+			},
+		},
+		{
+			name: "error server access log file failed to open",
+			args: args{
+				c: &config{
+					Server: []*ServerConfig{
+						{
+							AccessLog:     true,
+							AccessLogFile: stringPtr("access.log"),
+							Renderer:      &ServerRendererConfig{},
+						},
+					},
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return nil, errors.New("test error")
 					},
 				},
 			},
@@ -1267,7 +1310,9 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Robots: &RobotsRendererConfig{
-									Path: "/robots.txt",
+									Path:     "/robots.txt",
+									Cache:    true,
+									CacheTTL: 60,
 								},
 							},
 						},
@@ -1356,9 +1401,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{},
 									},
@@ -1387,9 +1430,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1420,9 +1461,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1457,9 +1496,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1496,9 +1533,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1538,9 +1573,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1575,9 +1608,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1614,9 +1645,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1653,9 +1682,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1701,9 +1728,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1751,9 +1776,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1803,9 +1826,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1851,9 +1872,7 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Sitemap: &SitemapRendererConfig{
-									Root:     "/sitemap.xml",
-									Cache:    configDefaultServerSitemapCache,
-									CacheTTL: configDefaultServerSitemapCacheTTL,
+									Root: "/sitemap.xml",
 									Routes: []SitemapRoute{
 										{
 											Path: "/sitemap.xml",
@@ -1895,24 +1914,22 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:        "/data/index.html",
-									Env:         configDefaultServerIndexEnv,
-									Container:   configDefaultServerIndexContainer,
-									State:       configDefaultServerIndexState,
-									Timeout:     configDefaultServerIndexTimeout,
-									MaxVMs:      configDefaultServerIndexMaxVMs,
-									MinSpareVMs: configDefaultServerIndexMinSpareVMs,
-									MaxSpareVMs: configDefaultServerIndexMaxSpareVMs,
-									Cache:       configDefaultServerIndexCache,
-									CacheTTL:    configDefaultServerIndexCacheTTL,
+									HTML:      "/data/index.html",
+									Env:       configDefaultServerIndexEnv,
+									Container: configDefaultServerIndexContainer,
+									State:     configDefaultServerIndexState,
+									Timeout:   configDefaultServerIndexTimeout,
+									MaxVMs:    1,
+									Cache:     configDefaultServerIndexCache,
+									CacheTTL:  configDefaultServerIndexCacheTTL,
 								},
 							},
 						},
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: false}, nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
 					},
 				},
 			},
@@ -1930,8 +1947,8 @@ func TestTestConfig(t *testing.T) {
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return nil, nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
 					},
 				},
 			},
@@ -1952,31 +1969,23 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:        "",
-									Bundle:      stringPtr(""),
-									Env:         "",
-									Container:   "",
-									State:       "",
-									Timeout:     -1,
-									MaxVMs:      -1,
-									MinSpareVMs: -1,
-									MaxSpareVMs: -1,
-									Cache:       true,
-									CacheTTL:    -1,
+									HTML:      "",
+									Bundle:    stringPtr(""),
+									Env:       "",
+									Container: "",
+									State:     "",
+									Timeout:   -1,
+									MaxVMs:    0,
+									Cache:     true,
+									CacheTTL:  -1,
 								},
 							},
 						},
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: false}, nil
-					},
-					validateIndexHTML: func(name, container string) error {
-						return nil
-					},
-					validateIndexBundle: func(name, env string, timeout int) error {
-						return nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
 					},
 				},
 			},
@@ -1988,43 +1997,33 @@ func TestTestConfig(t *testing.T) {
 				"index: option 'state', invalid/missing value",
 				"index: option 'timeout', invalid/missing value",
 				"index: option 'max_vms', invalid/missing value",
-				"index: option 'min_spare_vms', invalid/missing value",
-				"index: option 'max_spare_vms', invalid/missing value",
 				"index: option 'cache_ttl', invalid/missing value",
 			},
 			wantErr: true,
 		},
 		{
-			name: "error index renderer html and bundle files are directories",
+			name: "error index renderer open html and bundle files",
 			args: args{
 				c: &config{
 					Server: []*ServerConfig{
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:        "data/html/",
-									Bundle:      stringPtr("data/bundle/"),
-									Env:         configDefaultServerIndexEnv,
-									Container:   configDefaultServerIndexContainer,
-									State:       configDefaultServerIndexState,
-									Timeout:     configDefaultServerIndexTimeout,
-									MaxVMs:      configDefaultServerIndexMaxVMs,
-									MinSpareVMs: configDefaultServerIndexMinSpareVMs,
-									MaxSpareVMs: configDefaultServerIndexMaxSpareVMs,
+									HTML:      "data/html/",
+									Bundle:    stringPtr("data/bundle/"),
+									Env:       configDefaultServerIndexEnv,
+									Container: configDefaultServerIndexContainer,
+									State:     configDefaultServerIndexState,
+									Timeout:   configDefaultServerIndexTimeout,
+									MaxVMs:    1,
 								},
 							},
 						},
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: true}, nil
-					},
-					validateIndexHTML: func(name, container string) error {
-						return nil
-					},
-					validateIndexBundle: func(name, env string, timeout int) error {
-						return nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return nil, errors.New("test error")
 					},
 				},
 			},
@@ -2042,17 +2041,13 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:        "/data/index.html",
-									Bundle:      stringPtr("/data/bundle.js"),
-									Env:         configDefaultServerIndexEnv,
-									Container:   configDefaultServerIndexContainer,
-									State:       configDefaultServerIndexState,
-									Timeout:     configDefaultServerIndexTimeout,
-									MaxVMs:      configDefaultServerIndexMaxVMs,
-									MinSpareVMs: configDefaultServerIndexMinSpareVMs,
-									MaxSpareVMs: configDefaultServerIndexMaxSpareVMs,
-									Cache:       configDefaultServerIndexCache,
-									CacheTTL:    configDefaultServerIndexCacheTTL,
+									HTML:      "/data/index.html",
+									Bundle:    stringPtr("/data/bundle.js"),
+									Env:       configDefaultServerIndexEnv,
+									Container: configDefaultServerIndexContainer,
+									State:     configDefaultServerIndexState,
+									Timeout:   configDefaultServerIndexTimeout,
+									MaxVMs:    1,
 									Rules: []IndexRule{
 										{
 											State: []IndexRuleStateEntry{
@@ -2066,14 +2061,8 @@ func TestTestConfig(t *testing.T) {
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: false}, nil
-					},
-					validateIndexHTML: func(name, container string) error {
-						return nil
-					},
-					validateIndexBundle: func(name, env string, timeout int) error {
-						return nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
 					},
 				},
 			},
@@ -2092,17 +2081,13 @@ func TestTestConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:        "/data/index.html",
-									Bundle:      stringPtr("/data/bundle.js"),
-									Env:         configDefaultServerIndexEnv,
-									Container:   configDefaultServerIndexContainer,
-									State:       configDefaultServerIndexState,
-									Timeout:     configDefaultServerIndexTimeout,
-									MaxVMs:      configDefaultServerIndexMaxVMs,
-									MinSpareVMs: configDefaultServerIndexMinSpareVMs,
-									MaxSpareVMs: configDefaultServerIndexMaxSpareVMs,
-									Cache:       configDefaultServerIndexCache,
-									CacheTTL:    configDefaultServerIndexCacheTTL,
+									HTML:      "/data/index.html",
+									Bundle:    stringPtr("/data/bundle.js"),
+									Env:       configDefaultServerIndexEnv,
+									Container: configDefaultServerIndexContainer,
+									State:     configDefaultServerIndexState,
+									Timeout:   configDefaultServerIndexTimeout,
+									MaxVMs:    1,
 									Rules: []IndexRule{
 										{
 											Path: "(",
@@ -2120,14 +2105,8 @@ func TestTestConfig(t *testing.T) {
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: false}, nil
-					},
-					validateIndexHTML: func(name, container string) error {
-						return nil
-					},
-					validateIndexBundle: func(name, env string, timeout int) error {
-						return nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
 					},
 				},
 			},
@@ -2152,8 +2131,8 @@ func TestTestConfig(t *testing.T) {
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: false}, nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
 					},
 				},
 			},
@@ -2171,8 +2150,8 @@ func TestTestConfig(t *testing.T) {
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return nil, nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
 					},
 				},
 			},
@@ -2192,7 +2171,7 @@ func TestTestConfig(t *testing.T) {
 								Default: &DefaultRendererConfig{
 									File:       "",
 									StatusCode: 600,
-									Cache:      true,
+									Cache:      false,
 									CacheTTL:   -1,
 								},
 							},
@@ -2200,8 +2179,8 @@ func TestTestConfig(t *testing.T) {
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return nil, nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
 					},
 				},
 			},
@@ -2213,14 +2192,14 @@ func TestTestConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "error default renderer file is a directory",
+			name: "error default renderer open file",
 			args: args{
 				c: &config{
 					Server: []*ServerConfig{
 						{
 							Renderer: &ServerRendererConfig{
 								Default: &DefaultRendererConfig{
-									File:       "dir",
+									File:       "default.html",
 									StatusCode: 200,
 								},
 							},
@@ -2228,8 +2207,8 @@ func TestTestConfig(t *testing.T) {
 					},
 					Fetcher: &FetcherConfig{},
 					Loader:  &LoaderConfig{},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: true}, nil
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return nil, errors.New("test error")
 					},
 				},
 			},
@@ -2288,6 +2267,26 @@ func TestTestConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "fetcher open TLS files",
+			args: args{
+				c: &config{
+					Server: []*ServerConfig{
+						{
+							Renderer: &ServerRendererConfig{},
+						},
+					},
+					Fetcher: &FetcherConfig{
+						RequestTLSCAFile:   stringPtr("ca.pem"),
+						RequestTLSCertFile: stringPtr("cert.pem"),
+						RequestTLSKeyFile:  stringPtr("key.pem"),
+					},
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
+						return os.Open(os.DevNull)
+					},
+				},
+			},
+		},
+		{
 			name: "fetcher failed to open TLS files",
 			args: args{
 				c: &config{
@@ -2301,34 +2300,8 @@ func TestTestConfig(t *testing.T) {
 						RequestTLSCertFile: stringPtr("cert.pem"),
 						RequestTLSKeyFile:  stringPtr("key.pem"),
 					},
-					osStat: func(name string) (fs.FileInfo, error) {
+					osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
 						return nil, errors.New("test error")
-					},
-				},
-			},
-			want: []string{
-				"fetcher: option 'request_tls_ca_file', failed to open file",
-				"fetcher: option 'request_tls_cert_file', failed to open file",
-				"fetcher: option 'request_tls_key_file', failed to open file",
-			},
-			wantErr: true,
-		},
-		{
-			name: "error fetcher TLS files are directories",
-			args: args{
-				c: &config{
-					Server: []*ServerConfig{
-						{
-							Renderer: &ServerRendererConfig{},
-						},
-					},
-					Fetcher: &FetcherConfig{
-						RequestTLSCAFile:   stringPtr("ca/"),
-						RequestTLSCertFile: stringPtr("cert/"),
-						RequestTLSKeyFile:  stringPtr("key/"),
-					},
-					osStat: func(name string) (fs.FileInfo, error) {
-						return testConfigFileInfo{isDir: true}, nil
 					},
 				},
 			},
@@ -2552,22 +2525,16 @@ func TestTestConfig(t *testing.T) {
 						},
 					},
 					Loader: &LoaderConfig{
-						ExecStartup:          -1,
-						ExecInterval:         -1,
-						ExecFailsafeInterval: -1,
-						ExecWorkers:          -1,
-						ExecMaxOps:           -1,
-						ExecMaxDelay:         -1,
+						ExecStartup:  -1,
+						ExecInterval: -1,
+						ExecWorkers:  -1,
 					},
 				},
 			},
 			want: []string{
 				"loader: option 'exec_startup', invalid/missing value",
 				"loader: option 'exec_interval', invalid/missing value",
-				"loader: option 'exec_failsafe_interval', invalid/missing value",
 				"loader: option 'exec_workers', invalid/missing value",
-				"loader: option 'exec_max_ops', invalid/missing value",
-				"loader: option 'exec_max_delay', invalid/missing value",
 			},
 			wantErr: true,
 		},

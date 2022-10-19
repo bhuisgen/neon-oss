@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -52,6 +51,7 @@ type IndexRendererConfig struct {
 	Container string
 	State     string
 	Timeout   int
+	MaxVMs    int
 	Cache     bool
 	CacheTTL  int
 	Rules     []IndexRule
@@ -108,7 +108,7 @@ func CreateIndexRenderer(config *IndexRendererConfig, fetcher Fetcher) (*indexRe
 		logger:      log.New(os.Stderr, fmt.Sprint(indexLogger, ": "), log.LstdFlags|log.Lmsgprefix),
 		regexps:     []*regexp.Regexp{},
 		bufferPool:  newBufferPool(),
-		vmPool:      newVMPool(int32(runtime.NumCPU())),
+		vmPool:      newVMPool(int32(config.MaxVMs)),
 		cache:       newCache(),
 		fetcher:     fetcher,
 		osStat:      indexOsStat,
@@ -190,7 +190,8 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 	if r.config.Bundle != nil {
 		for index, rule := range r.config.Rules {
 			if DEBUG {
-				r.logger.Printf("Index: id=%s, rule=%d, phase=check, path=%s", req.Context().Value(ContextKeyID{}).(string),
+				r.logger.Printf("Index: id=%s, rule=%d, phase=check, path=%s",
+					req.Context().Value(ServerHandlerContextKeyRequestID{}).(string),
 					index+1, req.URL.Path)
 			}
 
@@ -200,7 +201,8 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 			}
 
 			if DEBUG {
-				r.logger.Printf("Index: id=%s, rule=%d, phase=match, path=%s", req.Context().Value(ContextKeyID{}).(string),
+				r.logger.Printf("Index: id=%s, rule=%d, phase=match, path=%s",
+					req.Context().Value(ServerHandlerContextKeyRequestID{}).(string),
 					index+1, req.URL.Path)
 			}
 
@@ -221,7 +223,7 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 
 			if DEBUG {
 				r.logger.Printf("Index: id=%s, rule=%d, phase=params, path=%s, params=%s",
-					req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, params)
+					req.Context().Value(ServerHandlerContextKeyRequestID{}).(string), index+1, req.URL.Path, params)
 			}
 
 			for _, entry := range rule.State {
@@ -234,7 +236,8 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 
 				if DEBUG {
 					r.logger.Printf("Index: id=%s, rule=%d, phase=state1, path=%s, state_key=%s, state_resource=%s",
-						req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, entry.Key, entry.Resource)
+						req.Context().Value(ServerHandlerContextKeyRequestID{}).(string), index+1, req.URL.Path, entry.Key,
+						entry.Resource)
 				}
 
 				stateKey := replaceIndexRouteParameters(entry.Key, params)
@@ -242,7 +245,8 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 
 				if DEBUG {
 					r.logger.Printf("Index: id=%s, rule=%d, phase=state2, path=%s, state_key=%s, state_resource=%s",
-						req.Context().Value(ContextKeyID{}).(string), index+1, req.URL.Path, stateKey, resourceKey)
+						req.Context().Value(ServerHandlerContextKeyRequestID{}).(string), index+1, req.URL.Path, stateKey,
+						resourceKey)
 				}
 
 				var resourceResult indexResourceResult
@@ -298,7 +302,8 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 
 			if r.config.Rules[index].Last {
 				if DEBUG {
-					r.logger.Printf("Index: id=%s, rule=%d, phase=last, path=%s", req.Context().Value(ContextKeyID{}).(string),
+					r.logger.Printf("Index: id=%s, rule=%d, phase=last, path=%s",
+						req.Context().Value(ServerHandlerContextKeyRequestID{}).(string),
 						index+1, req.URL.Path)
 				}
 
@@ -308,11 +313,13 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 
 		if DEBUG {
 			if serverState != nil {
-				r.logger.Printf("Index: id=%s, path=%s, server_state=%s", req.Context().Value(ContextKeyID{}).(string),
+				r.logger.Printf("Index: id=%s, path=%s, server_state=%s",
+					req.Context().Value(ServerHandlerContextKeyRequestID{}).(string),
 					req.URL.Path, *serverState)
 			}
 			if clientState != nil {
-				r.logger.Printf("Index: id=%s, path=%s, client_state=%s", req.Context().Value(ContextKeyID{}).(string),
+				r.logger.Printf("Index: id=%s, path=%s, client_state=%s",
+					req.Context().Value(ServerHandlerContextKeyRequestID{}).(string),
 					req.URL.Path, *clientState)
 			}
 		}
@@ -440,7 +447,8 @@ func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error)
 	if page.State != nil {
 		body = bytes.Replace(body,
 			[]byte("</body>"),
-			[]byte(fmt.Sprintf("<script id=\"%s\" type=\"application/json\">%s</script></body>", r.config.State, *page.State)),
+			[]byte(fmt.Sprintf("<script id=\"%s\" type=\"application/json\">%s</script></body>", r.config.State,
+				*page.State)),
 			1)
 	}
 
