@@ -51,9 +51,9 @@ type vmData struct {
 	redirectStatus *int
 	headers        map[string]string
 	title          *string
-	metas          map[string]map[string]string
-	links          map[string]map[string]string
-	scripts        map[string]map[string]string
+	metas          *domElementList
+	links          *domElementList
+	scripts        *domElementList
 }
 
 const (
@@ -182,12 +182,15 @@ func newVM() *vm {
 	v.serverResponseObject.Set("render", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
-			if len(args) > 0 {
-				render := []byte(args[0].String())
-				v.data.render = &render
+			if len(args) < 1 || !args[0].IsString() {
+				return nil
+			}
+
+			r := []byte(args[0].String())
+			v.data.render = &r
 
 				status := http.StatusOK
-				if len(args) > 1 {
+			if len(args) > 1 && args[1].IsNumber() {
 					code, err := strconv.Atoi(args[1].String())
 					if err != nil || code < 100 || code > 599 {
 						code = http.StatusInternalServerError
@@ -195,21 +198,24 @@ func newVM() *vm {
 					status = code
 				}
 				v.data.status = &status
-			}
+
 			return nil
 		}))
 
 	v.serverResponseObject.Set("redirect", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
-			if len(args) > 0 {
+			if len(args) < 1 || !args[0].IsString() {
+				return nil
+			}
+
 				redirect := true
 				redirectURL := args[0].String()
 				v.data.redirect = &redirect
 				v.data.redirectURL = &redirectURL
 
 				redirectStatus := http.StatusFound
-				if len(args) > 1 {
+			if len(args) > 1 && args[1].IsNumber() {
 					code, err := strconv.Atoi(args[1].String())
 					if err != nil || code < 100 || code > 599 {
 						code = http.StatusInternalServerError
@@ -217,23 +223,24 @@ func newVM() *vm {
 					redirectStatus = code
 				}
 				v.data.redirectStatus = &redirectStatus
-			}
+
 			return nil
 		}))
 
 	v.serverResponseObject.Set("setHeader", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
-			if len(args) > 1 {
+			if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
+				return nil
+			}
+
 				key := args[0].String()
 				value := args[1].String()
 
 				if v.data.headers == nil {
 					v.data.headers = make(map[string]string)
 				}
-
 				v.data.headers[key] = value
-			}
 
 			return nil
 		}))
@@ -241,79 +248,211 @@ func newVM() *vm {
 	v.serverResponseObject.Set("setTitle", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
-			if len(args) > 0 {
+			if len(args) < 1 || !args[0].IsString() {
+				return nil
+			}
+
 				title := args[0].String()
 				v.data.title = &title
-			}
+
 			return nil
 		}))
 
 	v.serverResponseObject.Set("setMeta", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
-			if len(args) > 1 {
-				id := args[0].String()
-				data := args[1].Object()
-
-				if v.data.metas == nil {
-					v.data.metas = make(map[string]map[string]string)
-				}
-
-				v.data.metas[id] = make(map[string]string)
-				for _, attribute := range []string{"name", "itemprop", "content", "charset", "http-equiv", "scheme",
-					"property"} {
-					if ok := data.Has(attribute); ok {
-						value, _ := data.Get(attribute)
-						v.data.metas[id][attribute] = value.String()
-					}
-				}
+			if len(args) < 2 || !args[0].IsString() || !args[1].IsMap() {
+				return nil
 			}
+
+				id := args[0].String()
+			attributes, err := args[1].AsObject()
+			if err != nil {
+				return nil
+				}
+
+			e := newDOMElement(id)
+
+			entries, err := attributes.MethodCall("entries")
+			if err != nil {
+				return nil
+					}
+			iterator, err := entries.AsObject()
+			if err != nil {
+				return nil
+			}
+			for {
+				next, err := iterator.MethodCall("next")
+				if err != nil {
+					return nil
+				}
+				iteration, err := next.AsObject()
+				if err != nil {
+					return nil
+				}
+				done, err := iteration.Get("done")
+				if err != nil {
+					return nil
+				}
+				if done.Boolean() {
+					break
+				}
+				value, err := iteration.Get("value")
+				if err != nil {
+					return nil
+				}
+				array, err := value.AsObject()
+				if err != nil {
+					return nil
+				}
+				k, err := array.GetIdx(0)
+				if err != nil || !k.IsString() {
+					return nil
+				}
+				v, err := array.GetIdx(1)
+				if err != nil || !v.IsString() {
+					return nil
+				}
+				e.SetAttribute(k.String(), v.String())
+			}
+
+			if v.data.metas == nil {
+				v.data.metas = newDOMElementList()
+			}
+			v.data.metas.Set(e)
+
 			return nil
 		}))
 
 	v.serverResponseObject.Set("setLink", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
-			if len(args) > 1 {
-				id := args[0].String()
-				data := args[1].Object()
-
-				if v.data.links == nil {
-					v.data.links = make(map[string]map[string]string)
-				}
-
-				v.data.links[id] = make(map[string]string)
-				for _, attribute := range []string{"rel", "href", "hreflang", "type", "sizes", "media", "as",
-					"crossorigin", "disabled", "importance", "integrity", "referrerpolicy", "title"} {
-					if ok := data.Has(attribute); ok {
-						value, _ := data.Get(attribute)
-						v.data.links[id][attribute] = value.String()
-					}
-				}
+			if len(args) < 2 || !args[0].IsString() || !args[1].IsMap() {
+				return nil
 			}
+
+				id := args[0].String()
+			attributes, err := args[1].AsObject()
+			if err != nil {
+				return nil
+				}
+
+			e := newDOMElement(id)
+
+			entries, err := attributes.MethodCall("entries")
+			if err != nil {
+				return nil
+					}
+			iterator, err := entries.AsObject()
+			if err != nil {
+				return nil
+				}
+			for {
+				next, err := iterator.MethodCall("next")
+				if err != nil {
+					return nil
+			}
+				iteration, err := next.AsObject()
+				if err != nil {
+					return nil
+				}
+				done, err := iteration.Get("done")
+				if err != nil {
+					return nil
+				}
+				if done.Boolean() {
+					break
+				}
+				value, err := iteration.Get("value")
+				if err != nil {
+					return nil
+				}
+				array, err := value.AsObject()
+				if err != nil {
+					return nil
+				}
+				k, err := array.GetIdx(0)
+				if err != nil || !k.IsString() {
+					return nil
+				}
+				v, err := array.GetIdx(1)
+				if err != nil || !v.IsString() {
+					return nil
+				}
+				e.SetAttribute(k.String(), v.String())
+			}
+
+			if v.data.links == nil {
+				v.data.links = newDOMElementList()
+			}
+			v.data.links.Set(e)
+
 			return nil
 		}))
 
 	v.serverResponseObject.Set("setScript", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
-			if len(args) > 1 {
-				id := args[0].String()
-				data := args[1].Object()
-
-				if v.data.scripts == nil {
-					v.data.scripts = make(map[string]map[string]string)
-				}
-
-				v.data.scripts[id] = make(map[string]string)
-				for _, attribute := range []string{"type", "src", "async", "crossorigin", "defer", "integrity", "nomodule",
-					"nonce", "referrerpolicy", "children"} {
-					if ok := data.Has(attribute); ok {
-						value, _ := data.Get(attribute)
-						v.data.scripts[id][attribute] = value.String()
-					}
-				}
+			if len(args) < 2 || !args[0].IsString() || !args[1].IsMap() {
+				return nil
 			}
+
+				id := args[0].String()
+			attributes, err := args[1].AsObject()
+			if err != nil {
+				return nil
+				}
+
+			e := newDOMElement(id)
+
+			entries, err := attributes.MethodCall("entries")
+			if err != nil {
+				return nil
+					}
+			iterator, err := entries.AsObject()
+			if err != nil {
+				return nil
+			}
+			for {
+				next, err := iterator.MethodCall("next")
+				if err != nil {
+					return nil
+				}
+				iteration, err := next.AsObject()
+				if err != nil {
+					return nil
+				}
+				done, err := iteration.Get("done")
+				if err != nil {
+					return nil
+				}
+				if done.Boolean() {
+					break
+				}
+				value, err := iteration.Get("value")
+				if err != nil {
+					return nil
+				}
+				array, err := value.AsObject()
+				if err != nil {
+					return nil
+				}
+				k, err := array.GetIdx(0)
+				if err != nil || !k.IsString() {
+					return nil
+				}
+				v, err := array.GetIdx(1)
+				if err != nil || !v.IsString() {
+					return nil
+				}
+				e.SetAttribute(k.String(), v.String())
+			}
+
+			if v.data.scripts == nil {
+				v.data.scripts = newDOMElementList()
+			}
+			v.data.scripts.Set(e)
+
 			return nil
 		}))
 
@@ -432,65 +571,30 @@ func (e vmError) Error() string {
 
 // vmResult implements the results of a VM
 type vmResult struct {
-	Render         []byte
-	Status         int
-	Redirect       bool
-	RedirectURL    string
-	RedirectStatus int
+	Render         *[]byte
+	Status         *int
+	Redirect       *bool
+	RedirectURL    *string
+	RedirectStatus *int
 	Headers        map[string]string
-	Title          string
-	Metas          map[string]map[string]string
-	Links          map[string]map[string]string
-	Scripts        map[string]map[string]string
+	Title          *string
+	Metas          *domElementList
+	Links          *domElementList
+	Scripts        *domElementList
 }
 
 // newVMResult creates a new VM result
 func newVMResult(d *vmData) *vmResult {
-	r := vmResult{}
-	if d.render != nil {
-		r.Render = *d.render
+	return &vmResult{
+		Render:         d.render,
+		Status:         d.status,
+		Redirect:       d.redirect,
+		RedirectURL:    d.redirectURL,
+		RedirectStatus: d.redirectStatus,
+		Headers:        d.headers,
+		Title:          d.title,
+		Metas:          d.metas,
+		Links:          d.links,
+		Scripts:        d.scripts,
 	}
-	if d.status != nil {
-		r.Status = *d.status
-	}
-	if d.redirect != nil {
-		r.Redirect = *d.redirect
-	}
-	if d.redirectURL != nil {
-		r.RedirectURL = *d.redirectURL
-	}
-	if d.redirectStatus != nil {
-		r.RedirectStatus = *d.redirectStatus
-	}
-	if d.headers != nil {
-		r.Headers = d.headers
-	}
-	if d.title != nil {
-		r.Title = *d.title
-	}
-	if d.metas != nil {
-		r.Metas = copyMap(d.metas)
-	}
-	if d.links != nil {
-		r.Links = copyMap(d.links)
-	}
-	if d.scripts != nil {
-		r.Scripts = copyMap(d.scripts)
-	}
-	return &r
-}
-
-// copyMap copy a map into a new one
-func copyMap(m map[string]map[string]string) map[string]map[string]string {
-	var cp map[string]map[string]string
-	if m != nil {
-		cp = make(map[string]map[string]string)
-		for k1, v1 := range m {
-			cp[k1] = make(map[string]string)
-			for k2, v2 := range v1 {
-				cp[k1][k2] = v2
-			}
-		}
-	}
-	return cp
 }

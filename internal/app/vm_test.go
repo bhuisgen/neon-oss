@@ -637,21 +637,18 @@ func TestNewVMResult(t *testing.T) {
 		"key": "value",
 	}
 	title := "test"
-	metas := map[string]map[string]string{
-		"test": {
-			"key": "value",
-		},
-	}
-	links := map[string]map[string]string{
-		"test": {
-			"key": "value",
-		},
-	}
-	scripts := map[string]map[string]string{
-		"test": {
-			"key": "value",
-		},
-	}
+	meta := newDOMElement("test")
+	meta.SetAttribute("key", "value")
+	metas := newDOMElementList()
+	metas.Set(meta)
+	link := newDOMElement("test")
+	link.SetAttribute("key", "value")
+	links := newDOMElementList()
+	links.Set(link)
+	script := newDOMElement("test")
+	script.SetAttribute("key", "value")
+	scripts := newDOMElementList()
+	scripts.Set(script)
 
 	type args struct {
 		d *vmData
@@ -696,13 +693,13 @@ func TestNewVMResult(t *testing.T) {
 				},
 			},
 			want: &vmResult{
-				Render:         render,
-				Status:         status,
-				Redirect:       redirect,
-				RedirectURL:    redirectURL,
-				RedirectStatus: redirectStatus,
+				Render:         &render,
+				Status:         &status,
+				Redirect:       &redirect,
+				RedirectURL:    &redirectURL,
+				RedirectStatus: &redirectStatus,
 				Headers:        headers,
-				Title:          title,
+				Title:          &title,
 				Metas:          metas,
 				Links:          links,
 				Scripts:        scripts,
@@ -1002,6 +999,27 @@ func TestVM_APIServerResponse(t *testing.T) {
 		t.Errorf("failed to create request: %s", err)
 	}
 
+	meta := newDOMElement("test")
+	meta.SetAttribute("k1", "v1")
+	meta.SetAttribute("k2", "v2")
+	meta.SetAttribute("k3", "v3")
+	metas := newDOMElementList()
+	metas.Set(meta)
+
+	link := newDOMElement("test")
+	link.SetAttribute("k1", "v1")
+	link.SetAttribute("k2", "v2")
+	link.SetAttribute("k3", "v3")
+	links := newDOMElementList()
+	links.Set(link)
+
+	script := newDOMElement("test")
+	script.SetAttribute("k1", "v1")
+	script.SetAttribute("k2", "v2")
+	script.SetAttribute("k3", "v3")
+	scripts := newDOMElementList()
+	scripts.Set(script)
+
 	type args struct {
 		name    string
 		source  string
@@ -1027,8 +1045,8 @@ func TestVM_APIServerResponse(t *testing.T) {
 				state:   nil,
 			},
 			want: &vmResult{
-				Render: []byte("test"),
-				Status: http.StatusOK,
+				Render: bytePtr([]byte("test")),
+				Status: intPtr(http.StatusOK),
 			},
 		},
 		{
@@ -1042,8 +1060,8 @@ func TestVM_APIServerResponse(t *testing.T) {
 				state:   nil,
 			},
 			want: &vmResult{
-				Render: []byte("test"),
-				Status: http.StatusOK,
+				Render: bytePtr([]byte("test")),
+				Status: intPtr(http.StatusOK),
 			},
 		},
 		{
@@ -1057,8 +1075,8 @@ func TestVM_APIServerResponse(t *testing.T) {
 				state:   nil,
 			},
 			want: &vmResult{
-				Render: []byte("test"),
-				Status: http.StatusInternalServerError,
+				Render: bytePtr([]byte("test")),
+				Status: intPtr(http.StatusInternalServerError),
 			},
 		},
 		{
@@ -1072,9 +1090,9 @@ func TestVM_APIServerResponse(t *testing.T) {
 				state:   nil,
 			},
 			want: &vmResult{
-				Redirect:       true,
-				RedirectURL:    "http://test",
-				RedirectStatus: http.StatusFound,
+				Redirect:       boolPtr(true),
+				RedirectURL:    stringPtr("http://test"),
+				RedirectStatus: intPtr(http.StatusFound),
 			},
 		},
 		{
@@ -1088,9 +1106,9 @@ func TestVM_APIServerResponse(t *testing.T) {
 				state:   nil,
 			},
 			want: &vmResult{
-				Redirect:       true,
-				RedirectURL:    "http://test",
-				RedirectStatus: http.StatusSeeOther,
+				Redirect:       boolPtr(true),
+				RedirectURL:    stringPtr("http://test"),
+				RedirectStatus: intPtr(http.StatusSeeOther),
 			},
 		},
 		{
@@ -1104,9 +1122,9 @@ func TestVM_APIServerResponse(t *testing.T) {
 				state:   nil,
 			},
 			want: &vmResult{
-				Redirect:       true,
-				RedirectURL:    "http://test",
-				RedirectStatus: http.StatusInternalServerError,
+				Redirect:       boolPtr(true),
+				RedirectURL:    stringPtr("http://test"),
+				RedirectStatus: intPtr(http.StatusInternalServerError),
 			},
 		},
 		{
@@ -1136,55 +1154,49 @@ func TestVM_APIServerResponse(t *testing.T) {
 				state:   nil,
 			},
 			want: &vmResult{
-				Title: "test",
+				Title: stringPtr("test"),
 			},
 		},
 		{
 			name: "set meta",
 			args: args{
 				name:    "test",
-				source:  `(() => { serverResponse.setMeta("test", {"name": "test"}); })();`,
+				source:  `(() => { serverResponse.setMeta("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
 				state:   nil,
 			},
 			want: &vmResult{
-				Metas: map[string]map[string]string{
-					"test": {"name": "test"},
-				},
+				Metas: metas,
 			},
 		},
 		{
 			name: "set link",
 			args: args{
 				name:    "test",
-				source:  `(() => { serverResponse.setLink("test", {"href": "/test"}); })();`,
+				source:  `(() => { serverResponse.setLink("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
 				state:   nil,
 			},
 			want: &vmResult{
-				Links: map[string]map[string]string{
-					"test": {"href": "/test"},
-				},
+				Links: links,
 			},
 		},
 		{
 			name: "set script",
 			args: args{
 				name:    "test",
-				source:  `(() => { serverResponse.setScript("test", {"type": "test", "children": ""}); })();`,
+				source:  `(() => { serverResponse.setScript("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`,
 				timeout: time.Duration(1) * time.Second,
 				info:    info,
 				req:     req,
 				state:   nil,
 			},
 			want: &vmResult{
-				Scripts: map[string]map[string]string{
-					"test": {"type": "test", "children": ""},
-				},
+				Scripts: scripts,
 			},
 		},
 	}

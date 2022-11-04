@@ -124,7 +124,7 @@ export interface ServerResponse {
    * @param id the meta id
    * @param attributes the meta attributes
    */
-  setMeta(id: string, attributes: Record<string, string>): void;
+  setMeta(id: string, attributes: Map<string, string>): void;
 
   /**
    * Sets a page link.
@@ -132,7 +132,7 @@ export interface ServerResponse {
    * @param id the link id
    * @param attributes the link attributes
    */
-  setLink(id: string, attributes: Record<string, string>): void;
+  setLink(id: string, attributes: Map<string, string>): void;
 
   /**
    * Sets a page script.
@@ -140,7 +140,7 @@ export interface ServerResponse {
    * @param id the script id
    * @param attributes the script attributes
    */
-  setScript(id: string, attributes: Record<string, string>): void;
+  setScript(id: string, attributes: Map<string, string>): void;
 }
 
 /**

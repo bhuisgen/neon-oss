@@ -76,9 +76,9 @@ type indexPage struct {
 	HTML    *[]byte
 	Render  *[]byte
 	Title   *string
-	Metas   map[string]map[string]string
-	Links   map[string]map[string]string
-	Scripts map[string]map[string]string
+	Metas   *domElementList
+	Links   *domElementList
+	Scripts *domElementList
 	State   *string
 }
 
@@ -360,11 +360,11 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 			return nil, err
 		}
 
-		if vmResult.Redirect {
+		if vmResult.Redirect != nil && *vmResult.Redirect && vmResult.RedirectURL != nil && vmResult.RedirectStatus != nil {
 			return &Render{
 				Redirect:       true,
-				RedirectTarget: vmResult.RedirectURL,
-				RedirectStatus: vmResult.RedirectStatus,
+				RedirectTarget: *vmResult.RedirectURL,
+				RedirectStatus: *vmResult.RedirectStatus,
 				Headers:        vmResult.Headers,
 			}, nil
 		}
@@ -393,8 +393,8 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 		HTML: r.html,
 	}
 	if vmResult != nil {
-		page.Render = &vmResult.Render
-		page.Title = &vmResult.Title
+		page.Render = vmResult.Render
+		page.Title = vmResult.Title
 		page.Metas = vmResult.Metas
 		page.Links = vmResult.Links
 		page.Scripts = vmResult.Scripts
@@ -408,8 +408,8 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 	}
 
 	var status int = http.StatusOK
-	if vmResult != nil {
-		status = vmResult.Status
+	if vmResult != nil && vmResult.Status != nil {
+		status = *vmResult.Status
 	}
 	if !valid {
 		status = http.StatusServiceUnavailable
@@ -459,48 +459,70 @@ func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error)
 			1)
 	}
 
-	for id, attributes := range page.Metas {
-		buf := r.bufferPool.Get()
-		defer r.bufferPool.Put(buf)
+	if page.Metas != nil {
+		for _, id := range page.Metas.Ids() {
+			buf := r.bufferPool.Get()
+			defer r.bufferPool.Put(buf)
 
-		for k, v := range attributes {
-			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
-		}
-		body = bytes.Replace(body,
-			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<meta id=\"%s\" name=\"%s\"%s/></head>", id, id, buf.String())),
-			1)
-	}
-
-	for id, attributes := range page.Links {
-		buf := r.bufferPool.Get()
-		defer r.bufferPool.Put(buf)
-
-		for k, v := range attributes {
-			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
-		}
-		body = bytes.Replace(body,
-			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<link id=\"%s\"%s/></head>", id, buf.String())),
-			1)
-	}
-
-	for id, attributes := range page.Scripts {
-		buf := r.bufferPool.Get()
-		defer r.bufferPool.Put(buf)
-
-		var content string = ""
-		for k, v := range attributes {
-			if k == "children" {
-				content = v
+			e, err := page.Metas.Get(id)
+			if err != nil {
 				continue
 			}
-			buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, v))
+			for _, k := range e.Attributes() {
+				buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, e.GetAttribute(k)))
+			}
+
+			body = bytes.Replace(body,
+				[]byte("</head>"),
+				[]byte(fmt.Sprintf("<meta id=\"%s\"%s></head>", id, buf.String())),
+				1)
 		}
-		body = bytes.Replace(body,
-			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<script id=\"%s\"%s>%s</script></head>", id, buf.String(), content)),
-			1)
+	}
+
+	if page.Links != nil {
+		for _, id := range page.Links.Ids() {
+			buf := r.bufferPool.Get()
+			defer r.bufferPool.Put(buf)
+
+			e, err := page.Links.Get(id)
+			if err != nil {
+				continue
+			}
+			for _, k := range e.Attributes() {
+				buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, e.GetAttribute(k)))
+			}
+
+			body = bytes.Replace(body,
+				[]byte("</head>"),
+				[]byte(fmt.Sprintf("<link id=\"%s\"%s></head>", id, buf.String())),
+				1)
+		}
+	}
+
+	if page.Scripts != nil {
+		for _, id := range page.Scripts.Ids() {
+			buf := r.bufferPool.Get()
+			defer r.bufferPool.Put(buf)
+
+			e, err := page.Scripts.Get(id)
+			if err != nil {
+				continue
+			}
+
+			var content string = ""
+			for _, k := range e.Attributes() {
+				if k == "children" {
+					content = e.GetAttribute(k)
+					continue
+				}
+				buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, e.GetAttribute(k)))
+			}
+
+			body = bytes.Replace(body,
+				[]byte("</head>"),
+				[]byte(fmt.Sprintf("<script id=\"%s\"%s>%s</script></head>", id, buf.String(), content)),
+				1)
+		}
 	}
 
 	return body, nil
