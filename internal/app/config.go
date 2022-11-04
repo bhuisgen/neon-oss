@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -1260,7 +1259,6 @@ func GenerateConfig() error {
 
 		data, err := fs.ReadFile(template_init, path)
 		if err != nil {
-			log.Print(err)
 			return err
 		}
 

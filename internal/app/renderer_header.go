@@ -67,10 +67,8 @@ func (r *headerRenderer) initialize() error {
 
 // Handle implements the renderer
 func (r *headerRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
-	var header bool
 	for index, regexp := range r.regexps {
 		if regexp.MatchString(req.URL.Path) {
-			header = true
 			for k, v := range r.config.Rules[index].Set {
 				w.Header().Set(k, v)
 			}
@@ -78,10 +76,6 @@ func (r *headerRenderer) Handle(w http.ResponseWriter, req *http.Request, info *
 				break
 			}
 		}
-	}
-
-	if header {
-		r.logger.Printf("Header processed (url=%s)", req.URL.Path)
 	}
 
 	r.next.Handle(w, req, info)

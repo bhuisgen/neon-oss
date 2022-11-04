@@ -77,8 +77,6 @@ func (r *staticRenderer) Handle(w http.ResponseWriter, req *http.Request, info *
 	}
 
 	r.staticHandler.ServeHTTP(w, req)
-
-	r.logger.Printf("Render completed (url=%s)", req.URL.Path)
 }
 
 // Next configures the next renderer

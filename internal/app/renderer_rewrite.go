@@ -104,15 +104,9 @@ func (r *rewriteRenderer) Handle(w http.ResponseWriter, req *http.Request, info 
 	if rewrite {
 		if redirect {
 			http.Redirect(w, req, path, status)
-
-			r.logger.Printf("Redirect processed (url=%s, status=%d, target=%s)", req.URL.Path, status, path)
-
 			return
 		}
-
 		req.URL.Path = path
-
-		r.logger.Printf("Rewrite processed (url=%s)", req.URL.Path)
 	}
 
 	r.next.Handle(w, req, info)
