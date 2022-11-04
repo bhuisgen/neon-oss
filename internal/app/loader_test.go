@@ -56,8 +56,8 @@ func (t testLoaderExecutorFetcher) Register(r *Resource) {
 func (t testLoaderExecutorFetcher) Unregister(name string) {
 }
 
-func (t testLoaderExecutorFetcher) CreateResourceFromTemplate(template string, resource string, params map[string]string,
-	headers map[string]string) (*Resource, error) {
+func (t testLoaderExecutorFetcher) CreateResourceFromTemplate(template string, resource string,
+	params map[string]string, headers map[string]string) (*Resource, error) {
 	if t.errCreateResourceFromTemplate {
 		return nil, errors.New("test error")
 	}
@@ -628,8 +628,9 @@ func TestLoaderExecutorLoadList(t *testing.T) {
 				config: &LoaderConfig{},
 				logger: log.Default(),
 				fetcher: testLoaderExecutorFetcher{
-					exists:                        false,
-					get:                           []byte(`{"data": [{"id": 1, "string": "test1", "float": -1.00, "bool": true}]}`),
+					exists: false,
+					get: []byte(
+						`{"data": [{"id": 1, "string": "test1", "float": -1.00, "bool": true}]}`),
 					errCreateResourceFromTemplate: true,
 				},
 				jsonUnmarshal: loaderJsonUnmarshal,

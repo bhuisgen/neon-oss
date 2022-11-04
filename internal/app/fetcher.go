@@ -301,8 +301,8 @@ func fetchRequesterHttpNewRequestWithContext(ctx context.Context, method string,
 	return http.NewRequestWithContext(ctx, method, url, body)
 }
 
-// fetchRequestHttpClientDo redirects to http.Client.Do
-func fetchRequestHttpClientDo(client *http.Client, req *http.Request) (*http.Response, error) {
+// fetchRequesterHttpClientDo redirects to http.Client.Do
+func fetchRequesterHttpClientDo(client *http.Client, req *http.Request) (*http.Response, error) {
 	return client.Do(req)
 }
 
@@ -321,7 +321,7 @@ func newFetchRequester(logger *log.Logger, client *http.Client, headers map[stri
 		retry:                     retry,
 		delay:                     delay,
 		httpNewRequestWithContext: fetchRequesterHttpNewRequestWithContext,
-		httpClientDo:              fetchRequestHttpClientDo,
+		httpClientDo:              fetchRequesterHttpClientDo,
 		ioReadAll:                 fetchRequesterIoReadAll,
 	}
 }

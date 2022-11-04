@@ -76,8 +76,8 @@ func (t testSitemapRendererFetcher) Register(r *Resource) {
 func (t testSitemapRendererFetcher) Unregister(name string) {
 }
 
-func (t testSitemapRendererFetcher) CreateResourceFromTemplate(template string, resource string, params map[string]string,
-	headers map[string]string) (*Resource, error) {
+func (t testSitemapRendererFetcher) CreateResourceFromTemplate(template string, resource string,
+	params map[string]string, headers map[string]string) (*Resource, error) {
 	if t.errCreateResourceFromTemplate {
 		return nil, errors.New("test error")
 	}
