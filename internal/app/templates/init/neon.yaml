@@ -2,6 +2,7 @@ server:
   - listen_addr: 0.0.0.0
     listen_port: 8080
     tls: false
+    compress: -1
     access_log: true
 
     header:
@@ -41,7 +42,6 @@ server:
                 loc: /
                 changefreq: always
                 priority: 1.0
-
 # fetcher:
 #   request_headers:
 #     Content-Type: application/json

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -71,19 +72,30 @@ type IndexRuleStateEntry struct {
 	Export   *bool
 }
 
+// indexRender implements a render
+type indexRender struct {
+	Body           []byte
+	Status         int
+	Redirect       bool
+	RedirectURL    string
+	RedirectStatus int
+	Headers        map[string]string
+}
+
 // indexPage implements a page
 type indexPage struct {
 	HTML    *[]byte
 	Render  *[]byte
+	State   *string
 	Title   *string
 	Metas   *domElementList
 	Links   *domElementList
 	Scripts *domElementList
-	State   *string
 }
 
 const (
-	indexLogger string = "server[index]"
+	indexLogger           string = "server[index]"
+	indexResourceNotExist string = "unknown resource"
 )
 
 // indexOsStat redirects to os.Stat
@@ -139,7 +151,37 @@ func (r *indexRenderer) initialize() error {
 
 // Handle implements the renderer
 func (r *indexRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
-	result, err := r.render(req, info)
+	if r.config.Cache {
+		obj := r.cache.Get(req.URL.Path)
+		if obj != nil {
+			result := obj.(*indexRender)
+
+			for _, header := range result.Headers {
+				w.Header().Add(header, result.Headers[header])
+			}
+
+			if result.Redirect {
+				http.Redirect(w, req, result.RedirectURL, result.RedirectStatus)
+
+				r.logger.Printf("Render completed (url=%s, redirect=%s, status=%d, cache=%t)", req.URL.Path, result.RedirectURL,
+					result.RedirectStatus, true)
+
+				return
+			}
+
+			w.WriteHeader(result.Status)
+			w.Write(result.Body)
+
+			r.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", req.URL.Path, result.Status, true)
+
+			return
+		}
+	}
+
+	b := r.bufferPool.Get()
+	defer r.bufferPool.Put(b)
+
+	result, err := r.render(req, info, b)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
@@ -149,20 +191,33 @@ func (r *indexRenderer) Handle(w http.ResponseWriter, req *http.Request, info *S
 		return
 	}
 
-	if result.Redirect {
-		http.Redirect(w, req, result.RedirectTarget, result.RedirectStatus)
+	if r.config.Cache {
+		body := make([]byte, b.Len())
+		copy(body, b.Bytes())
 
-		r.logger.Printf("Redirect completed (url=%s, status=%d, target=%s)", req.URL.Path, result.RedirectStatus,
-			result.RedirectTarget)
+		r.cache.Set(req.URL.Path, &indexRender{
+			Body:           body,
+			Status:         result.Status,
+			Redirect:       result.Redirect,
+			RedirectURL:    result.RedirectURL,
+			RedirectStatus: result.RedirectStatus,
+			Headers:        result.Headers,
+		}, time.Duration(r.config.CacheTTL)*time.Second)
+	}
+
+	if result.Redirect {
+		http.Redirect(w, req, result.RedirectURL, result.RedirectStatus)
+
+		r.logger.Printf("Render completed (url=%s, redirect=%s, status=%d, cache=%t)", req.URL.Path, result.RedirectURL,
+			result.RedirectStatus, false)
 
 		return
 	}
 
 	w.WriteHeader(result.Status)
-	w.Write(result.Body)
+	w.Write(b.Bytes())
 
-	r.logger.Printf("Render completed (url=%s, status=%d, valid=%t, cache=%t)", req.URL.Path, result.Status, result.Valid,
-		result.Cache)
+	r.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", req.URL.Path, result.Status, false)
 }
 
 // Next configures the next renderer
@@ -171,16 +226,7 @@ func (r *indexRenderer) Next(renderer Renderer) {
 }
 
 // render makes a new render
-func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, error) {
-	if r.config.Cache {
-		obj := r.cache.Get(req.URL.Path)
-		if obj != nil {
-			result := obj.(*Render)
-
-			return result, nil
-		}
-	}
-
+func (r *indexRenderer) render(req *http.Request, info *ServerInfo, w io.Writer) (*indexRender, error) {
 	var valid bool = true
 	var mServerState map[string]indexResourceResult
 	var serverState *string
@@ -240,8 +286,8 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 						entry.Resource)
 				}
 
-				stateKey := replaceIndexRouteParameters(entry.Key, params)
-				resourceKey := replaceIndexRouteParameters(entry.Resource, params)
+				stateKey := r.replaceIndexRouteParameters(entry.Key, params)
+				resourceKey := r.replaceIndexRouteParameters(entry.Resource, params)
 
 				if DEBUG {
 					r.logger.Printf("Index: id=%s, rule=%d, phase=state2, path=%s, state_key=%s, state_resource=%s",
@@ -255,7 +301,7 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 					if r.fetcher.Exists(resourceKey) {
 						resourceResult.Loading = true
 					} else {
-						resourceResult.Error = "unknown resource"
+						resourceResult.Error = indexResourceNotExist
 					}
 
 					mServerState[stateKey] = resourceResult
@@ -361,9 +407,9 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 		}
 
 		if vmResult.Redirect != nil && *vmResult.Redirect && vmResult.RedirectURL != nil && vmResult.RedirectStatus != nil {
-			return &Render{
-				Redirect:       true,
-				RedirectTarget: *vmResult.RedirectURL,
+			return &indexRender{
+				Redirect:       *vmResult.Redirect,
+				RedirectURL:    *vmResult.RedirectURL,
 				RedirectStatus: *vmResult.RedirectStatus,
 				Headers:        vmResult.Headers,
 			}, nil
@@ -394,142 +440,176 @@ func (r *indexRenderer) render(req *http.Request, info *ServerInfo) (*Render, er
 	}
 	if vmResult != nil {
 		page.Render = vmResult.Render
+		page.State = clientState
 		page.Title = vmResult.Title
 		page.Metas = vmResult.Metas
 		page.Links = vmResult.Links
 		page.Scripts = vmResult.Scripts
-		page.State = clientState
 	}
-	body, err := index(&page, r, req)
+
+	err = r.index(&page, req, w)
 	if err != nil {
-		r.logger.Printf("Failed to generate index: %s", err)
+		r.logger.Printf("Failed to render: %s", err)
 
 		return nil, err
 	}
 
 	var status int = http.StatusOK
-	if vmResult != nil && vmResult.Status != nil {
-		status = *vmResult.Status
-	}
 	if !valid {
 		status = http.StatusServiceUnavailable
 	}
 
-	result := Render{
-		Body:   body,
-		Valid:  valid,
+	indexRender := indexRender{
 		Status: status,
 	}
 	if vmResult != nil {
-		result.Headers = vmResult.Headers
-	}
-	if result.Valid && r.config.Cache {
-		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
-		result.Cache = true
+		if vmResult.Status != nil {
+			indexRender.Status = *vmResult.Status
+		}
+		if vmResult.Redirect != nil {
+			indexRender.Redirect = *vmResult.Redirect
+		}
+		if vmResult.RedirectURL != nil {
+			indexRender.RedirectURL = *vmResult.RedirectURL
+		}
+		if vmResult.RedirectStatus != nil {
+			indexRender.RedirectStatus = *vmResult.RedirectStatus
+		}
+		indexRender.Headers = vmResult.Headers
 	}
 
-	return &result, nil
+	return &indexRender, nil
 }
 
 // index generates the final index response body
-func index(page *indexPage, r *indexRenderer, req *http.Request) ([]byte, error) {
+func (r *indexRenderer) index(page *indexPage, req *http.Request, w io.Writer) error {
 	var body []byte
 
 	body = *page.HTML
 
 	if page.Render != nil {
-		body = bytes.Replace(body,
-			[]byte(fmt.Sprintf("<div id=\"%s\"></div>", r.config.Container)),
-			[]byte(fmt.Sprintf("<div id=\"%s\">%s</div>", r.config.Container, *page.Render)),
-			1)
+		var old strings.Builder
+		old.WriteString("<div id=\"")
+		old.WriteString(r.config.Container)
+		old.WriteString("\"></div>")
+
+		var new strings.Builder
+		new.WriteString("<div id=\"")
+		new.WriteString(r.config.Container)
+		new.WriteString("\">")
+		new.Write(*page.Render)
+		new.WriteString("</div>")
+
+		body = bytes.Replace(body, []byte(old.String()), []byte(new.String()), 1)
 	}
 
 	if page.State != nil {
-		body = bytes.Replace(body,
-			[]byte("</body>"),
-			[]byte(fmt.Sprintf("<script id=\"%s\" type=\"application/json\">%s</script></body>", r.config.State,
-				*page.State)),
-			1)
+		var b strings.Builder
+		b.WriteString("<script id=\"")
+		b.WriteString(r.config.State)
+		b.WriteString("\" type=\"application/json\">")
+		b.WriteString(*page.State)
+		b.WriteString("</script></body>")
+
+		body = bytes.Replace(body, []byte("</body>"), []byte(b.String()), 1)
 	}
 
 	if page.Title != nil && *page.Title != "" {
-		body = bytes.Replace(body,
-			[]byte("</head>"),
-			[]byte(fmt.Sprintf("<title>%s</title></head>", *page.Title)),
-			1)
+		var b strings.Builder
+		b.WriteString("<title>")
+		b.WriteString(*page.Title)
+		b.WriteString("</title></head>")
+
+		body = bytes.Replace(body, []byte("</head>"), []byte(b.String()), 1)
 	}
 
 	if page.Metas != nil {
 		for _, id := range page.Metas.Ids() {
-			buf := r.bufferPool.Get()
-			defer r.bufferPool.Put(buf)
-
 			e, err := page.Metas.Get(id)
 			if err != nil {
 				continue
 			}
-			for _, k := range e.Attributes() {
-				buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, e.GetAttribute(k)))
-			}
 
-			body = bytes.Replace(body,
-				[]byte("</head>"),
-				[]byte(fmt.Sprintf("<meta id=\"%s\"%s></head>", id, buf.String())),
-				1)
+			var b strings.Builder
+			b.WriteString("<meta id=\"")
+			b.WriteString(id)
+			b.WriteString("\"")
+			for _, k := range e.Attributes() {
+				b.WriteString(" ")
+				b.WriteString(k)
+				b.WriteString("=\"")
+				b.WriteString(e.GetAttribute(k))
+				b.WriteString("\"")
+			}
+			b.WriteString("></head>")
+
+			body = bytes.Replace(body, []byte("</head>"), []byte(b.String()), 1)
 		}
 	}
 
 	if page.Links != nil {
 		for _, id := range page.Links.Ids() {
-			buf := r.bufferPool.Get()
-			defer r.bufferPool.Put(buf)
-
 			e, err := page.Links.Get(id)
 			if err != nil {
 				continue
 			}
-			for _, k := range e.Attributes() {
-				buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, e.GetAttribute(k)))
-			}
 
-			body = bytes.Replace(body,
-				[]byte("</head>"),
-				[]byte(fmt.Sprintf("<link id=\"%s\"%s></head>", id, buf.String())),
-				1)
+			var b strings.Builder
+			b.WriteString("<link id=\"")
+			b.WriteString(id)
+			b.WriteString("\"")
+			for _, k := range e.Attributes() {
+				b.WriteString(" ")
+				b.WriteString(k)
+				b.WriteString("=\"")
+				b.WriteString(e.GetAttribute(k))
+				b.WriteString("\"")
+			}
+			b.WriteString("></head>")
+
+			body = bytes.Replace(body, []byte("</head>"), []byte(b.String()), 1)
 		}
 	}
 
 	if page.Scripts != nil {
 		for _, id := range page.Scripts.Ids() {
-			buf := r.bufferPool.Get()
-			defer r.bufferPool.Put(buf)
-
 			e, err := page.Scripts.Get(id)
 			if err != nil {
 				continue
 			}
 
-			var content string = ""
+			var b strings.Builder
+			b.WriteString("<script id=\"")
+			b.WriteString(id)
+			b.WriteString("\"")
 			for _, k := range e.Attributes() {
 				if k == "children" {
-					content = e.GetAttribute(k)
 					continue
 				}
-				buf.WriteString(fmt.Sprintf(" %s=\"%s\"", k, e.GetAttribute(k)))
+				b.WriteString(" ")
+				b.WriteString(k)
+				b.WriteString("=\"")
+				b.WriteString(e.GetAttribute(k))
+				b.WriteString("\"")
 			}
+			b.WriteString(">")
+			children := e.GetAttribute("children")
+			if children != "" {
+				b.WriteString(children)
+			}
+			b.WriteString("</script></head>")
 
-			body = bytes.Replace(body,
-				[]byte("</head>"),
-				[]byte(fmt.Sprintf("<script id=\"%s\"%s>%s</script></head>", id, buf.String(), content)),
-				1)
+			body = bytes.Replace(body, []byte("</head>"), []byte(b.String()), 1)
 		}
 	}
 
-	return body, nil
+	w.Write(body)
+
+	return nil
 }
 
 // replaceIndexRouteParameters returns a copy of the string s with all its parameters replaced
-func replaceIndexRouteParameters(s string, params map[string]string) string {
+func (r *indexRenderer) replaceIndexRouteParameters(s string, params map[string]string) string {
 	tmp := s
 	for key, value := range params {
 		tmp = strings.ReplaceAll(tmp, fmt.Sprint("$", key), value)

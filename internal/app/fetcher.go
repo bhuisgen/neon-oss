@@ -24,7 +24,7 @@ type fetcher struct {
 	config                         *FetcherConfig
 	logger                         *log.Logger
 	requester                      FetchRequester
-	resources                      map[string]*Resource
+	resources                      map[string]Resource
 	resourcesLock                  sync.RWMutex
 	data                           Cache
 	osReadFile                     func(name string) ([]byte, error)
@@ -93,8 +93,7 @@ func createFetcherWithRequester(config *FetcherConfig, fetchRequester FetchReque
 		config:                         config,
 		logger:                         log.New(os.Stderr, fmt.Sprint(fetcherLogger, ": "), log.LstdFlags|log.Lmsgprefix),
 		requester:                      fetchRequester,
-		resources:                      make(map[string]*Resource),
-		resourcesLock:                  sync.RWMutex{},
+		resources:                      make(map[string]Resource),
 		data:                           newCache(),
 		osReadFile:                     fetcherOsReadFile,
 		tlsLoadX509KeyPair:             fetcherTlsLoadX509KeyPair,
@@ -161,7 +160,7 @@ func (f *fetcher) initialize(fetchRequester FetchRequester) error {
 	}
 
 	for _, r := range f.config.Resources {
-		f.Register(&Resource{
+		f.Register(Resource{
 			Name:    r.Name,
 			Method:  r.Method,
 			URL:     r.URL,
@@ -220,7 +219,7 @@ func (f *fetcher) Get(name string) ([]byte, error) {
 }
 
 // Register registers a resource
-func (f *fetcher) Register(r *Resource) {
+func (f *fetcher) Register(r Resource) {
 	f.resourcesLock.Lock()
 	defer f.resourcesLock.Unlock()
 

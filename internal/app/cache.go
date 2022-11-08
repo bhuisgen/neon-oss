@@ -19,7 +19,7 @@ type Cache interface {
 
 // cache implements a cache of objects
 type cache struct {
-	objects map[string]*cacheObject
+	objects map[string]cacheObject
 	lock    sync.RWMutex
 }
 
@@ -32,18 +32,23 @@ type cacheObject struct {
 // newCache returns a new cache instance
 func newCache() *cache {
 	return &cache{
-		objects: make(map[string]*cacheObject),
-		lock:    sync.RWMutex{},
+		objects: make(map[string]cacheObject),
 	}
 }
 
 // Get returns the value of the cached object with the given key
 func (c *cache) Get(key string) interface{} {
 	c.lock.RLock()
-	defer c.lock.RUnlock()
+	v, ok := c.objects[key]
+	c.lock.RUnlock()
 
-	if v, ok := c.objects[key]; ok {
+	if ok {
 		if !v.ExpireAt.IsZero() && v.ExpireAt.Before(time.Now()) {
+			c.lock.Lock()
+			defer c.lock.Unlock()
+
+			delete(c.objects, key)
+
 			return nil
 		}
 
@@ -55,7 +60,7 @@ func (c *cache) Get(key string) interface{} {
 
 // Set stores a object in the cache with given key, value and ttl
 func (c *cache) Set(key string, value interface{}, ttl time.Duration) {
-	item := &cacheObject{
+	item := cacheObject{
 		Value: value,
 	}
 	if ttl > 0 {

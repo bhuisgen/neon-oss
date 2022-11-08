@@ -14,7 +14,7 @@ type Fetcher interface {
 	Fetch(ctx context.Context, name string) error
 	Exists(name string) bool
 	Get(name string) ([]byte, error)
-	Register(r *Resource)
+	Register(r Resource)
 	Unregister(name string)
 	CreateResourceFromTemplate(template string, resource string, params map[string]string,
 		headers map[string]string) (*Resource, error)
@@ -41,18 +41,6 @@ type Renderer interface {
 type Server interface {
 	Start() error
 	Stop(ctx context.Context) error
-}
-
-// Render
-type Render struct {
-	Body           []byte
-	Valid          bool
-	Status         int
-	Redirect       bool
-	RedirectTarget string
-	RedirectStatus int
-	Headers        map[string]string
-	Cache          bool
 }
 
 // Resource

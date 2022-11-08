@@ -4,19 +4,21 @@
 
 package app
 
-import "errors"
+import (
+	"errors"
+)
 
 // domElement implement a DOM element
 type domElement struct {
 	id   string
-	data *dataMap
+	data *orderedMap
 }
 
 // newDOMElement returns a new DOM element
 func newDOMElement(id string) *domElement {
 	return &domElement{
 		id:   id,
-		data: newDataMap(),
+		data: newOrderedMap(),
 	}
 }
 
@@ -27,7 +29,11 @@ func (e *domElement) Id() string {
 
 // Attributes returns the attributes list
 func (e *domElement) Attributes() []string {
-	return e.data.Keys()
+	attributes := []string{}
+	for _, k := range e.data.Keys() {
+		attributes = append(attributes, k.(string))
+	}
+	return attributes
 }
 
 // GetAttribute returns the given attribute value
@@ -47,14 +53,14 @@ func (e *domElement) SetAttribute(key string, value string) {
 // domElementList implements a list of DOM elements
 type domElementList struct {
 	ids  []string
-	data *dataMap
+	data *orderedMap
 }
 
 // newDOMElementList returns a new DOM element list
 func newDOMElementList() *domElementList {
 	return &domElementList{
 		ids:  []string{},
-		data: newDataMap(),
+		data: newOrderedMap(),
 	}
 }
 

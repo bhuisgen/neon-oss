@@ -4,28 +4,56 @@
 
 package app
 
-// dataMap implements a map with ordered keys
-type dataMap struct {
-	keys []string
-	data map[string]interface{}
+import (
+	"sync"
+)
+
+// OrderedMap
+type OrderedMap interface {
+	Keys() []string
+	Get(key string) interface{}
+	Set(key string, value interface{})
+	Remove(key string)
+	Clear()
 }
 
-// newDataMap returns a new data map
-func newDataMap() *dataMap {
-	return &dataMap{
-		data: make(map[string]interface{}),
-		keys: []string{},
+// orderedMap implements a map with ordered keys
+type orderedMap struct {
+	keys []interface{}
+	data map[interface{}]interface{}
+	lock sync.RWMutex
+	}
+
+// newOrderedMap returns a new data map
+func newOrderedMap() *orderedMap {
+	return &orderedMap{
+		data: make(map[interface{}]interface{}),
+		keys: []interface{}{},
 	}
 }
 
+// Keys returns the ordered keys
+func (m *orderedMap) Keys() []interface{} {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return m.keys
+}
+
 // Get returns the value of the given key
-func (m *dataMap) Get(key string) (interface{}, bool) {
+func (m *orderedMap) Get(key string) (interface{}, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	v, ok := m.data[key]
 	return v, ok
 }
 
 // Set adds or update a value with the given key
-func (m *dataMap) Set(key string, value interface{}) {
+func (m *orderedMap) Set(key string, value interface{}) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	_, ok := m.data[key]
 	if !ok {
 		m.keys = append(m.keys, key)
@@ -33,8 +61,11 @@ func (m *dataMap) Set(key string, value interface{}) {
 	m.data[key] = value
 }
 
-// Delete removes the value with the given key
-func (m *dataMap) Delete(key string) {
+// Remove removes the value with the given key
+func (m *orderedMap) Remove(key string) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	_, ok := m.data[key]
 	if !ok {
 		return
@@ -42,12 +73,19 @@ func (m *dataMap) Delete(key string) {
 	for i, k := range m.keys {
 		if k == key {
 			m.keys = append(m.keys[:i], m.keys[i+1:]...)
+			break
 		}
 	}
 	delete(m.data, key)
 }
 
-// Keys returns the ordered keys
-func (m *dataMap) Keys() []string {
-	return m.keys
+// Clear removes all values of the map
+func (m *orderedMap) Clear() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.keys = []interface{}{}
+	for key := range m.data {
+		delete(m.data, key)
+	}
 }

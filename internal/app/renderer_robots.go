@@ -6,6 +6,7 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -30,6 +31,12 @@ type RobotsRendererConfig struct {
 	CacheTTL int
 }
 
+// robotsRender implements a render
+type robotsRender struct {
+	Body   []byte
+	Status int
+}
+
 const (
 	robotsLogger string = "server[robots]"
 )
@@ -52,7 +59,23 @@ func (r *robotsRenderer) Handle(w http.ResponseWriter, req *http.Request, info *
 		return
 	}
 
-	result, err := r.render(req)
+	if r.config.Cache {
+		obj := r.cache.Get(req.URL.Path)
+		if obj != nil {
+			result := obj.(*robotsRender)
+			w.WriteHeader(result.Status)
+			w.Write(result.Body)
+
+			r.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", req.URL.Path, result.Status, true)
+
+			return
+		}
+	}
+
+	b := r.bufferPool.Get()
+	defer r.bufferPool.Put(b)
+
+	err := r.render(req, b)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
@@ -62,11 +85,20 @@ func (r *robotsRenderer) Handle(w http.ResponseWriter, req *http.Request, info *
 		return
 	}
 
-	w.WriteHeader(result.Status)
-	w.Write(result.Body)
+	if r.config.Cache {
+		body := make([]byte, b.Len())
+		copy(body, b.Bytes())
 
-	r.logger.Printf("Render completed (url=%s, status=%d, valid=%t, cache=%t)", req.URL.Path, result.Status, result.Valid,
-		result.Cache)
+		r.cache.Set(req.URL.Path, &robotsRender{
+			Body:   body,
+			Status: http.StatusOK,
+		}, time.Duration(r.config.CacheTTL)*time.Second)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(b.Bytes())
+
+	r.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", req.URL.Path, http.StatusOK, false)
 }
 
 // Next configures the next renderer
@@ -75,41 +107,7 @@ func (r *robotsRenderer) Next(renderer Renderer) {
 }
 
 // render makes a new render
-func (r *robotsRenderer) render(req *http.Request) (*Render, error) {
-	if r.config.Cache {
-		obj := r.cache.Get(req.URL.Path)
-		if obj != nil {
-			result := obj.(*Render)
-
-			return result, nil
-		}
-	}
-
-	body, err := robots(r, req)
-	if err != nil {
-		r.logger.Printf("Failed to render: %s", err)
-
-		return nil, err
-	}
-
-	result := Render{
-		Body:   body,
-		Valid:  true,
-		Status: http.StatusOK,
-	}
-	if result.Valid && r.config.Cache {
-		r.cache.Set(req.URL.Path, &result, time.Duration(r.config.CacheTTL)*time.Second)
-		result.Cache = true
-	}
-
-	return &result, nil
-}
-
-// robots generates the robots.txt content
-func robots(r *robotsRenderer, req *http.Request) ([]byte, error) {
-	body := r.bufferPool.Get()
-	defer r.bufferPool.Put(body)
-
+func (r *robotsRenderer) render(req *http.Request, w io.Writer) error {
 	var check bool
 	for _, host := range r.config.Hosts {
 		if host == req.Host {
@@ -117,21 +115,21 @@ func robots(r *robotsRenderer, req *http.Request) ([]byte, error) {
 		}
 	}
 	if !check {
-		body.WriteString("User-agent: *\n")
-		body.WriteString("Disallow: /\n")
+		w.Write([]byte("User-agent: *\n"))
+		w.Write([]byte("Disallow: /\n"))
 
-		return body.Bytes(), nil
+		return nil
 	}
 
-	body.WriteString("User-agent: *\n")
-	body.WriteString("Allow: /\n")
+	w.Write([]byte("User-agent: *\n"))
+	w.Write([]byte("Allow: /\n"))
 
 	for i, s := range r.config.Sitemaps {
 		if i == 0 {
-			body.WriteString("\n")
+			w.Write([]byte("\n"))
 		}
-		body.WriteString(fmt.Sprintf("Sitemap: %s\n", s))
+		w.Write([]byte(fmt.Sprintf("Sitemap: %s\n", s)))
 	}
 
-	return body.Bytes(), nil
+	return nil
 }

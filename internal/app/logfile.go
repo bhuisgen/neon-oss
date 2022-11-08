@@ -21,11 +21,11 @@ type LogFileWriter interface {
 
 // logFileWriter implements a log file writer
 type logFileWriter struct {
-	mutex sync.Mutex
 	name  string
 	flag  int
 	perm  os.FileMode
 	f     *os.File
+	mutex sync.Mutex
 }
 
 // CreateLogFileWriter creates a log file writer

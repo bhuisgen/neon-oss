@@ -38,7 +38,7 @@ func TestNewDOMElement(t *testing.T) {
 func TestDOMElementId(t *testing.T) {
 	type fields struct {
 		id   string
-		data *dataMap
+		data *orderedMap
 	}
 	tests := []struct {
 		name   string
@@ -49,7 +49,7 @@ func TestDOMElementId(t *testing.T) {
 			name: "default",
 			fields: fields{
 				id:   "test",
-				data: &dataMap{},
+				data: &orderedMap{},
 			},
 			want: "test",
 		},
@@ -70,7 +70,7 @@ func TestDOMElementId(t *testing.T) {
 func TestDOMElementAttributes(t *testing.T) {
 	type fields struct {
 		id   string
-		data *dataMap
+		data *orderedMap
 	}
 	tests := []struct {
 		name   string
@@ -81,8 +81,8 @@ func TestDOMElementAttributes(t *testing.T) {
 			name: "default",
 			fields: fields{
 				id: "test",
-				data: &dataMap{
-					keys: []string{"key1", "key2", "key3"},
+				data: &orderedMap{
+					keys: []interface{}{"key1", "key2", "key3"},
 				},
 			},
 			want: []string{"key1", "key2", "key3"},
@@ -104,7 +104,7 @@ func TestDOMElementAttributes(t *testing.T) {
 func TestDOMElementGetAttribute(t *testing.T) {
 	type fields struct {
 		id   string
-		data *dataMap
+		data *orderedMap
 	}
 	type args struct {
 		name string
@@ -119,9 +119,9 @@ func TestDOMElementGetAttribute(t *testing.T) {
 			name: "default",
 			fields: fields{
 				id: "test",
-				data: &dataMap{
-					keys: []string{"key"},
-					data: map[string]interface{}{
+				data: &orderedMap{
+					keys: []interface{}{"key"},
+					data: map[interface{}]interface{}{
 						"key": "value",
 					},
 				},
@@ -135,9 +135,9 @@ func TestDOMElementGetAttribute(t *testing.T) {
 			name: "invalid key",
 			fields: fields{
 				id: "test",
-				data: &dataMap{
-					keys: []string{"key"},
-					data: map[string]interface{}{
+				data: &orderedMap{
+					keys: []interface{}{"key"},
+					data: map[interface{}]interface{}{
 						"key": "value",
 					},
 				},
@@ -164,7 +164,7 @@ func TestDOMElementGetAttribute(t *testing.T) {
 func TestDOMElementSetAttribute(t *testing.T) {
 	type fields struct {
 		id   string
-		data *dataMap
+		data *orderedMap
 	}
 	type args struct {
 		key   string
@@ -179,9 +179,9 @@ func TestDOMElementSetAttribute(t *testing.T) {
 			name: "default",
 			fields: fields{
 				id: "test",
-				data: &dataMap{
-					keys: []string{},
-					data: map[string]interface{}{},
+				data: &orderedMap{
+					keys: []interface{}{},
+					data: map[interface{}]interface{}{},
 				},
 			},
 		},
@@ -219,7 +219,7 @@ func TestNewDOMElementList(t *testing.T) {
 func TestDOMElementListIds(t *testing.T) {
 	type fields struct {
 		ids  []string
-		data *dataMap
+		data *orderedMap
 	}
 	tests := []struct {
 		name   string
@@ -230,7 +230,7 @@ func TestDOMElementListIds(t *testing.T) {
 			name: "default",
 			fields: fields{
 				ids:  []string{"test"},
-				data: &dataMap{},
+				data: &orderedMap{},
 			},
 			want: []string{"test"},
 		},
@@ -253,7 +253,7 @@ func TestDOMElementListGet(t *testing.T) {
 
 	type fields struct {
 		ids  []string
-		data *dataMap
+		data *orderedMap
 	}
 	type args struct {
 		id string
@@ -269,9 +269,9 @@ func TestDOMElementListGet(t *testing.T) {
 			name: "default",
 			fields: fields{
 				ids: []string{"test"},
-				data: &dataMap{
-					keys: []string{"test"},
-					data: map[string]interface{}{
+				data: &orderedMap{
+					keys: []interface{}{"test"},
+					data: map[interface{}]interface{}{
 						"test": test,
 					},
 				},
@@ -285,9 +285,9 @@ func TestDOMElementListGet(t *testing.T) {
 			name: "invalid id",
 			fields: fields{
 				ids: []string{"test"},
-				data: &dataMap{
-					keys: []string{"test"},
-					data: map[string]interface{}{
+				data: &orderedMap{
+					keys: []interface{}{"test"},
+					data: map[interface{}]interface{}{
 						"test": test,
 					},
 				},
@@ -321,7 +321,7 @@ func TestDOMElementListSet(t *testing.T) {
 
 	type fields struct {
 		ids  []string
-		data *dataMap
+		data *orderedMap
 	}
 	type args struct {
 		e *domElement
@@ -335,9 +335,9 @@ func TestDOMElementListSet(t *testing.T) {
 			name: "default",
 			fields: fields{
 				ids: []string{},
-				data: &dataMap{
-					keys: []string{},
-					data: map[string]interface{}{},
+				data: &orderedMap{
+					keys: []interface{}{},
+					data: map[interface{}]interface{}{},
 				},
 			},
 			args: args{

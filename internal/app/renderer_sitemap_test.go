@@ -5,12 +5,12 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log"
 	"net/http"
 	"net/url"
-	"reflect"
 	"testing"
 )
 
@@ -70,7 +70,7 @@ func (t testSitemapRendererFetcher) Get(name string) ([]byte, error) {
 	return t.get, nil
 }
 
-func (t testSitemapRendererFetcher) Register(r *Resource) {
+func (t testSitemapRendererFetcher) Register(r Resource) {
 }
 
 func (t testSitemapRendererFetcher) Unregister(name string) {
@@ -350,7 +350,7 @@ func TestSitemapRendererRender(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *Render
+		wantW   string
 		wantErr bool
 	}{
 		{
@@ -387,17 +387,13 @@ func TestSitemapRendererRender(t *testing.T) {
 					},
 				},
 			},
-			want: &Render{
-				Body: []byte(`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+			wantW: `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <sitemap>
 <loc>http://localhost/</loc>
 </sitemap>
 </sitemapindex>
-`),
-				Valid:  true,
-				Status: 200,
-			},
+`,
 		},
 		{
 			name: "sitemap static",
@@ -436,8 +432,7 @@ func TestSitemapRendererRender(t *testing.T) {
 					},
 				},
 			},
-			want: &Render{
-				Body: []byte(`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+			wantW: `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
    xmlns:xhtml="http://www.w3.org/1999/xhtml">
 <url>
@@ -447,10 +442,7 @@ func TestSitemapRendererRender(t *testing.T) {
 <priority>0.5</priority>
 </url>
 </urlset>
-`),
-				Valid:  true,
-				Status: 200,
-			},
+`,
 		},
 		{
 			name: "sitemap list",
@@ -505,8 +497,7 @@ func TestSitemapRendererRender(t *testing.T) {
 					},
 				},
 			},
-			want: &Render{
-				Body: []byte(`<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+			wantW: `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
    xmlns:xhtml="http://www.w3.org/1999/xhtml">
 <url>
@@ -522,10 +513,7 @@ func TestSitemapRendererRender(t *testing.T) {
 <priority>0.5</priority>
 </url>
 </urlset>
-`),
-				Valid:  true,
-				Status: 200,
-			},
+`,
 		},
 	}
 	for _, tt := range tests {
@@ -538,13 +526,13 @@ func TestSitemapRendererRender(t *testing.T) {
 				fetcher:    tt.fields.fetcher,
 				next:       tt.fields.next,
 			}
-			got, err := r.render(tt.args.routeIndex, tt.args.req)
-			if (err != nil) != tt.wantErr {
+			w := &bytes.Buffer{}
+			if err := r.render(tt.args.routeIndex, tt.args.req, w); (err != nil) != tt.wantErr {
 				t.Errorf("sitemapRenderer.render() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sitemapRenderer.render() = %v, want %v", got, tt.want)
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("sitemapRenderer.render() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

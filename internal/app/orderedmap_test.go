@@ -6,6 +6,7 @@ package app
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -20,7 +21,7 @@ func TestNewOrderedMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := newDataMap()
+			got := newOrderedMap()
 			if (got == nil) != tt.wantNil {
 				t.Errorf("NewOrderedMap() got = %v, wantNil %v", got, tt.wantNil)
 			}
@@ -28,10 +29,47 @@ func TestNewOrderedMap(t *testing.T) {
 	}
 }
 
+func TestOrderedMapKeys(t *testing.T) {
+	type fields struct {
+		keys []interface{}
+		data map[interface{}]interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []interface{}
+	}{
+		{
+			name: "default",
+			fields: fields{
+				keys: []interface{}{"key3", "key2", "key1"},
+				data: map[interface{}]interface{}{
+					"key1": "value3",
+					"key2": "value2",
+					"key3": "value1",
+				},
+			},
+			want: []interface{}{"key3", "key2", "key1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &orderedMap{
+				keys: tt.fields.keys,
+				data: tt.fields.data,
+				lock: sync.RWMutex{},
+			}
+			if got := m.Keys(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("orderedMap.Keys() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestOrderedMapGet(t *testing.T) {
 	type fields struct {
-		keys []string
-		data map[string]interface{}
+		keys []interface{}
+		data map[interface{}]interface{}
 	}
 	type args struct {
 		key string
@@ -46,8 +84,8 @@ func TestOrderedMapGet(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				keys: []string{"key"},
-				data: map[string]interface{}{
+				keys: []interface{}{"key"},
+				data: map[interface{}]interface{}{
 					"key": "value",
 				},
 			},
@@ -60,9 +98,10 @@ func TestOrderedMapGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &dataMap{
+			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
+				lock: sync.RWMutex{},
 			}
 			got, got1 := m.Get(tt.args.key)
 			if !reflect.DeepEqual(got, tt.want) {
@@ -77,8 +116,8 @@ func TestOrderedMapGet(t *testing.T) {
 
 func TestOrderedMapSet(t *testing.T) {
 	type fields struct {
-		keys []string
-		data map[string]interface{}
+		keys []interface{}
+		data map[interface{}]interface{}
 	}
 	type args struct {
 		key   string
@@ -92,8 +131,8 @@ func TestOrderedMapSet(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				keys: []string{},
-				data: map[string]interface{}{},
+				keys: []interface{}{},
+				data: map[interface{}]interface{}{},
 			},
 			args: args{
 				key:   "key",
@@ -103,19 +142,20 @@ func TestOrderedMapSet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &dataMap{
+			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
+				lock: sync.RWMutex{},
 			}
 			m.Set(tt.args.key, tt.args.value)
 		})
 	}
 }
 
-func TestOrderedMapDelete(t *testing.T) {
+func TestOrderedMapRemove(t *testing.T) {
 	type fields struct {
-		keys []string
-		data map[string]interface{}
+		keys []interface{}
+		data map[interface{}]interface{}
 	}
 	type args struct {
 		key string
@@ -128,8 +168,8 @@ func TestOrderedMapDelete(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				keys: []string{"key"},
-				data: map[string]interface{}{
+				keys: []interface{}{"key"},
+				data: map[interface{}]interface{}{
 					"key": "value",
 				},
 			},
@@ -140,8 +180,8 @@ func TestOrderedMapDelete(t *testing.T) {
 		{
 			name: "invalid key",
 			fields: fields{
-				keys: []string{"key"},
-				data: map[string]interface{}{
+				keys: []interface{}{"key"},
+				data: map[interface{}]interface{}{
 					"key": "value",
 				},
 			},
@@ -152,47 +192,43 @@ func TestOrderedMapDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &dataMap{
+			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
+				lock: sync.RWMutex{},
 			}
-			m.Delete(tt.args.key)
+			m.Remove(tt.args.key)
 		})
 	}
 }
 
-func TestOrderedMapKeys(t *testing.T) {
+func TestOrderedMapClear(t *testing.T) {
 	type fields struct {
-		keys []string
-		data map[string]interface{}
+		keys []interface{}
+		data map[interface{}]interface{}
 	}
 	tests := []struct {
 		name   string
 		fields fields
-		want   []string
 	}{
 		{
 			name: "default",
 			fields: fields{
-				keys: []string{"key1", "key2", "key3"},
-				data: map[string]interface{}{
-					"key3": "value3",
-					"key2": "value2",
-					"key1": "value1",
+				keys: []interface{}{"key"},
+				data: map[interface{}]interface{}{
+					"key": "value",
 				},
 			},
-			want: []string{"key1", "key2", "key3"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &dataMap{
+			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
+				lock: sync.RWMutex{},
 			}
-			if got := m.Keys(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("orderedMap.Keys() = %v, want %v", got, tt.want)
-			}
+			m.Clear()
 		})
 	}
 }

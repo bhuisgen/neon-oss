@@ -50,7 +50,7 @@ func (t testLoaderExecutorFetcher) Get(name string) ([]byte, error) {
 	return t.get, nil
 }
 
-func (t testLoaderExecutorFetcher) Register(r *Resource) {
+func (t testLoaderExecutorFetcher) Register(r Resource) {
 }
 
 func (t testLoaderExecutorFetcher) Unregister(name string) {

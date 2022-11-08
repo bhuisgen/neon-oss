@@ -5,14 +5,9 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"flag"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
-	"time"
 
 	"github.com/bhuisgen/neon/internal/app"
 )
@@ -20,7 +15,6 @@ import (
 // checkCommand implements the check command
 type checkCommand struct {
 	flagset *flag.FlagSet
-	timeout uint
 	verbose bool
 }
 
@@ -28,7 +22,6 @@ type checkCommand struct {
 func NewCheckCommand() *checkCommand {
 	c := checkCommand{}
 	c.flagset = flag.NewFlagSet("check", flag.ExitOnError)
-	c.flagset.UintVar(&c.timeout, "timeout", 5, "Set the check timeout (seconds)")
 	c.flagset.BoolVar(&c.verbose, "verbose", false, "Use verbose output")
 	c.flagset.Usage = func() {
 		fmt.Println("Usage: neon check [OPTIONS]")
@@ -48,7 +41,7 @@ func (c *checkCommand) Name() string {
 
 // Description returns the command description
 func (c *checkCommand) Description() string {
-	return "Check the instance health"
+	return "Check the configuration file"
 }
 
 // Init initializes the command
@@ -65,71 +58,17 @@ func (c *checkCommand) Execute() error {
 		return err
 	}
 
-	for _, serverConfig := range config.Server {
-		tlsConfig := &tls.Config{
-			MinVersion: tls.VersionTLS12,
+	report, err := app.CheckConfig(config)
+	if err != nil {
+		for _, line := range report {
+			fmt.Println(line)
 		}
+		fmt.Println("Configuration is not valid")
 
-		if serverConfig.TLSCAFile != nil {
-			ca, err := os.ReadFile(*serverConfig.TLSCAFile)
-			if err != nil {
-				fmt.Printf("Failed to read TLS CA file: %s\n", err)
-
-				return err
-			}
-
-			caCertPool := x509.NewCertPool()
-			caCertPool.AppendCertsFromPEM(ca)
-
-			tlsConfig.RootCAs = caCertPool
-
-			if serverConfig.TLSCertFile != nil && serverConfig.TLSKeyFile != nil {
-				clientCert, err := tls.LoadX509KeyPair(*serverConfig.TLSCertFile, *serverConfig.TLSKeyFile)
-				if err != nil {
-					fmt.Printf("Failed to parse TLS certificate: %s\n", err)
-
-					return err
-				}
-
-				tlsConfig.Certificates = []tls.Certificate{clientCert}
-			}
-		}
-
-		transport := http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout: time.Duration(c.timeout) * time.Second,
-			}).Dial,
-			TLSClientConfig:       tlsConfig,
-			TLSHandshakeTimeout:   time.Duration(c.timeout) * time.Second,
-			ResponseHeaderTimeout: time.Duration(c.timeout) * time.Second,
-			ExpectContinueTimeout: time.Duration(c.timeout) * time.Second,
-			ForceAttemptHTTP2:     true,
-		}
-
-		client := http.Client{
-			Transport: &transport,
-			Timeout:   time.Duration(c.timeout) * time.Second,
-		}
-
-		scheme := "http"
-		if serverConfig.TLS {
-			scheme = "https"
-		}
-		url := fmt.Sprintf("%s://%s:%d", scheme, serverConfig.ListenAddr, serverConfig.ListenPort)
-
-		_, err := client.Head(url)
-		if c.verbose {
-			if err != nil {
-				fmt.Printf("Check '%s': KO\n", url)
-			} else {
-				fmt.Printf("Check '%s': OK\n", url)
-			}
-		}
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("check failure")
 	}
+
+	fmt.Println("Configuration is valid")
 
 	return nil
 }

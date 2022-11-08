@@ -5,10 +5,10 @@
 package app
 
 import (
+	"bytes"
 	"log"
 	"net/http"
 	"net/url"
-	"reflect"
 	"testing"
 )
 
@@ -69,7 +69,6 @@ func TestRobotsRendererHandle(t *testing.T) {
 		bufferPool BufferPool
 		cache      Cache
 		next       Renderer
-		osReadFile func(name string) ([]byte, error)
 	}
 	type args struct {
 		w    http.ResponseWriter
@@ -91,9 +90,6 @@ func TestRobotsRendererHandle(t *testing.T) {
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 				next:       testRobotsRendererNextRenderer{},
-				osReadFile: func(name string) ([]byte, error) {
-					return []byte{}, nil
-				},
 			},
 			args: args{
 				w: testRobotsRendererResponseWriter{},
@@ -106,18 +102,16 @@ func TestRobotsRendererHandle(t *testing.T) {
 			},
 		},
 		{
-			name: "error render",
+			name: "cache",
 			fields: fields{
 				config: &RobotsRendererConfig{
-					Path: "/robots.txt",
+					Path:     "/robots.txt",
+					Cache:    true,
+					CacheTTL: 60,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
-				next:       testRobotsRendererNextRenderer{},
-				osReadFile: func(name string) ([]byte, error) {
-					return []byte{}, nil
-				},
 			},
 			args: args{
 				w: testRobotsRendererResponseWriter{},
@@ -139,9 +133,6 @@ func TestRobotsRendererHandle(t *testing.T) {
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 				next:       testRobotsRendererNextRenderer{},
-				osReadFile: func(name string) ([]byte, error) {
-					return []byte{}, nil
-				},
 			},
 			args: args{
 				w: testRobotsRendererResponseWriter{},
@@ -217,7 +208,7 @@ func TestRobotsRendererRender(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *Render
+		wantW   string
 		wantErr bool
 	}{
 		{
@@ -237,37 +228,7 @@ func TestRobotsRendererRender(t *testing.T) {
 					},
 				},
 			},
-			want: &Render{
-				Body:   []byte("User-agent: *\nDisallow: /\n"),
-				Valid:  true,
-				Status: 200,
-			},
-		},
-		{
-			name: "cache",
-			fields: fields{
-				config: &RobotsRendererConfig{
-					Path:     "/robots.txt",
-					Cache:    true,
-					CacheTTL: 60,
-				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				cache:      newCache(),
-			},
-			args: args{
-				req: &http.Request{
-					URL: &url.URL{
-						Path: "/robots.txt",
-					},
-				},
-			},
-			want: &Render{
-				Body:   []byte("User-agent: *\nDisallow: /\n"),
-				Valid:  true,
-				Status: 200,
-				Cache:  true,
-			},
+			wantW: "User-agent: *\nDisallow: /\n",
 		},
 		{
 			name: "allow host",
@@ -288,11 +249,7 @@ func TestRobotsRendererRender(t *testing.T) {
 					},
 				},
 			},
-			want: &Render{
-				Body:   []byte("User-agent: *\nAllow: /\n"),
-				Valid:  true,
-				Status: 200,
-			},
+			wantW: "User-agent: *\nAllow: /\n",
 		},
 		{
 			name: "disallow host",
@@ -313,11 +270,7 @@ func TestRobotsRendererRender(t *testing.T) {
 					},
 				},
 			},
-			want: &Render{
-				Body:   []byte("User-agent: *\nDisallow: /\n"),
-				Valid:  true,
-				Status: 200,
-			},
+			wantW: "User-agent: *\nDisallow: /\n",
 		},
 		{
 			name: "sitemap",
@@ -339,11 +292,7 @@ func TestRobotsRendererRender(t *testing.T) {
 					},
 				},
 			},
-			want: &Render{
-				Body:   []byte("User-agent: *\nAllow: /\n\nSitemap: http://localhost/sitemap.xml\n"),
-				Valid:  true,
-				Status: 200,
-			},
+			wantW: "User-agent: *\nAllow: /\n\nSitemap: http://localhost/sitemap.xml\n",
 		},
 	}
 	for _, tt := range tests {
@@ -355,13 +304,13 @@ func TestRobotsRendererRender(t *testing.T) {
 				cache:      tt.fields.cache,
 				next:       tt.fields.next,
 			}
-			got, err := r.render(tt.args.req)
-			if (err != nil) != tt.wantErr {
+			w := &bytes.Buffer{}
+			if err := r.render(tt.args.req, w); (err != nil) != tt.wantErr {
 				t.Errorf("robotsRenderer.render() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("robotsRenderer.render() = %v, want %v", got, tt.want)
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("robotsRenderer.render() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

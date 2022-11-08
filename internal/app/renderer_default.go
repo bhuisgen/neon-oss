@@ -6,6 +6,7 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ import (
 type defaultRenderer struct {
 	config     *DefaultRendererConfig
 	logger     *log.Logger
+	bufferPool BufferPool
 	cache      Cache
 	next       Renderer
 	osReadFile func(name string) ([]byte, error)
@@ -27,6 +29,12 @@ type DefaultRendererConfig struct {
 	StatusCode int
 	Cache      bool
 	CacheTTL   int
+}
+
+// defaultRender implements a render
+type defaultRender struct {
+	Body   []byte
+	Status int
 }
 
 const (
@@ -43,6 +51,7 @@ func CreateDefaultRenderer(config *DefaultRendererConfig) (*defaultRenderer, err
 	return &defaultRenderer{
 		config:     config,
 		logger:     log.New(os.Stderr, fmt.Sprint(defaultLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		bufferPool: newBufferPool(),
 		cache:      newCache(),
 		osReadFile: defaultOsReadFile,
 	}, nil
@@ -50,7 +59,23 @@ func CreateDefaultRenderer(config *DefaultRendererConfig) (*defaultRenderer, err
 
 // Handle implements the renderer
 func (r *defaultRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
-	result, err := r.render(req)
+	if r.config.Cache {
+		obj := r.cache.Get(req.URL.Path)
+		if obj != nil {
+			result := obj.(*defaultRender)
+			w.WriteHeader(result.Status)
+			w.Write(result.Body)
+
+			r.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", req.URL.Path, result.Status, true)
+
+			return
+		}
+	}
+
+	b := r.bufferPool.Get()
+	defer r.bufferPool.Put(b)
+
+	err := r.render(req, b)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})
@@ -60,11 +85,20 @@ func (r *defaultRenderer) Handle(w http.ResponseWriter, req *http.Request, info 
 		return
 	}
 
-	w.WriteHeader(result.Status)
-	w.Write(result.Body)
+	if r.config.Cache {
+		body := make([]byte, b.Len())
+		copy(body, b.Bytes())
 
-	r.logger.Printf("Render completed (url=%s, status=%d, valid=%t, cache=%t)", req.URL.Path, result.Status, result.Valid,
-		result.Cache)
+		r.cache.Set(req.URL.Path, &defaultRender{
+			Body:   body,
+			Status: http.StatusOK,
+		}, time.Duration(r.config.CacheTTL)*time.Second)
+	}
+
+	w.WriteHeader(r.config.StatusCode)
+	w.Write(b.Bytes())
+
+	r.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", req.URL.Path, r.config.StatusCode, false)
 }
 
 // Next configures the next renderer
@@ -73,44 +107,15 @@ func (r *defaultRenderer) Next(renderer Renderer) {
 }
 
 // render makes a new render
-func (r *defaultRenderer) render(req *http.Request) (*Render, error) {
-	if r.config.Cache {
-		obj := r.cache.Get("default")
-		if obj != nil {
-			result := obj.(*Render)
-
-			return result, nil
-		}
-	}
-
-	body, err := defaultFile(r, req)
-	if err != nil {
-		r.logger.Printf("Failed to render: %s", err)
-
-		return nil, err
-	}
-
-	result := Render{
-		Body:   body,
-		Valid:  true,
-		Status: http.StatusOK,
-	}
-	if result.Valid && r.config.Cache {
-		r.cache.Set("default", &result, time.Duration(r.config.CacheTTL)*time.Second)
-		result.Cache = true
-	}
-
-	return &result, nil
-}
-
-// defaultFile generates a default file
-func defaultFile(r *defaultRenderer, req *http.Request) ([]byte, error) {
+func (r *defaultRenderer) render(req *http.Request, w io.Writer) error {
 	body, err := r.osReadFile(r.config.File)
 	if err != nil {
 		r.logger.Printf("Failed to read default file '%s': %s", r.config.File, err)
 
-		return nil, err
+		return err
 	}
 
-	return body, nil
+	w.Write(body)
+
+	return nil
 }

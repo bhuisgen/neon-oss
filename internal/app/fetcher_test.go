@@ -83,7 +83,7 @@ func TestFetcherInitialize(t *testing.T) {
 		config                         *FetcherConfig
 		logger                         *log.Logger
 		requester                      FetchRequester
-		resources                      map[string]*Resource
+		resources                      map[string]Resource
 		data                           Cache
 		osReadFile                     func(name string) ([]byte, error)
 		x509CertPoolAppendCertsFromPEM func(pool *x509.CertPool, pemCerts []byte) bool
@@ -110,7 +110,7 @@ func TestFetcherInitialize(t *testing.T) {
 						},
 					},
 				},
-				resources:                      make(map[string]*Resource),
+				resources:                      make(map[string]Resource),
 				osReadFile:                     fetcherOsReadFile,
 				x509CertPoolAppendCertsFromPEM: fetcherX509CertPoolAppendCertsFromPEM,
 				tlsLoadX509KeyPair:             fetcherTlsLoadX509KeyPair,
@@ -234,7 +234,7 @@ func TestFetcherFetch(t *testing.T) {
 		config    *FetcherConfig
 		logger    *log.Logger
 		requester FetchRequester
-		resources map[string]*Resource
+		resources map[string]Resource
 		data      Cache
 	}
 	type args struct {
@@ -253,7 +253,7 @@ func TestFetcherFetch(t *testing.T) {
 				config:    &FetcherConfig{},
 				logger:    log.Default(),
 				requester: &testFetcherFetchRequester{},
-				resources: map[string]*Resource{
+				resources: map[string]Resource{
 					"test": {
 						Name:   "test",
 						Method: http.MethodGet,
@@ -274,7 +274,7 @@ func TestFetcherFetch(t *testing.T) {
 				config:    &FetcherConfig{},
 				logger:    log.Default(),
 				requester: &testFetcherFetchRequester{},
-				resources: map[string]*Resource{},
+				resources: map[string]Resource{},
 				data:      newCache(),
 			},
 			args: args{
@@ -291,7 +291,7 @@ func TestFetcherFetch(t *testing.T) {
 				requester: &testFetcherFetchRequester{
 					err: true,
 				},
-				resources: map[string]*Resource{
+				resources: map[string]Resource{
 					"test": {
 						Name:   "test",
 						Method: http.MethodGet,
@@ -330,7 +330,7 @@ func TestFetcherExists(t *testing.T) {
 		config    *FetcherConfig
 		logger    *log.Logger
 		requester FetchRequester
-		resources map[string]*Resource
+		resources map[string]Resource
 		data      Cache
 	}
 	type args struct {
@@ -350,7 +350,7 @@ func TestFetcherExists(t *testing.T) {
 				requester: &testFetcherFetchRequester{
 					err: true,
 				},
-				resources: map[string]*Resource{
+				resources: map[string]Resource{
 					"test": {
 						Name:   "test",
 						Method: http.MethodGet,
@@ -373,7 +373,7 @@ func TestFetcherExists(t *testing.T) {
 				requester: &testFetcherFetchRequester{
 					err: true,
 				},
-				resources: map[string]*Resource{},
+				resources: map[string]Resource{},
 				data:      newCache(),
 			},
 			args: args{
@@ -404,7 +404,7 @@ func TestFetcherGet(t *testing.T) {
 		config    *FetcherConfig
 		logger    *log.Logger
 		requester FetchRequester
-		resources map[string]*Resource
+		resources map[string]Resource
 		data      Cache
 	}
 	type args struct {
@@ -425,7 +425,7 @@ func TestFetcherGet(t *testing.T) {
 				requester: &testFetcherFetchRequester{
 					response: []byte("test"),
 				},
-				resources: map[string]*Resource{
+				resources: map[string]Resource{
 					"test": {
 						Name:   "test",
 						Method: http.MethodGet,
@@ -434,7 +434,7 @@ func TestFetcherGet(t *testing.T) {
 					},
 				},
 				data: &cache{
-					objects: map[string]*cacheObject{
+					objects: map[string]cacheObject{
 						"test": {
 							Value: []byte("test"),
 						},
@@ -455,10 +455,10 @@ func TestFetcherGet(t *testing.T) {
 				requester: &testFetcherFetchRequester{
 					err: true,
 				},
-				resources: map[string]*Resource{},
+				resources: map[string]Resource{},
 
 				data: &cache{
-					objects: map[string]*cacheObject{},
+					objects: map[string]cacheObject{},
 					lock:    sync.RWMutex{},
 				},
 			},
@@ -496,11 +496,11 @@ func TestFetcherRegister(t *testing.T) {
 		config    *FetcherConfig
 		logger    *log.Logger
 		requester FetchRequester
-		resources map[string]*Resource
+		resources map[string]Resource
 		data      Cache
 	}
 	type args struct {
-		r *Resource
+		r Resource
 	}
 	tests := []struct {
 		name   string
@@ -515,14 +515,14 @@ func TestFetcherRegister(t *testing.T) {
 				requester: &testFetcherFetchRequester{
 					response: []byte("test"),
 				},
-				resources: map[string]*Resource{},
+				resources: map[string]Resource{},
 				data: &cache{
-					objects: map[string]*cacheObject{},
+					objects: map[string]cacheObject{},
 					lock:    sync.RWMutex{},
 				},
 			},
 			args: args{
-				r: &Resource{
+				r: Resource{
 					Name:   "test",
 					Method: http.MethodGet,
 					URL:    "http://localhost",
@@ -551,7 +551,7 @@ func TestFetcherUnregister(t *testing.T) {
 		config    *FetcherConfig
 		logger    *log.Logger
 		requester FetchRequester
-		resources map[string]*Resource
+		resources map[string]Resource
 		data      Cache
 	}
 	type args struct {
@@ -570,9 +570,9 @@ func TestFetcherUnregister(t *testing.T) {
 				requester: &testFetcherFetchRequester{
 					response: []byte("test"),
 				},
-				resources: map[string]*Resource{},
+				resources: map[string]Resource{},
 				data: &cache{
-					objects: map[string]*cacheObject{},
+					objects: map[string]cacheObject{},
 					lock:    sync.RWMutex{},
 				},
 			},
@@ -601,7 +601,7 @@ func TestFetcherCreateResourceFromTemplate(t *testing.T) {
 		config    *FetcherConfig
 		logger    *log.Logger
 		requester FetchRequester
-		resources map[string]*Resource
+		resources map[string]Resource
 		data      Cache
 	}
 	type args struct {
@@ -648,9 +648,9 @@ func TestFetcherCreateResourceFromTemplate(t *testing.T) {
 				},
 				logger:    log.Default(),
 				requester: &testFetcherFetchRequester{},
-				resources: map[string]*Resource{},
+				resources: map[string]Resource{},
 				data: &cache{
-					objects: map[string]*cacheObject{},
+					objects: map[string]cacheObject{},
 					lock:    sync.RWMutex{},
 				},
 			},
@@ -686,9 +686,9 @@ func TestFetcherCreateResourceFromTemplate(t *testing.T) {
 				},
 				logger:    log.Default(),
 				requester: &testFetcherFetchRequester{},
-				resources: map[string]*Resource{},
+				resources: map[string]Resource{},
 				data: &cache{
-					objects: map[string]*cacheObject{},
+					objects: map[string]cacheObject{},
 					lock:    sync.RWMutex{},
 				},
 			},

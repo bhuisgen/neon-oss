@@ -23,10 +23,10 @@ type command interface {
 // main is the entrypoint
 func main() {
 	commands := []command{
-		NewInitCommand(),
 		NewCheckCommand(),
+		NewHealthcheckCommand(),
+		NewInitCommand(),
 		NewServeCommand(),
-		NewTestCommand(),
 	}
 
 	var showVersion bool

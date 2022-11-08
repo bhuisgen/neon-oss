@@ -621,8 +621,8 @@ func LoadConfig() (*config, error) {
 	return c, nil
 }
 
-// TestConfig validates the configuration
-func TestConfig(c *config) ([]string, error) {
+// CheckConfig validates the configuration file
+func CheckConfig(c *config) ([]string, error) {
 	var report []string
 
 	if c.Server == nil {

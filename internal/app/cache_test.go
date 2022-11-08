@@ -24,7 +24,7 @@ func TestCacheGet(t *testing.T) {
 	value := "value"
 
 	cache := newCache()
-	cache.objects[key] = &cacheObject{
+	cache.objects[key] = cacheObject{
 		Value: value,
 	}
 	if v := cache.Get(key); v != value {
@@ -37,7 +37,7 @@ func TestCacheGet_InvalidKey(t *testing.T) {
 	value := "value"
 
 	cache := newCache()
-	cache.objects[key] = &cacheObject{
+	cache.objects[key] = cacheObject{
 		Value: value,
 	}
 	if v := cache.Get("invalid"); v != nil {
@@ -51,7 +51,7 @@ func TestCacheGet_ExpiredKey(t *testing.T) {
 	ttl := time.Duration(10) * time.Millisecond
 
 	cache := newCache()
-	cache.objects[key] = &cacheObject{
+	cache.objects[key] = cacheObject{
 		Value:    value,
 		ExpireAt: time.Now().Add(ttl),
 	}
@@ -94,11 +94,11 @@ func TestCacheRemove(t *testing.T) {
 	value := "value"
 
 	cache := newCache()
-	cache.objects[key] = &cacheObject{
+	cache.objects[key] = cacheObject{
 		Value: value,
 	}
 	cache.Remove(key)
-	if v := cache.objects[key]; v != nil {
+	if _, ok := cache.objects[key]; ok {
 		t.Error("failed to remove key")
 	}
 }
@@ -108,11 +108,11 @@ func TestCacheClear(t *testing.T) {
 	value := "value"
 
 	cache := newCache()
-	cache.objects[key] = &cacheObject{
+	cache.objects[key] = cacheObject{
 		Value: value,
 	}
 	cache.Clear()
-	if v := cache.objects[key]; v != nil {
+	if _, ok := cache.objects[key]; ok {
 		t.Error("failed to clear cache")
 	}
 }

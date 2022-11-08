@@ -63,7 +63,7 @@ func (c *serveCommand) Execute() error {
 		return err
 	}
 
-	_, err = app.TestConfig(config)
+	_, err = app.CheckConfig(config)
 	if err != nil {
 		fmt.Printf("Failed to validate configuration: %s\n", err)
 

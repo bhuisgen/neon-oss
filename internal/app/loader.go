@@ -239,15 +239,22 @@ func (e loaderExecutor) loadSingle(ctx context.Context, rule *LoaderRuleSingle) 
 	}
 
 	rKey := replaceLoaderResourceParameters(rule.ItemTemplateResource, mItem)
-	rParams := make(map[string]string)
+
+	var rParams map[string]string
 	for rParamKey, rParamValue := range rule.ItemTemplateResourceParams {
+		if rParams == nil {
+			rParams = make(map[string]string)
+		}
 		rParamKey = replaceLoaderResourceParameters(rParamKey, mItem)
 		rParamValue = replaceLoaderResourceParameters(rParamValue, mItem)
 		rParams[rParamKey] = rParamValue
 	}
 
-	rHeaders := make(map[string]string)
+	var rHeaders map[string]string
 	for rHeaderKey, rHeaderValue := range rule.ItemTemplateResourceParams {
+		if rHeaders == nil {
+			rHeaders = make(map[string]string)
+		}
 		rHeaderKey = replaceLoaderResourceParameters(rHeaderKey, mItem)
 		rHeaderValue = replaceLoaderResourceParameters(rHeaderValue, mItem)
 		rHeaders[rHeaderKey] = rHeaderValue
@@ -259,7 +266,7 @@ func (e loaderExecutor) loadSingle(ctx context.Context, rule *LoaderRuleSingle) 
 	}
 
 	if !e.fetcher.Exists(r.Name) {
-		e.fetcher.Register(r)
+		e.fetcher.Register(*r)
 	}
 
 	err = e.fetcher.Fetch(ctx, r.Name)
@@ -304,15 +311,22 @@ func (e loaderExecutor) loadList(ctx context.Context, rule *LoaderRuleList) erro
 		}
 
 		rKey := replaceLoaderResourceParameters(rule.ItemTemplateResource, mItem)
-		rParams := make(map[string]string)
+
+		var rParams map[string]string
 		for rParamKey, rParamValue := range rule.ItemTemplateResourceParams {
+			if rParams == nil {
+				rParams = make(map[string]string)
+			}
 			rParamKey = replaceLoaderResourceParameters(rParamKey, mItem)
 			rParamValue = replaceLoaderResourceParameters(rParamValue, mItem)
 			rParams[rParamKey] = rParamValue
 		}
 
-		rHeaders := make(map[string]string)
+		var rHeaders map[string]string
 		for rHeaderKey, rHeaderValue := range rule.ItemTemplateResourceParams {
+			if rHeaders == nil {
+				rHeaders = make(map[string]string)
+			}
 			rHeaderKey = replaceLoaderResourceParameters(rHeaderKey, mItem)
 			rHeaderValue = replaceLoaderResourceParameters(rHeaderValue, mItem)
 			rHeaders[rHeaderKey] = rHeaderValue
@@ -324,7 +338,7 @@ func (e loaderExecutor) loadList(ctx context.Context, rule *LoaderRuleList) erro
 		}
 
 		if !e.fetcher.Exists(r.Name) {
-			e.fetcher.Register(r)
+			e.fetcher.Register(*r)
 		}
 
 		err = e.fetcher.Fetch(ctx, r.Name)

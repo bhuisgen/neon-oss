@@ -875,7 +875,7 @@ func TestConfigParserYAMLParse_Env(t *testing.T) {
 	}
 }
 
-func TestTestConfig(t *testing.T) {
+func TestCheckConfig(t *testing.T) {
 	type args struct {
 		c *config
 	}
@@ -2828,13 +2828,13 @@ func TestTestConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := TestConfig(tt.args.c)
+			got, err := CheckConfig(tt.args.c)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("TestConfig() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CheckConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("TestConfig() = %v, want %v", got, tt.want)
+				t.Errorf("CheckConfig() = %v, want %v", got, tt.want)
 			}
 		})
 	}

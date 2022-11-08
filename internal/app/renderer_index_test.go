@@ -5,12 +5,15 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -81,7 +84,7 @@ func (t testIndexRendererFetcher) Get(name string) ([]byte, error) {
 	return t.get[name], nil
 }
 
-func (t testIndexRendererFetcher) Register(r *Resource) {
+func (t testIndexRendererFetcher) Register(r Resource) {
 }
 
 func (t testIndexRendererFetcher) Unregister(name string) {
@@ -508,16 +511,15 @@ func TestIndexRendererRender(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *Render
+		want    *indexRender
+		wantW   string
 		wantErr bool
 	}{
 		{
 			name: "html",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:     "data/index.html",
-					Cache:    true,
-					CacheTTL: 60,
+					HTML: "data/index.html",
 				},
 				logger:  log.Default(),
 				regexps: []*regexp.Regexp{},
@@ -526,7 +528,7 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					return []byte{}, nil
+					return []byte("html"), nil
 				},
 				jsonMarshal: func(v any) ([]byte, error) {
 					return []byte{}, nil
@@ -536,6 +538,10 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "html",
 		},
 		{
 			name: "html error stat file",
@@ -596,9 +602,10 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -624,16 +631,19 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"root\"><p>test</p></div></body>",
 		},
 		{
 			name: "error bundle stat file",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:     "data/index.html",
-					Bundle:   stringPtr("data/bundle.js"),
-					Cache:    true,
-					CacheTTL: 60,
-					Timeout:  4,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -668,11 +678,10 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "error bundle read file",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:     "data/index.html",
-					Bundle:   stringPtr("data/bundle.js"),
-					Cache:    true,
-					CacheTTL: 60,
-					Timeout:  4,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -704,9 +713,10 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "error vm configure",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 4,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -732,11 +742,10 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "error vm execute",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:     "data/index.html",
-					Bundle:   stringPtr("data/bundle.js"),
-					Cache:    true,
-					CacheTTL: 60,
-					Timeout:  1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -768,9 +777,10 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle render",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -797,14 +807,19 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"root\"><p>test</p></div></body>",
 		},
 		{
 			name: "bundle redirect",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -831,14 +846,22 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Redirect:       true,
+				RedirectURL:    "http://external",
+				RedirectStatus: 302,
+			},
+			wantW: "",
 		},
 		{
 			name: "state with a named capturing group regex",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					State:     "state",
+					Timeout:   1,
 					Rules: []IndexRule{
 						{
 							Path: "/test1/(?P<slug>.+)/?",
@@ -876,21 +899,32 @@ func TestIndexRendererRender(t *testing.T) {
 					return []byte{}, nil
 				},
 				jsonMarshal: func(v any) ([]byte, error) {
-					return []byte{}, nil
+					return json.Marshal(v)
 				},
 			},
 			args: args{
 				req:  req1,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"root\"><p>test</p></div>" +
+				"<script id=\"state\" type=\"application/json\">" +
+				"{\"test1-value\":{\"loading\":false,\"error\":\"\",\"response\":" +
+				"\"{\\\"data\\\": {\\\"id\\\": 1, \\\"string\\\": \\\"test\\\", \\\"float\\\": -1.00, \\\"bool\\\": true}}\"" +
+				"}}" +
+				"</script></body>",
 		},
 		{
 			name: "state with an indexed capturing group regex",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					State:     "state",
+					Timeout:   1,
 					Rules: []IndexRule{
 						{
 							Path: "/test2/(.+)/?",
@@ -928,21 +962,32 @@ func TestIndexRendererRender(t *testing.T) {
 					return []byte{}, nil
 				},
 				jsonMarshal: func(v any) ([]byte, error) {
-					return []byte{}, nil
+					return json.Marshal(v)
 				},
 			},
 			args: args{
 				req:  req2,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"root\"><p>test</p></div>" +
+				"<script id=\"state\" type=\"application/json\">" +
+				"{\"test2-value\":{\"loading\":false,\"error\":\"\",\"response\":" +
+				"\"{\\\"data\\\": {\\\"id\\\": 1, \\\"string\\\": \\\"test\\\", \\\"float\\\": -1.00, \\\"bool\\\": true}}\"" +
+				"}}" +
+				"</script></body>",
 		},
 		{
 			name: "state without match",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					State:     "state",
+					Timeout:   1,
 					Rules: []IndexRule{
 						{
 							Path: "/test1/(.+)/?",
@@ -987,14 +1032,20 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"root\"><p>test</p></div></body>",
 		},
 		{
 			name: "state error fetcher get",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					State:     "state",
+					Timeout:   1,
 					Rules: []IndexRule{
 						{
 							Path: "/test1/(?P<slug>.+)/?",
@@ -1031,21 +1082,31 @@ func TestIndexRendererRender(t *testing.T) {
 					return []byte{}, nil
 				},
 				jsonMarshal: func(v any) ([]byte, error) {
-					return []byte{}, nil
+					return json.Marshal(v)
 				},
 			},
 			args: args{
 				req:  req1,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"root\"><p>test</p></div>" +
+				"<script id=\"state\" type=\"application/json\">" +
+				"{\"test1-value\":{\"loading\":true,\"error\":\"\",\"response\":\"\"" +
+				"}}" +
+				"</script></body>",
 		},
 		{
 			name: "state error fetcher exists",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					State:     "state",
+					Timeout:   1,
 					Rules: []IndexRule{
 						{
 							Path: "/test1/(?P<slug>.+)/?",
@@ -1081,21 +1142,31 @@ func TestIndexRendererRender(t *testing.T) {
 					return []byte{}, nil
 				},
 				jsonMarshal: func(v any) ([]byte, error) {
-					return []byte{}, nil
+					return json.Marshal(v)
 				},
 			},
 			args: args{
 				req:  req1,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"root\"><p>test</p></div>" +
+				"<script id=\"state\" type=\"application/json\">" +
+				"{\"test1-value\":{\"loading\":false,\"error\":\"unknown resource\",\"response\":\"\"" +
+				"}}" +
+				"</script></body>",
 		},
 		{
 			name: "state error json unmarshal",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
-					Timeout: 1,
+					HTML:      "data/index.html",
+					Bundle:    stringPtr("data/bundle.js"),
+					Container: "root",
+					State:     "state",
+					Timeout:   1,
 					Rules: []IndexRule{
 						{
 							Path: "/test1/(?P<slug>.+)/?",
@@ -1149,7 +1220,8 @@ func TestIndexRendererRender(t *testing.T) {
 					HTML:      "data/index.html",
 					Bundle:    stringPtr("data/bundle.js"),
 					Container: "test",
-					Timeout:   4,
+					State:     "state",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -1176,6 +1248,10 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"test\"><p>test</p></div></body>",
 		},
 		{
 			name: "bundle with title",
@@ -1183,8 +1259,8 @@ func TestIndexRendererRender(t *testing.T) {
 				config: &IndexRendererConfig{
 					HTML:      "data/index.html",
 					Bundle:    stringPtr("data/bundle.js"),
-					Container: "test",
-					Timeout:   4,
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -1196,11 +1272,11 @@ func TestIndexRendererRender(t *testing.T) {
 				},
 				osReadFile: func(name string) ([]byte, error) {
 					if name == "data/index.html" {
-						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
+						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
-							` serverResponse.setTitle("title"); })();`), nil
+							` serverResponse.setTitle("test"); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1212,6 +1288,10 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8><title>test</title></head><body><div id=\"root\"><p>test</p></div></body>",
 		},
 		{
 			name: "bundle with meta",
@@ -1219,8 +1299,8 @@ func TestIndexRendererRender(t *testing.T) {
 				config: &IndexRendererConfig{
 					HTML:      "data/index.html",
 					Bundle:    stringPtr("data/bundle.js"),
-					Container: "test",
-					Timeout:   4,
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -1232,11 +1312,11 @@ func TestIndexRendererRender(t *testing.T) {
 				},
 				osReadFile: func(name string) ([]byte, error) {
 					if name == "data/index.html" {
-						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
+						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
-							` serverResponse.setMeta("test", {"name": "test"}); })();`), nil
+							` serverResponse.setMeta("test", new Map([["name", "test"]])); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1248,6 +1328,10 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8><meta id=\"test\" name=\"test\"></head><body><div id=\"root\"><p>test</p></div></body>",
 		},
 		{
 			name: "bundle with link",
@@ -1255,8 +1339,8 @@ func TestIndexRendererRender(t *testing.T) {
 				config: &IndexRendererConfig{
 					HTML:      "data/index.html",
 					Bundle:    stringPtr("data/bundle.js"),
-					Container: "test",
-					Timeout:   4,
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -1268,11 +1352,11 @@ func TestIndexRendererRender(t *testing.T) {
 				},
 				osReadFile: func(name string) ([]byte, error) {
 					if name == "data/index.html" {
-						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
+						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
-							` serverResponse.setLink("test", {"href": "test", "rel": "test"}); })();`), nil
+							` serverResponse.setLink("test", new Map([["href", "test"],["rel", "test"]])); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1284,6 +1368,10 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8><link id=\"test\" href=\"test\" rel=\"test\"></head><body><div id=\"root\"><p>test</p></div></body>",
 		},
 		{
 			name: "bundle with script",
@@ -1291,8 +1379,8 @@ func TestIndexRendererRender(t *testing.T) {
 				config: &IndexRendererConfig{
 					HTML:      "data/index.html",
 					Bundle:    stringPtr("data/bundle.js"),
-					Container: "test",
-					Timeout:   4,
+					Container: "root",
+					Timeout:   1,
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -1304,11 +1392,11 @@ func TestIndexRendererRender(t *testing.T) {
 				},
 				osReadFile: func(name string) ([]byte, error) {
 					if name == "data/index.html" {
-						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
+						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
-							` serverResponse.setScript("test", {"type": "test", "children": "content"}); })();`), nil
+							` serverResponse.setScript("test", new Map([["type", "test"], ["children", "content"]])); })();`), nil
 					}
 					return []byte{}, nil
 				},
@@ -1320,6 +1408,10 @@ func TestIndexRendererRender(t *testing.T) {
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8><script id=\"test\" type=\"test\">content</script></head><body><div id=\"root\"><p>test</p></div></body>",
 		},
 	}
 	for _, tt := range tests {
@@ -1341,10 +1433,17 @@ func TestIndexRendererRender(t *testing.T) {
 				osReadFile:  tt.fields.osReadFile,
 				jsonMarshal: tt.fields.jsonMarshal,
 			}
-			_, err := r.render(tt.args.req, tt.args.info)
+			w := &bytes.Buffer{}
+			got, err := r.render(tt.args.req, tt.args.info, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("indexRenderer.render() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("indexRenderer.render() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("indexRenderer.render() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}
@@ -1395,7 +1494,8 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *Render
+		want    *indexRender
+		wantW   string
 		wantErr bool
 	}{
 		{
@@ -1404,10 +1504,9 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 				config: &IndexRendererConfig{
 					HTML:      "data/index.html",
 					Bundle:    stringPtr("data/bundle.js"),
-					Container: "test",
-					Cache:     true,
-					CacheTTL:  60,
-					Timeout:   4,
+					Container: "root",
+					State:     "state",
+					Timeout:   1,
 					Rules: []IndexRule{
 						{
 							Path: "/(?P<slug>.+)/?",
@@ -1432,12 +1531,12 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 				},
 				fetcher: testIndexRendererFetcher{
 					get: map[string][]byte{
-						"resource-value": []byte(`{"data": {"id": 1, "string": "test", "float": -1.00, "bool": true}}`),
+						"resource-test": []byte(`{"data": {"id": 1, "string": "test", "float": -1.00, "bool": true}}`),
 					},
 				},
 				osReadFile: func(name string) ([]byte, error) {
 					if name == "data/index.html" {
-						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
+						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
 					if name == "data/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
@@ -1445,13 +1544,22 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 					return []byte{}, nil
 				},
 				jsonMarshal: func(v any) ([]byte, error) {
-					return []byte{}, nil
+					return json.Marshal(v)
 				},
 			},
 			args: args{
 				req:  req,
 				info: &ServerInfo{},
 			},
+			want: &indexRender{
+				Status: 200,
+			},
+			wantW: "<!doctype html><head><meta charset=utf-8></head><body><div id=\"root\"><p>test</p></div>" +
+				"<script id=\"state\" type=\"application/json\">" +
+				"{\"test-test\":{\"loading\":false,\"error\":\"\",\"response\":" +
+				"\"{\\\"data\\\": {\\\"id\\\": 1, \\\"string\\\": \\\"test\\\", \\\"float\\\": -1.00, \\\"bool\\\": true}}\"" +
+				"}}" +
+				"</script></body>",
 		},
 	}
 	for _, tt := range tests {
@@ -1473,10 +1581,17 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 				osReadFile:  tt.fields.osReadFile,
 				jsonMarshal: tt.fields.jsonMarshal,
 			}
-			_, err := r.render(tt.args.req, tt.args.info)
+			w := &bytes.Buffer{}
+			got, err := r.render(tt.args.req, tt.args.info, w)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("indexRenderer.render() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("indexRenderer.render() = %v, want %v", got, tt.want)
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("indexRenderer.render() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

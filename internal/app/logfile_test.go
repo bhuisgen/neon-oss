@@ -85,11 +85,11 @@ func TestLogFileWriterClose(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &logFileWriter{
-				mutex: sync.Mutex{},
 				name:  tt.fields.name,
 				flag:  tt.fields.flag,
 				perm:  tt.fields.perm,
 				f:     tt.fields.f,
+				mutex: sync.Mutex{},
 			}
 			if err := w.Close(); (err != nil) != tt.wantErr {
 				t.Errorf("logFileWriter.Close() error = %v, wantErr %v", err, tt.wantErr)
@@ -139,11 +139,11 @@ func TestLogFileWriterReopen(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &logFileWriter{
-				mutex: sync.Mutex{},
 				name:  tt.fields.name,
 				flag:  tt.fields.flag,
 				perm:  tt.fields.perm,
 				f:     tt.fields.f,
+				mutex: sync.Mutex{},
 			}
 			if err := w.Reopen(); (err != nil) != tt.wantErr {
 				t.Errorf("logFileWriter.Reopen() error = %v, wantErr %v", err, tt.wantErr)
@@ -188,11 +188,11 @@ func TestLogFileWriterWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &logFileWriter{
-				mutex: sync.Mutex{},
 				name:  tt.fields.name,
 				flag:  tt.fields.flag,
 				perm:  tt.fields.perm,
 				f:     tt.fields.f,
+				mutex: sync.Mutex{},
 			}
 			_, err := w.Write(tt.args.p)
 			if (err != nil) != tt.wantErr {
