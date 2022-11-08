@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/google/uuid v1.3.0
 	gopkg.in/yaml.v3 v3.0.1
-	rogchap.com/v8go v0.7.0
+	rogchap.com/v8go v0.7.1-0.20221102201510-1f00b5007d95
 )
 
 require (
