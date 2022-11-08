@@ -1,0 +1,122 @@
+project_name: neon
+
+env:
+  - DOCKER_CERT_PATH={{.Env.DOCKER_CERT_PATH}}
+  - DOCKER_HOST={{.Env.DOCKER_HOST}}
+  - DOCKER_TLS_VERIFY={{.Env.DOCKER_TLS_VERIFY}}
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/exec/
+    binary: neon
+    flags:
+      - -trimpath
+    env:
+      - CGO_ENABLED=1
+    tags:
+      - netgo
+      - osusergo
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{.CommitTimestamp}}"
+    hooks:
+      post:
+        - upx "{{.Path}}"
+    overrides:
+      - goos: linux
+        goarch: amd64
+        goamd64: v1
+        ldflags:
+          - -s -w -extldflags '-static' -X app.version={{.Version}} -X app.commit={{.Commit}}
+      - goos: linux
+        goarch: arm64
+        goarm: ""
+        env:
+          - CC=aarch64-linux-gnu-gcc
+          - CXX=aarch64-linux-gnu-g++
+        ldflags:
+          - -s -w -X app.version={{.Version}} -X app.commit={{.Commit}}
+      - goos: darwin
+        goarch: amd64
+        goamd64: v1
+        env:
+          - CC=o64-clang
+          - CXX=o64-clang++
+        ldflags:
+          - -s -w -X app.version={{.Version}} -X app.commit={{.Commit}}
+      - goos: darwin
+        goarch: arm64
+        goarm: ""
+        env:
+          - CC=oa64-clang
+          - CXX=oa64-clang++
+        ldflags:
+          - -s -w -X app.version={{.Version}} -X app.commit={{.Commit}}
+
+dockers:
+  - use: buildx
+    image_templates:
+      - "{{.ProjectName}}:{{.Version}}-amd64"
+      - "{{.ProjectName}}:latest-amd64"
+    goos: linux
+    goarch: amd64
+    skip_push: true
+    build_flag_templates:
+      - "--label=maintainer=boris.huisgen@bhexpert.fr"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/bhuisgen/neon-pro"
+      - "--label=org.opencontainers.image.vendor=Boris HUISGEN"
+      - "--platform=linux/amd64"
+  - use: buildx
+    image_templates:
+      - "{{.ProjectName}}:{{.Version}}-arm64"
+      - "{{.ProjectName}}:latest-arm64"
+    goos: linux
+    goarch: arm64
+    goarm: ""
+    skip_push: true
+    build_flag_templates:
+      - "--label=maintainer=boris.huisgen@bhexpert.fr"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source=https://github.com/bhuisgen/neon-pro"
+      - "--label=org.opencontainers.image.vendor=Boris HUISGEN"
+      - "--platform=linux/arm64/v8"
+
+# docker_manifests:
+#   - name_template: "{{.ProjectName}}:{{.Version}}"
+#     image_templates:
+#       - "{{.ProjectName}}:{{.Version}}-amd64"
+#       - "{{.ProjectName}}:{{.Version}}-arm64"
+#   - name_template: "{{.ProjectName}}:latest"
+#     image_templates:
+#       - "{{.ProjectName}}:latest-amd64"
+#       - "{{.ProjectName}}:latest-arm64"
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+# modelines, feel free to remove those if you don't want/use them:
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj

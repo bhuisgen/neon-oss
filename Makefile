@@ -3,19 +3,22 @@ GIT_COMMIT = $(shell git describe --always)
 GIT_URL = $(shell git config --get remote.origin.url)
 TAG ?= dev
 
-.PHONY: all build clean init dev
-
 all: build
 
+.PHONY: build
 build: init
-	docker build --build-arg BUILD_OS=linux --build-arg BUILD_ARCH=amd64 --build-arg TAG=$(TAG) \
-		--build-arg BUILD_DATE=$(DATE) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg GIT_URL=$(GIT_URL) \
-		-t neon:$(TAG) .
+	CGO_ENABLED=1 go build -tags netgo,osusergo \
+      -ldflags "-s -w -extldflags '-static' -X main.version=${TAG} -X main.commit=${GIT_COMMIT}" \
+      -o neon cmd/exec/*.go
 
+.PHONY: clean
 clean:
 
+.PHONY: init
 init:
 
-dev:
-	docker build --build-arg BUILD_OS=linux --build-arg BUILD_ARCH=amd64 -t neon:dev -f Dockerfile.dev .
-	docker run -it --rm  --name debug $(OPTIONS) neon:dev dap --listen=:12345
+.PHONY: dist
+dist:
+	docker run --rm -v devcontainer_neon:/workspace -w /workspace/neon \
+		-e DOCKER_CERT_PATH=${DOCKER_CERT_PATH} -e DOCKER_HOST=${DOCKER_HOST} -e DOCKER_TLS_VERIFY=${DOCKER_TLS_VERIFY} \
+		bhuisgen/goreleaser-cross:v1.19.3-amd64 --snapshot --rm-dist
