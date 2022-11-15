@@ -34,6 +34,14 @@ func floatPtr(f float32) *float32 {
 	return &f
 }
 
+func sliceStringPtr(ss []string) *[]string {
+	return &ss
+}
+
+func sliceIntPtr(si []int) *[]int {
+	return &si
+}
+
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
@@ -148,8 +156,6 @@ func TestConfigParserYAMLParse(t *testing.T) {
 									Rules []struct {
 										Path   string            "yaml:\"path\""
 										Set    map[string]string "yaml:\"set,omitempty\""
-										Add    map[string]string "yaml:\"add,omitempty\""
-										Remove []string          "yaml:\"remove,omitempty\""
 										Last   *bool             "yaml:\"last,omitempty\""
 									} "yaml:\"rules\""
 								}{},
@@ -192,6 +198,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 												ResourcePayloadItems       string   "yaml:\"resource_payload_items\""
 												ResourcePayloadItemLoc     string   "yaml:\"resource_payload_item_loc\""
 												ResourcePayloadItemLastmod *string  "yaml:\"resource_payload_item_lastmod,omitempty\""
+												ResourcePayloadItemIgnore  *string  "yaml:\"resource_payload_item_ignore,omitempty\""
 												Changefreq                 *string  "yaml:\"changefreq,omitempty\""
 												Priority                   *float32 "yaml:\"priority,omitempty\""
 											} "yaml:\"list,omitempty\""
@@ -280,37 +287,21 @@ func TestConfigParserYAMLParse(t *testing.T) {
 								},
 								Header: &struct {
 									Rules []struct {
-										Path   string            "yaml:\"path\""
-										Set    map[string]string "yaml:\"set,omitempty\""
-										Add    map[string]string "yaml:\"add,omitempty\""
-										Remove []string          "yaml:\"remove,omitempty\""
-										Last   *bool             "yaml:\"last,omitempty\""
+										Path string            "yaml:\"path\""
+										Set  map[string]string "yaml:\"set,omitempty\""
+										Last *bool             "yaml:\"last,omitempty\""
 									} "yaml:\"rules\""
 								}{
 									Rules: []struct {
-										Path   string            "yaml:\"path\""
-										Set    map[string]string "yaml:\"set,omitempty\""
-										Add    map[string]string "yaml:\"add,omitempty\""
-										Remove []string          "yaml:\"remove,omitempty\""
-										Last   *bool             "yaml:\"last,omitempty\""
+										Path string            "yaml:\"path\""
+										Set  map[string]string "yaml:\"set,omitempty\""
+										Last *bool             "yaml:\"last,omitempty\""
 									}{
 										{
 											Path: "/.*",
 											Set: map[string]string{
 												"header1": "test1",
 											},
-											Remove: []string{"header3"},
-										},
-										{
-											Path: "/",
-											Add: map[string]string{
-												"header2": "test2",
-											},
-										},
-										{
-											Path:   "/",
-											Remove: []string{"header3"},
-											Last:   boolPtr(true),
 										},
 									},
 								},
@@ -318,7 +309,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 									Dir   string "yaml:\"dir\""
 									Index *bool  "yaml:\"index,omitempty\""
 								}{
-									Dir:   "/data/static",
+									Dir:   "/dist/static",
 									Index: boolPtr(false),
 								},
 								Robots: &struct {
@@ -362,6 +353,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 												ResourcePayloadItems       string   "yaml:\"resource_payload_items\""
 												ResourcePayloadItemLoc     string   "yaml:\"resource_payload_item_loc\""
 												ResourcePayloadItemLastmod *string  "yaml:\"resource_payload_item_lastmod,omitempty\""
+												ResourcePayloadItemIgnore  *string  "yaml:\"resource_payload_item_ignore,omitempty\""
 												Changefreq                 *string  "yaml:\"changefreq,omitempty\""
 												Priority                   *float32 "yaml:\"priority,omitempty\""
 											} "yaml:\"list,omitempty\""
@@ -395,6 +387,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 												ResourcePayloadItems       string   "yaml:\"resource_payload_items\""
 												ResourcePayloadItemLoc     string   "yaml:\"resource_payload_item_loc\""
 												ResourcePayloadItemLastmod *string  "yaml:\"resource_payload_item_lastmod,omitempty\""
+												ResourcePayloadItemIgnore  *string  "yaml:\"resource_payload_item_ignore,omitempty\""
 												Changefreq                 *string  "yaml:\"changefreq,omitempty\""
 												Priority                   *float32 "yaml:\"priority,omitempty\""
 											} "yaml:\"list,omitempty\""
@@ -438,6 +431,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 													ResourcePayloadItems       string   "yaml:\"resource_payload_items\""
 													ResourcePayloadItemLoc     string   "yaml:\"resource_payload_item_loc\""
 													ResourcePayloadItemLastmod *string  "yaml:\"resource_payload_item_lastmod,omitempty\""
+													ResourcePayloadItemIgnore  *string  "yaml:\"resource_payload_item_ignore,omitempty\""
 													Changefreq                 *string  "yaml:\"changefreq,omitempty\""
 													Priority                   *float32 "yaml:\"priority,omitempty\""
 												} "yaml:\"list,omitempty\""
@@ -465,6 +459,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 														ResourcePayloadItems       string   "yaml:\"resource_payload_items\""
 														ResourcePayloadItemLoc     string   "yaml:\"resource_payload_item_loc\""
 														ResourcePayloadItemLastmod *string  "yaml:\"resource_payload_item_lastmod,omitempty\""
+														ResourcePayloadItemIgnore  *string  "yaml:\"resource_payload_item_ignore,omitempty\""
 														Changefreq                 *string  "yaml:\"changefreq,omitempty\""
 														Priority                   *float32 "yaml:\"priority,omitempty\""
 													}{
@@ -500,8 +495,8 @@ func TestConfigParserYAMLParse(t *testing.T) {
 										Last *bool "yaml:\"last,omitempty\""
 									} "yaml:\"rules\""
 								}{
-									HTML:      "data/index.html",
-									Bundle:    stringPtr("data/bundle.js"),
+									HTML:      "dist/index.html",
+									Bundle:    stringPtr("dist/bundle.js"),
 									Env:       stringPtr("test"),
 									Container: stringPtr("root"),
 									State:     stringPtr("state"),
@@ -555,7 +550,7 @@ func TestConfigParserYAMLParse(t *testing.T) {
 									Cache      *bool  "yaml:\"cache,omitempty\""
 									CacheTTL   *int   "yaml:\"cache_ttl,omitempty\""
 								}{
-									File:       "data/default.html",
+									File:       "dist/default.html",
 									StatusCode: intPtr(200),
 									Cache:      boolPtr(false),
 									CacheTTL:   intPtr(60),
@@ -567,8 +562,6 @@ func TestConfigParserYAMLParse(t *testing.T) {
 							RequestTLSCertFile: stringPtr("cert.pem"),
 							RequestTLSKeyFile:  stringPtr("key.pem"),
 							RequestTimeout:     intPtr(10),
-							RequestRetry:       intPtr(3),
-							RequestDelay:       intPtr(4),
 							Resources: []struct {
 								Name    string            "yaml:\"name\""
 								Method  string            "yaml:\"method\""
@@ -772,8 +765,6 @@ func TestConfigParserYAMLParse_Env(t *testing.T) {
 									Rules []struct {
 										Path   string            "yaml:\"path\""
 										Set    map[string]string "yaml:\"set,omitempty\""
-										Add    map[string]string "yaml:\"add,omitempty\""
-										Remove []string          "yaml:\"remove,omitempty\""
 										Last   *bool             "yaml:\"last,omitempty\""
 									} "yaml:\"rules\""
 								}{},
@@ -816,6 +807,7 @@ func TestConfigParserYAMLParse_Env(t *testing.T) {
 												ResourcePayloadItems       string   "yaml:\"resource_payload_items\""
 												ResourcePayloadItemLoc     string   "yaml:\"resource_payload_item_loc\""
 												ResourcePayloadItemLastmod *string  "yaml:\"resource_payload_item_lastmod,omitempty\""
+												ResourcePayloadItemIgnore  *string  "yaml:\"resource_payload_item_ignore,omitempty\""
 												Changefreq                 *string  "yaml:\"changefreq,omitempty\""
 												Priority                   *float32 "yaml:\"priority,omitempty\""
 											} "yaml:\"list,omitempty\""
@@ -1241,7 +1233,7 @@ func TestCheckConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Static: &StaticRendererConfig{
-									Dir: "data/static",
+									Dir: "dist/static",
 								},
 							},
 						},
@@ -1914,7 +1906,7 @@ func TestCheckConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:      "/data/index.html",
+									HTML:      "/dist/index.html",
 									Env:       configDefaultServerIndexEnv,
 									Container: configDefaultServerIndexContainer,
 									State:     configDefaultServerIndexState,
@@ -2009,8 +2001,8 @@ func TestCheckConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:      "data/html/",
-									Bundle:    stringPtr("data/bundle/"),
+									HTML:      "dist/html/",
+									Bundle:    stringPtr("dist/bundle/"),
 									Env:       configDefaultServerIndexEnv,
 									Container: configDefaultServerIndexContainer,
 									State:     configDefaultServerIndexState,
@@ -2041,8 +2033,8 @@ func TestCheckConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:      "/data/index.html",
-									Bundle:    stringPtr("/data/bundle.js"),
+									HTML:      "/dist/index.html",
+									Bundle:    stringPtr("/dist/bundle.js"),
 									Env:       configDefaultServerIndexEnv,
 									Container: configDefaultServerIndexContainer,
 									State:     configDefaultServerIndexState,
@@ -2081,8 +2073,8 @@ func TestCheckConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Index: &IndexRendererConfig{
-									HTML:      "/data/index.html",
-									Bundle:    stringPtr("/data/bundle.js"),
+									HTML:      "/dist/index.html",
+									Bundle:    stringPtr("/dist/bundle.js"),
 									Env:       configDefaultServerIndexEnv,
 									Container: configDefaultServerIndexContainer,
 									State:     configDefaultServerIndexState,
@@ -2123,7 +2115,7 @@ func TestCheckConfig(t *testing.T) {
 						{
 							Renderer: &ServerRendererConfig{
 								Default: &DefaultRendererConfig{
-									File:       "/data/default.html",
+									File:       "/dist/default.html",
 									StatusCode: configDefaultServerDefaultStatusCode,
 								},
 							},
@@ -2323,8 +2315,6 @@ func TestCheckConfig(t *testing.T) {
 					},
 					Fetcher: &FetcherConfig{
 						RequestTimeout: -1,
-						RequestRetry:   -1,
-						RequestDelay:   -1,
 					},
 					osStat: func(name string) (fs.FileInfo, error) {
 						return testConfigFileInfo{isDir: true}, nil
@@ -2333,8 +2323,6 @@ func TestCheckConfig(t *testing.T) {
 			},
 			want: []string{
 				"fetcher: option 'request_timeout', invalid/missing value",
-				"fetcher: option 'request_retry', invalid/missing value",
-				"fetcher: option 'request_delay', invalid/missing value",
 			},
 			wantErr: true,
 		},

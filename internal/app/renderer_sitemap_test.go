@@ -12,11 +12,12 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"text/template"
 )
 
 type testSitemapRendererNextRenderer struct{}
 
-func (r testSitemapRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r testSitemapRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 }
 
 func (r testSitemapRendererNextRenderer) Next(renderer Renderer) {
@@ -114,12 +115,14 @@ func TestCreateSitemapRenderer(t *testing.T) {
 
 func TestSitemapRendererHandle(t *testing.T) {
 	type fields struct {
-		config     *SitemapRendererConfig
-		logger     *log.Logger
-		bufferPool BufferPool
-		cache      Cache
-		fetcher    Fetcher
-		next       Renderer
+		config               *SitemapRendererConfig
+		logger               *log.Logger
+		templateSitemapIndex *template.Template
+		templateSitemap      *template.Template
+		bufferPool           BufferPool
+		cache                Cache
+		fetcher              Fetcher
+		next                 Renderer
 	}
 	type args struct {
 		w    http.ResponseWriter
@@ -152,10 +155,12 @@ func TestSitemapRendererHandle(t *testing.T) {
 						},
 					},
 				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				cache:      newCache(),
-				next:       testSitemapRendererNextRenderer{},
+				logger:               log.Default(),
+				templateSitemapIndex: template.Must(template.New("sitemap_index").Parse(sitemapTemplateSitemapIndex)),
+				templateSitemap:      template.Must(template.New("sitemap").Parse(sitemapTemplateSitemap)),
+				bufferPool:           newBufferPool(),
+				cache:                newCache(),
+				next:                 testSitemapRendererNextRenderer{},
 			},
 			args: args{
 				w: testSitemapRendererResponseWriter{},
@@ -188,10 +193,12 @@ func TestSitemapRendererHandle(t *testing.T) {
 						},
 					},
 				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				cache:      newCache(),
-				next:       testSitemapRendererNextRenderer{},
+				logger:               log.Default(),
+				templateSitemapIndex: template.Must(template.New("sitemap_index").Parse(sitemapTemplateSitemapIndex)),
+				templateSitemap:      template.Must(template.New("sitemap").Parse(sitemapTemplateSitemap)),
+				bufferPool:           newBufferPool(),
+				cache:                newCache(),
+				next:                 testSitemapRendererNextRenderer{},
 			},
 			args: args{
 				w: testSitemapRendererResponseWriter{},
@@ -226,10 +233,12 @@ func TestSitemapRendererHandle(t *testing.T) {
 						},
 					},
 				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				cache:      newCache(),
-				next:       testSitemapRendererNextRenderer{},
+				logger:               log.Default(),
+				templateSitemapIndex: template.Must(template.New("sitemap_index").Parse(sitemapTemplateSitemapIndex)),
+				templateSitemap:      template.Must(template.New("sitemap").Parse(sitemapTemplateSitemap)),
+				bufferPool:           newBufferPool(),
+				cache:                newCache(),
+				next:                 testSitemapRendererNextRenderer{},
 			},
 			args: args{
 				w: testSitemapRendererResponseWriter{},
@@ -262,10 +271,12 @@ func TestSitemapRendererHandle(t *testing.T) {
 						},
 					},
 				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				cache:      newCache(),
-				next:       testSitemapRendererNextRenderer{},
+				logger:               log.Default(),
+				templateSitemapIndex: template.Must(template.New("sitemap_index").Parse(sitemapTemplateSitemapIndex)),
+				templateSitemap:      template.Must(template.New("sitemap").Parse(sitemapTemplateSitemap)),
+				bufferPool:           newBufferPool(),
+				cache:                newCache(),
+				next:                 testSitemapRendererNextRenderer{},
 			},
 			args: args{
 				w: testSitemapRendererResponseWriter{},
@@ -281,12 +292,14 @@ func TestSitemapRendererHandle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &sitemapRenderer{
-				config:     tt.fields.config,
-				logger:     tt.fields.logger,
-				bufferPool: tt.fields.bufferPool,
-				cache:      tt.fields.cache,
-				fetcher:    tt.fields.fetcher,
-				next:       tt.fields.next,
+				config:               tt.fields.config,
+				logger:               tt.fields.logger,
+				templateSitemapIndex: tt.fields.templateSitemapIndex,
+				templateSitemap:      tt.fields.templateSitemap,
+				bufferPool:           tt.fields.bufferPool,
+				cache:                tt.fields.cache,
+				fetcher:              tt.fields.fetcher,
+				next:                 tt.fields.next,
 			}
 			r.Handle(tt.args.w, tt.args.req, tt.args.info)
 		})
@@ -295,12 +308,14 @@ func TestSitemapRendererHandle(t *testing.T) {
 
 func TestSitemapRendererNext(t *testing.T) {
 	type fields struct {
-		config     *SitemapRendererConfig
-		logger     *log.Logger
-		bufferPool BufferPool
-		cache      Cache
-		fetcher    Fetcher
-		next       Renderer
+		config               *SitemapRendererConfig
+		logger               *log.Logger
+		templateSitemapIndex *template.Template
+		templateSitemap      *template.Template
+		bufferPool           BufferPool
+		cache                Cache
+		fetcher              Fetcher
+		next                 Renderer
 	}
 	type args struct {
 		renderer Renderer
@@ -317,12 +332,14 @@ func TestSitemapRendererNext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &sitemapRenderer{
-				config:     tt.fields.config,
-				logger:     tt.fields.logger,
-				bufferPool: tt.fields.bufferPool,
-				cache:      tt.fields.cache,
-				fetcher:    tt.fields.fetcher,
-				next:       tt.fields.next,
+				config:               tt.fields.config,
+				logger:               tt.fields.logger,
+				templateSitemapIndex: tt.fields.templateSitemapIndex,
+				templateSitemap:      tt.fields.templateSitemap,
+				bufferPool:           tt.fields.bufferPool,
+				cache:                tt.fields.cache,
+				fetcher:              tt.fields.fetcher,
+				next:                 tt.fields.next,
 			}
 			r.Next(tt.args.renderer)
 		})
@@ -335,12 +352,14 @@ func TestSitemapRendererRender(t *testing.T) {
 	}
 
 	type fields struct {
-		config     *SitemapRendererConfig
-		logger     *log.Logger
-		bufferPool BufferPool
-		cache      Cache
-		fetcher    Fetcher
-		next       Renderer
+		config               *SitemapRendererConfig
+		logger               *log.Logger
+		templateSitemapIndex *template.Template
+		templateSitemap      *template.Template
+		bufferPool           BufferPool
+		cache                Cache
+		fetcher              Fetcher
+		next                 Renderer
 	}
 	type args struct {
 		routeIndex int
@@ -374,10 +393,11 @@ func TestSitemapRendererRender(t *testing.T) {
 						},
 					},
 				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				cache:      newCache(),
-				fetcher:    &testSitemapRendererFetcher{},
+				logger:               log.Default(),
+				templateSitemapIndex: template.Must(template.New("sitemap_index").Parse(sitemapTemplateSitemapIndex)),
+				bufferPool:           newBufferPool(),
+				cache:                newCache(),
+				fetcher:              &testSitemapRendererFetcher{},
 			},
 			args: args{
 				routeIndex: 0,
@@ -419,10 +439,11 @@ func TestSitemapRendererRender(t *testing.T) {
 						},
 					},
 				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				cache:      newCache(),
-				fetcher:    &testSitemapRendererFetcher{},
+				logger:          log.Default(),
+				templateSitemap: template.Must(template.New("sitemap").Parse(sitemapTemplateSitemap)),
+				bufferPool:      newBufferPool(),
+				cache:           newCache(),
+				fetcher:         &testSitemapRendererFetcher{},
 			},
 			args: args{
 				routeIndex: 0,
@@ -462,6 +483,7 @@ func TestSitemapRendererRender(t *testing.T) {
 										ResourcePayloadItems:       "data",
 										ResourcePayloadItemLoc:     "loc",
 										ResourcePayloadItemLastmod: stringPtr("lastmod"),
+										ResourcePayloadItemIgnore:  stringPtr("ignore"),
 										Changefreq:                 stringPtr("daily"),
 										Priority:                   floatPtr(0.5),
 									},
@@ -470,23 +492,30 @@ func TestSitemapRendererRender(t *testing.T) {
 						},
 					},
 				},
-				logger:     log.Default(),
-				bufferPool: newBufferPool(),
-				cache:      newCache(),
+				logger:          log.Default(),
+				templateSitemap: template.Must(template.New("sitemap").Parse(sitemapTemplateSitemap)),
+				bufferPool:      newBufferPool(),
+				cache:           newCache(),
 				fetcher: &testSitemapRendererFetcher{
 					get: []byte(`{"data": [
-		{
-			"id": 1,
-			"loc": "/item1",
-			"lastmod": "2022-10-15T12:00:00.000Z"
-		},
-		{
-			"id": 2,
-			"loc": "/item2",
-			"lastmod": "2022-10-14T12:00:00.000Z"
-		}
-	]
-}`),
+								{
+									"id": 1,
+									"loc": "/item1",
+									"lastmod": "2022-10-15T12:00:00.000Z"
+								},
+								{
+									"id": 2,
+									"loc": "/item2",
+									"lastmod": "2022-10-14T12:00:00.000Z"
+								},
+								{
+									"id": 3,
+									"loc": "/item3",
+									"lastmod": "2022-10-14T12:00:00.000Z",
+									"ignore": true
+								}
+							]
+						}`),
 				},
 			},
 			args: args{
@@ -519,12 +548,14 @@ func TestSitemapRendererRender(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &sitemapRenderer{
-				config:     tt.fields.config,
-				logger:     tt.fields.logger,
-				bufferPool: tt.fields.bufferPool,
-				cache:      tt.fields.cache,
-				fetcher:    tt.fields.fetcher,
-				next:       tt.fields.next,
+				config:               tt.fields.config,
+				logger:               tt.fields.logger,
+				templateSitemapIndex: tt.fields.templateSitemapIndex,
+				templateSitemap:      tt.fields.templateSitemap,
+				bufferPool:           tt.fields.bufferPool,
+				cache:                tt.fields.cache,
+				fetcher:              tt.fields.fetcher,
+				next:                 tt.fields.next,
 			}
 			w := &bytes.Buffer{}
 			if err := r.render(tt.args.routeIndex, tt.args.req, w); (err != nil) != tt.wantErr {

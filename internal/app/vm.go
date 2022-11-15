@@ -189,15 +189,15 @@ func newVM() *vm {
 			r := []byte(args[0].String())
 			v.data.render = &r
 
-				status := http.StatusOK
+			status := http.StatusOK
 			if len(args) > 1 && args[1].IsNumber() {
-					code, err := strconv.Atoi(args[1].String())
-					if err != nil || code < 100 || code > 599 {
-						code = http.StatusInternalServerError
-					}
-					status = code
+				code, err := strconv.Atoi(args[1].String())
+				if err != nil || code < 100 || code > 599 {
+					code = http.StatusInternalServerError
 				}
-				v.data.status = &status
+				status = code
+			}
+			v.data.status = &status
 
 			return nil
 		}))
@@ -209,20 +209,20 @@ func newVM() *vm {
 				return nil
 			}
 
-				redirect := true
-				redirectURL := args[0].String()
-				v.data.redirect = &redirect
-				v.data.redirectURL = &redirectURL
+			redirect := true
+			redirectURL := args[0].String()
+			v.data.redirect = &redirect
+			v.data.redirectURL = &redirectURL
 
-				redirectStatus := http.StatusFound
+			redirectStatus := http.StatusFound
 			if len(args) > 1 && args[1].IsNumber() {
-					code, err := strconv.Atoi(args[1].String())
-					if err != nil || code < 100 || code > 599 {
-						code = http.StatusInternalServerError
-					}
-					redirectStatus = code
+				code, err := strconv.Atoi(args[1].String())
+				if err != nil || code < 100 || code > 599 {
+					code = http.StatusInternalServerError
 				}
-				v.data.redirectStatus = &redirectStatus
+				redirectStatus = code
+			}
+			v.data.redirectStatus = &redirectStatus
 
 			return nil
 		}))
@@ -234,13 +234,13 @@ func newVM() *vm {
 				return nil
 			}
 
-				key := args[0].String()
-				value := args[1].String()
+			key := args[0].String()
+			value := args[1].String()
 
-				if v.data.headers == nil {
-					v.data.headers = make(map[string]string)
-				}
-				v.data.headers[key] = value
+			if v.data.headers == nil {
+				v.data.headers = make(map[string]string)
+			}
+			v.data.headers[key] = value
 
 			return nil
 		}))
@@ -252,8 +252,8 @@ func newVM() *vm {
 				return nil
 			}
 
-				title := args[0].String()
-				v.data.title = &title
+			title := args[0].String()
+			v.data.title = &title
 
 			return nil
 		}))
@@ -265,18 +265,18 @@ func newVM() *vm {
 				return nil
 			}
 
-				id := args[0].String()
+			id := args[0].String()
 			attributes, err := args[1].AsObject()
 			if err != nil {
 				return nil
-				}
+			}
 
 			e := newDOMElement(id)
 
 			entries, err := attributes.MethodCall("entries")
 			if err != nil {
 				return nil
-					}
+			}
 			iterator, err := entries.AsObject()
 			if err != nil {
 				return nil
@@ -331,27 +331,27 @@ func newVM() *vm {
 				return nil
 			}
 
-				id := args[0].String()
+			id := args[0].String()
 			attributes, err := args[1].AsObject()
 			if err != nil {
 				return nil
-				}
+			}
 
 			e := newDOMElement(id)
 
 			entries, err := attributes.MethodCall("entries")
 			if err != nil {
 				return nil
-					}
+			}
 			iterator, err := entries.AsObject()
 			if err != nil {
 				return nil
-				}
+			}
 			for {
 				next, err := iterator.MethodCall("next")
 				if err != nil {
 					return nil
-			}
+				}
 				iteration, err := next.AsObject()
 				if err != nil {
 					return nil
@@ -397,18 +397,18 @@ func newVM() *vm {
 				return nil
 			}
 
-				id := args[0].String()
+			id := args[0].String()
 			attributes, err := args[1].AsObject()
 			if err != nil {
 				return nil
-				}
+			}
 
 			e := newDOMElement(id)
 
 			entries, err := attributes.MethodCall("entries")
 			if err != nil {
 				return nil
-					}
+			}
 			iterator, err := entries.AsObject()
 			if err != nil {
 				return nil

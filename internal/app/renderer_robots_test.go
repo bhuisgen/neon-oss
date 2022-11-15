@@ -10,11 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"text/template"
 )
 
 type testRobotsRendererNextRenderer struct{}
 
-func (r testRobotsRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r testRobotsRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 }
 
 func (r testRobotsRendererNextRenderer) Next(renderer Renderer) {
@@ -66,6 +67,7 @@ func TestRobotsRendererHandle(t *testing.T) {
 	type fields struct {
 		config     *RobotsRendererConfig
 		logger     *log.Logger
+		template   *template.Template
 		bufferPool BufferPool
 		cache      Cache
 		next       Renderer
@@ -87,6 +89,7 @@ func TestRobotsRendererHandle(t *testing.T) {
 					Path: "/robots.txt",
 				},
 				logger:     log.Default(),
+				template:   template.Must(template.New("robots").Parse(robotsTemplate)),
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 				next:       testRobotsRendererNextRenderer{},
@@ -110,6 +113,7 @@ func TestRobotsRendererHandle(t *testing.T) {
 					CacheTTL: 60,
 				},
 				logger:     log.Default(),
+				template:   template.Must(template.New("robots").Parse(robotsTemplate)),
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 			},
@@ -130,6 +134,7 @@ func TestRobotsRendererHandle(t *testing.T) {
 					Path: "/robots.txt",
 				},
 				logger:     log.Default(),
+				template:   template.Must(template.New("robots").Parse(robotsTemplate)),
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 				next:       testRobotsRendererNextRenderer{},
@@ -150,6 +155,7 @@ func TestRobotsRendererHandle(t *testing.T) {
 			r := &robotsRenderer{
 				config:     tt.fields.config,
 				logger:     tt.fields.logger,
+				template:   tt.fields.template,
 				bufferPool: tt.fields.bufferPool,
 				cache:      tt.fields.cache,
 				next:       tt.fields.next,
@@ -161,9 +167,11 @@ func TestRobotsRendererHandle(t *testing.T) {
 
 func TestRobotsRendererNext(t *testing.T) {
 	type fields struct {
-		config *RobotsRendererConfig
-		logger *log.Logger
-		next   Renderer
+		config     *RobotsRendererConfig
+		logger     *log.Logger
+		template   *template.Template
+		bufferPool BufferPool
+		next       Renderer
 	}
 	type args struct {
 		renderer Renderer
@@ -180,9 +188,11 @@ func TestRobotsRendererNext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &robotsRenderer{
-				config: tt.fields.config,
-				logger: tt.fields.logger,
-				next:   tt.fields.next,
+				config:     tt.fields.config,
+				logger:     tt.fields.logger,
+				template:   tt.fields.template,
+				bufferPool: tt.fields.bufferPool,
+				next:       tt.fields.next,
 			}
 			r.Next(tt.args.renderer)
 		})
@@ -197,6 +207,7 @@ func TestRobotsRendererRender(t *testing.T) {
 	type fields struct {
 		config     *RobotsRendererConfig
 		logger     *log.Logger
+		template   *template.Template
 		bufferPool BufferPool
 		cache      Cache
 		next       Renderer
@@ -218,6 +229,7 @@ func TestRobotsRendererRender(t *testing.T) {
 					Path: "/robots.txt",
 				},
 				logger:     log.Default(),
+				template:   template.Must(template.New("robots").Parse(robotsTemplate)),
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 			},
@@ -228,7 +240,9 @@ func TestRobotsRendererRender(t *testing.T) {
 					},
 				},
 			},
-			wantW: "User-agent: *\nDisallow: /\n",
+			wantW: `User-agent: *
+Disallow: /
+`,
 		},
 		{
 			name: "allow host",
@@ -238,6 +252,7 @@ func TestRobotsRendererRender(t *testing.T) {
 					Hosts: []string{"localhost", "test"},
 				},
 				logger:     log.Default(),
+				template:   template.Must(template.New("robots").Parse(robotsTemplate)),
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 			},
@@ -249,7 +264,9 @@ func TestRobotsRendererRender(t *testing.T) {
 					},
 				},
 			},
-			wantW: "User-agent: *\nAllow: /\n",
+			wantW: `User-agent: *
+Allow: /
+`,
 		},
 		{
 			name: "disallow host",
@@ -259,6 +276,7 @@ func TestRobotsRendererRender(t *testing.T) {
 					Hosts: []string{"localhost"},
 				},
 				logger:     log.Default(),
+				template:   template.Must(template.New("robots").Parse(robotsTemplate)),
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 			},
@@ -270,7 +288,9 @@ func TestRobotsRendererRender(t *testing.T) {
 					},
 				},
 			},
-			wantW: "User-agent: *\nDisallow: /\n",
+			wantW: `User-agent: *
+Disallow: /
+`,
 		},
 		{
 			name: "sitemap",
@@ -278,9 +298,10 @@ func TestRobotsRendererRender(t *testing.T) {
 				config: &RobotsRendererConfig{
 					Path:     "/robots.txt",
 					Hosts:    []string{"localhost"},
-					Sitemaps: []string{"http://localhost/sitemap.xml"},
+					Sitemaps: []string{"http://localhost/sitemap1.xml", "http://localhost/sitemap2.xml"},
 				},
 				logger:     log.Default(),
+				template:   template.Must(template.New("robots").Parse(robotsTemplate)),
 				bufferPool: newBufferPool(),
 				cache:      newCache(),
 			},
@@ -292,7 +313,12 @@ func TestRobotsRendererRender(t *testing.T) {
 					},
 				},
 			},
-			wantW: "User-agent: *\nAllow: /\n\nSitemap: http://localhost/sitemap.xml\n",
+			wantW: `User-agent: *
+Allow: /
+
+Sitemap: http://localhost/sitemap1.xml
+Sitemap: http://localhost/sitemap2.xml
+`,
 		},
 	}
 	for _, tt := range tests {
@@ -300,6 +326,7 @@ func TestRobotsRendererRender(t *testing.T) {
 			r := &robotsRenderer{
 				config:     tt.fields.config,
 				logger:     tt.fields.logger,
+				template:   tt.fields.template,
 				bufferPool: tt.fields.bufferPool,
 				cache:      tt.fields.cache,
 				next:       tt.fields.next,

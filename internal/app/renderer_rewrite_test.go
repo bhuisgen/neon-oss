@@ -14,7 +14,7 @@ import (
 
 type testRewriteRendererNextRenderer struct{}
 
-func (r testRewriteRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r testRewriteRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 }
 
 func (r testRewriteRendererNextRenderer) Next(renderer Renderer) {

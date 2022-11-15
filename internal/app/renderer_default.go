@@ -58,7 +58,7 @@ func CreateDefaultRenderer(config *DefaultRendererConfig) (*defaultRenderer, err
 }
 
 // Handle implements the renderer
-func (r *defaultRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r *defaultRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 	if r.config.Cache {
 		obj := r.cache.Get(req.URL.Path)
 		if obj != nil {

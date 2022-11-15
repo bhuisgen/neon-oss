@@ -150,7 +150,7 @@ func (r *indexRenderer) initialize() error {
 }
 
 // Handle implements the renderer
-func (r *indexRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r *indexRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 	if r.config.Cache {
 		obj := r.cache.Get(req.URL.Path)
 		if obj != nil {
@@ -181,7 +181,7 @@ func (r *indexRenderer) Handle(w http.ResponseWriter, req *http.Request, info *S
 	b := r.bufferPool.Get()
 	defer r.bufferPool.Put(b)
 
-	result, err := r.render(req, info, b)
+	result, err := r.render(req, i, b)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte{})

@@ -5,7 +5,8 @@
 package app
 
 var (
-	Name    string = "Neon"
+	Name    string = "neon"
 	Version string = "dev"
-	Commit  string = "HEAD"
+	Commit  string = ""
+	Date    string = ""
 )

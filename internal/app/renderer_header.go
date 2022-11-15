@@ -66,7 +66,7 @@ func (r *headerRenderer) initialize() error {
 }
 
 // Handle implements the renderer
-func (r *headerRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r *headerRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 	for index, regexp := range r.regexps {
 		if regexp.MatchString(req.URL.Path) {
 			for k, v := range r.config.Rules[index].Set {
@@ -78,7 +78,7 @@ func (r *headerRenderer) Handle(w http.ResponseWriter, req *http.Request, info *
 		}
 	}
 
-	r.next.Handle(w, req, info)
+	r.next.Handle(w, req, i)
 }
 
 // Next configures the next renderer

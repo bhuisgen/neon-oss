@@ -70,7 +70,7 @@ func (r *rewriteRenderer) initialize() error {
 }
 
 // Handle implements the renderer
-func (r *rewriteRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r *rewriteRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 	var rewrite bool
 	var path string = req.URL.Path
 	var status int = http.StatusFound
@@ -109,7 +109,7 @@ func (r *rewriteRenderer) Handle(w http.ResponseWriter, req *http.Request, info 
 		req.URL.Path = path
 	}
 
-	r.next.Handle(w, req, info)
+	r.next.Handle(w, req, i)
 }
 
 // Next configures the next renderer

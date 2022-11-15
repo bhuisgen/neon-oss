@@ -5,24 +5,29 @@
 package app
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"text/template"
 	"time"
 )
 
 // sitemapRenderer implements the sitemap renderer
 type sitemapRenderer struct {
-	config     *SitemapRendererConfig
-	logger     *log.Logger
-	bufferPool BufferPool
-	cache      Cache
-	fetcher    Fetcher
-	next       Renderer
+	config               *SitemapRendererConfig
+	logger               *log.Logger
+	templateSitemapIndex *template.Template
+	templateSitemap      *template.Template
+	bufferPool           BufferPool
+	cache                Cache
+	fetcher              Fetcher
+	next                 Renderer
 }
 
 // SitemapRendererConfig implements the sitemap renderer configuration
@@ -75,6 +80,7 @@ type SitemapEntryList struct {
 	ResourcePayloadItems       string
 	ResourcePayloadItemLoc     string
 	ResourcePayloadItemLastmod *string
+	ResourcePayloadItemIgnore  *string
 	Changefreq                 *string
 	Priority                   *float32
 }
@@ -83,6 +89,29 @@ type SitemapEntryList struct {
 type sitemapRender struct {
 	Body   []byte
 	Status int
+}
+
+// sitemapTemplateSitemapIndexData implements the sitemap index template data
+type sitemapTemplateSitemapIndexData struct {
+	Items []sitemapTemplateSitemapIndexItem
+}
+
+// sitemapTemplateSitemapIndexItem implements a sitemap index template item
+type sitemapTemplateSitemapIndexItem struct {
+	Loc string
+}
+
+// sitemapTemplateSitemapData implements the sitemap template data
+type sitemapTemplateSitemapData struct {
+	Items []sitemapTemplateSitemapItem
+}
+
+// sitemapTemplateSitemapIndexEntry implements a sitemap template item
+type sitemapTemplateSitemapItem struct {
+	Loc        string
+	Lastmod    string
+	Changefreq string
+	Priority   string
 }
 
 const (
@@ -101,19 +130,38 @@ const (
 	sitemapChangefreqNever             string = "never"
 )
 
+var (
+	//go:embed templates/sitemap/sitemapindex.xml.tmpl
+	sitemapTemplateSitemapIndex string
+	//go:embed templates/sitemap/sitemap.xml.tmpl
+	sitemapTemplateSitemap string
+)
+
 // CreateSitemapRenderer creates a new sitemap renderer
 func CreateSitemapRenderer(config *SitemapRendererConfig, fetcher Fetcher) (*sitemapRenderer, error) {
+	templateSitemapIndex, err := template.New("sitemap_index").Parse(sitemapTemplateSitemapIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	templateSitemap, err := template.New("sitemap").Parse(sitemapTemplateSitemap)
+	if err != nil {
+		return nil, err
+	}
+
 	return &sitemapRenderer{
-		config:     config,
-		logger:     log.New(os.Stderr, fmt.Sprint(sitemapLogger, ": "), log.LstdFlags|log.Lmsgprefix),
-		bufferPool: newBufferPool(),
-		cache:      newCache(),
-		fetcher:    fetcher,
+		config:               config,
+		logger:               log.New(os.Stderr, fmt.Sprint(sitemapLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		templateSitemapIndex: templateSitemapIndex,
+		templateSitemap:      templateSitemap,
+		bufferPool:           newBufferPool(),
+		cache:                newCache(),
+		fetcher:              fetcher,
 	}, nil
 }
 
 // Handle implements the renderer
-func (r *sitemapRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r *sitemapRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 	var routeIndex int = -1
 	for index, route := range r.config.Routes {
 		if route.Path != req.URL.Path {
@@ -125,7 +173,7 @@ func (r *sitemapRenderer) Handle(w http.ResponseWriter, req *http.Request, info 
 		break
 	}
 	if routeIndex == -1 {
-		r.next.Handle(w, req, info)
+		r.next.Handle(w, req, i)
 
 		return
 	}
@@ -182,9 +230,9 @@ func (r *sitemapRenderer) render(routeIndex int, req *http.Request, w io.Writer)
 	var err error
 	switch r.config.Routes[routeIndex].Kind {
 	case sitemapKindSitemapIndex:
-		err = r.sitemapIndex(&r.config.Routes[routeIndex].SitemapIndex, req, w)
+		err = r.sitemapIndex(r.config.Routes[routeIndex].SitemapIndex, req, w)
 	case sitemapKindSitemap:
-		err = r.sitemap(&r.config.Routes[routeIndex].Sitemap, req, w)
+		err = r.sitemap(r.config.Routes[routeIndex].Sitemap, req, w)
 	}
 	if err != nil {
 		r.logger.Printf("Failed to render: %s", err)
@@ -196,129 +244,117 @@ func (r *sitemapRenderer) render(routeIndex int, req *http.Request, w io.Writer)
 }
 
 // sitemapIndex generates a sitemap index
-func (r *sitemapRenderer) sitemapIndex(s *[]SitemapIndexEntry, req *http.Request, w io.Writer) error {
-	w.Write([]byte("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\n"))
-	w.Write([]byte("<sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"))
-
-	var err error
-	for _, item := range *s {
-		switch item.Type {
-		case sitemapEntrySitemapIndexTypeStatic:
-			err = r.sitemapIndexStatic(&item.Static, req, w)
-		}
-		if err != nil {
-			return err
-		}
+func (r *sitemapRenderer) sitemapIndex(s []SitemapIndexEntry, req *http.Request, w io.Writer) error {
+	var items []sitemapTemplateSitemapIndexItem
+	for _, sitemapEntry := range s {
+		items = append(items, sitemapTemplateSitemapIndexItem{
+			Loc: r.absURL(sitemapEntry.Static.Loc, r.config.Root),
+		})
 	}
 
-	w.Write([]byte("</sitemapindex>\n"))
-
-	return nil
-}
-
-// sitemapIndexStatic generates a sitemap index static entry
-func (r *sitemapRenderer) sitemapIndexStatic(static *SitemapIndexEntryStatic, req *http.Request,
-	w io.Writer) error {
-	w.Write([]byte("<sitemap>\n"))
-	w.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", r.sitemapAbsLink(static.Loc, r.config.Root))))
-	w.Write([]byte("</sitemap>\n"))
+	err := r.templateSitemapIndex.Execute(w, sitemapTemplateSitemapIndexData{
+		Items: items,
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 // sitemap generates a sitemap
-func (r *sitemapRenderer) sitemap(s *[]SitemapEntry, req *http.Request, w io.Writer) error {
-	w.Write([]byte("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\n"))
-	w.Write([]byte("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n"))
-	w.Write([]byte("   xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n"))
-
-	var err error
-	for _, item := range *s {
-		switch item.Type {
+func (r *sitemapRenderer) sitemap(s []SitemapEntry, req *http.Request, w io.Writer) error {
+	var items []sitemapTemplateSitemapItem
+	for _, sitemapEntry := range s {
+		switch sitemapEntry.Type {
 		case sitemapEntrySitemapTypeStatic:
-			err = r.sitemapStatic(&item.Static, req, w)
+			item := sitemapTemplateSitemapItem{
+				Loc: r.absURL(sitemapEntry.Static.Loc, r.config.Root),
+			}
+			if sitemapEntry.Static.Lastmod != nil {
+				item.Lastmod = fmt.Sprintf("%v", *sitemapEntry.Static.Lastmod)
+			}
+			if sitemapEntry.Static.Changefreq != nil {
+				item.Changefreq = fmt.Sprintf("%v", *sitemapEntry.Static.Changefreq)
+			}
+			if sitemapEntry.Static.Priority != nil {
+				item.Priority = fmt.Sprintf("%v", *sitemapEntry.Static.Priority)
+			}
+			items = append(items, item)
+
 		case sitemapEntrySitemapTypeList:
-			err = r.sitemapList(&item.List, req, w)
+			response, err := r.fetcher.Get(sitemapEntry.List.Resource)
+			if err != nil {
+				continue
+			}
+
+			var payload interface{}
+			err = json.Unmarshal(response, &payload)
+			if err != nil {
+				continue
+			}
+
+			mPayload := payload.(map[string]interface{})
+			responseData := mPayload[sitemapEntry.List.ResourcePayloadItems]
+			payloadDataArray := responseData.([]interface{})
+
+			for _, item := range payloadDataArray {
+				mItem := item.(map[string]interface{})
+
+				var loc, lastmod, ignore string
+				if v, ok := mItem[sitemapEntry.List.ResourcePayloadItemLoc].(string); ok {
+					loc = r.absURL(v, r.config.Root)
+				} else {
+					continue
+				}
+				if sitemapEntry.List.ResourcePayloadItemLastmod != nil {
+					if v, ok := mItem[*sitemapEntry.List.ResourcePayloadItemLastmod].(string); ok {
+						lastmod = v
+					}
+				}
+				if sitemapEntry.List.ResourcePayloadItemIgnore != nil {
+					switch value := mItem[*sitemapEntry.List.ResourcePayloadItemIgnore].(type) {
+					case string:
+						ignore = value
+					case bool:
+						ignore = strconv.FormatBool(value)
+					case int64:
+						ignore = strconv.FormatInt(value, 10)
+					}
+				}
+				if strings.EqualFold(ignore, "true") || strings.EqualFold(ignore, "1") {
+					continue
+				}
+
+				entry := sitemapTemplateSitemapItem{
+					Loc:     loc,
+					Lastmod: lastmod,
+				}
+				if sitemapEntry.List.Changefreq != nil {
+					entry.Changefreq = fmt.Sprintf("%v", *sitemapEntry.List.Changefreq)
+				}
+				if sitemapEntry.List.Priority != nil {
+					entry.Priority = fmt.Sprintf("%v", *sitemapEntry.List.Priority)
+				}
+				items = append(items, entry)
+			}
 		}
-		if err != nil {
-			return err
-		}
 	}
 
-	w.Write([]byte("</urlset>\n"))
-
-	return nil
-}
-
-// sitemapStatic generates a sitemap static entry
-func (r *sitemapRenderer) sitemapStatic(static *SitemapEntryStatic, req *http.Request, w io.Writer) error {
-	w.Write([]byte("<url>\n"))
-	w.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", r.sitemapAbsLink(static.Loc, r.config.Root))))
-	if static.Lastmod != nil {
-		w.Write([]byte(fmt.Sprintf("<lastmod>%s</lastmod>\n", *static.Lastmod)))
-	}
-	if static.Changefreq != nil {
-		w.Write([]byte(fmt.Sprintf("<changefreq>%s</changefreq>\n", *static.Changefreq)))
-	}
-	if static.Priority != nil {
-		w.Write([]byte(fmt.Sprintf("<priority>%.1f</priority>\n", *static.Priority)))
-	}
-	w.Write([]byte("</url>\n"))
-
-	return nil
-}
-
-// sitemapList generates a sitemap list entry
-func (r *sitemapRenderer) sitemapList(list *SitemapEntryList, req *http.Request, w io.Writer) error {
-	response, err := r.fetcher.Get(list.Resource)
-	if err != nil {
-		return nil
-	}
-
-	var payload interface{}
-	err = json.Unmarshal(response, &payload)
+	err := r.templateSitemap.Execute(w, sitemapTemplateSitemapData{
+		Items: items,
+	})
 	if err != nil {
 		return err
 	}
-	mPayload := payload.(map[string]interface{})
-	responseData := mPayload[list.ResourcePayloadItems]
-	payloadDataArray := responseData.([]interface{})
-	for _, item := range payloadDataArray {
-		mItem := item.(map[string]interface{})
-
-		var loc, lastmod string
-		if v, ok := mItem[list.ResourcePayloadItemLoc].(string); ok {
-			loc = v
-		} else {
-			continue
-		}
-		if list.ResourcePayloadItemLastmod != nil {
-			if v, ok := mItem[*list.ResourcePayloadItemLastmod].(string); ok {
-				lastmod = v
-			}
-		}
-
-		w.Write([]byte("<url>\n"))
-		w.Write([]byte(fmt.Sprintf("<loc>%s</loc>\n", r.sitemapAbsLink(loc, r.config.Root))))
-		if lastmod != "" {
-			w.Write([]byte(fmt.Sprintf("<lastmod>%s</lastmod>\n", lastmod)))
-		}
-		if list.Changefreq != nil {
-			w.Write([]byte(fmt.Sprintf("<changefreq>%s</changefreq>\n", *list.Changefreq)))
-		}
-		if list.Priority != nil {
-			w.Write([]byte(fmt.Sprintf("<priority>%.1f</priority>\n", *list.Priority)))
-		}
-		w.Write([]byte("</url>\n"))
-	}
 
 	return nil
 }
 
-// sitemapAbsLink returns the absolute address of the given link
-func (r *sitemapRenderer) sitemapAbsLink(link string, root string) string {
-	if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") {
-		return link
+// absURL returns the absolute form of the given URL
+func (r *sitemapRenderer) absURL(url string, root string) string {
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		return url
 	}
-	return fmt.Sprintf("%s%s", root, link)
+	return fmt.Sprintf("%s%s", root, url)
 }

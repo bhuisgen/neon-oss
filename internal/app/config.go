@@ -123,11 +123,9 @@ type yamlConfigServer struct {
 
 	Header *struct {
 		Rules []struct {
-			Path   string            `yaml:"path"`
-			Set    map[string]string `yaml:"set,omitempty"`
-			Add    map[string]string `yaml:"add,omitempty"`
-			Remove []string          `yaml:"remove,omitempty"`
-			Last   *bool             `yaml:"last,omitempty"`
+			Path string            `yaml:"path"`
+			Set  map[string]string `yaml:"set,omitempty"`
+			Last *bool             `yaml:"last,omitempty"`
 		} `yaml:"rules"`
 	} `yaml:"header,omitempty"`
 
@@ -172,6 +170,7 @@ type yamlConfigServer struct {
 					ResourcePayloadItems       string   `yaml:"resource_payload_items"`
 					ResourcePayloadItemLoc     string   `yaml:"resource_payload_item_loc"`
 					ResourcePayloadItemLastmod *string  `yaml:"resource_payload_item_lastmod,omitempty"`
+					ResourcePayloadItemIgnore  *string  `yaml:"resource_payload_item_ignore,omitempty"`
 					Changefreq                 *string  `yaml:"changefreq,omitempty"`
 					Priority                   *float32 `yaml:"priority,omitempty"`
 				} `yaml:"list,omitempty"`
@@ -215,8 +214,6 @@ type yamlConfigFetcher struct {
 	RequestTLSKeyFile  *string           `yaml:"request_tls_key_file,omitempty"`
 	RequestHeaders     map[string]string `yaml:"request_headers,omitempty"`
 	RequestTimeout     *int              `yaml:"request_timeout,omitempty"`
-	RequestRetry       *int              `yaml:"request_retry,omitempty"`
-	RequestDelay       *int              `yaml:"request_delay,omitempty"`
 	Resources          []struct {
 		Name    string            `yaml:"name"`
 		Method  string            `yaml:"method"`
@@ -388,7 +385,6 @@ func (p *configParserYAML) parse(data []byte, c *config) error {
 				robotsRendererConfig.Path = configDefaultServerRobotsPath
 			}
 			robotsRendererConfig.Hosts = yamlConfigServer.Robots.Hosts
-			robotsRendererConfig.Sitemaps = yamlConfigServer.Robots.Sitemaps
 			if yamlConfigServer.Robots.Cache != nil {
 				robotsRendererConfig.Cache = *yamlConfigServer.Robots.Cache
 			} else {
@@ -399,6 +395,7 @@ func (p *configParserYAML) parse(data []byte, c *config) error {
 			} else {
 				robotsRendererConfig.CacheTTL = configDefaultServerRobotsCacheTTL
 			}
+			robotsRendererConfig.Sitemaps = yamlConfigServer.Robots.Sitemaps
 			serverConfig.Renderer.Robots = &robotsRendererConfig
 		}
 
@@ -536,16 +533,6 @@ func (p *configParserYAML) parse(data []byte, c *config) error {
 		fetcherConfig.RequestTimeout = *y.Fetcher.RequestTimeout
 	} else {
 		fetcherConfig.RequestTimeout = configDefaultFetcherRequestTimeout
-	}
-	if y.Fetcher.RequestRetry != nil {
-		fetcherConfig.RequestRetry = *y.Fetcher.RequestRetry
-	} else {
-		fetcherConfig.RequestRetry = configDefaultFetcherRequestRetry
-	}
-	if y.Fetcher.RequestDelay != nil {
-		fetcherConfig.RequestDelay = *y.Fetcher.RequestDelay
-	} else {
-		fetcherConfig.RequestDelay = configDefaultFetcherRequestDelay
 	}
 	for _, resource := range y.Fetcher.Resources {
 		fetcherConfig.Resources = append(fetcherConfig.Resources, FetcherResource{
@@ -883,6 +870,11 @@ func CheckConfig(c *config) ([]string, error) {
 									fmt.Sprintf("sitemap: sitemap list entry option '%s', invalid/missing value",
 										"resource_payload_item_lastmod"))
 							}
+							if entry.List.ResourcePayloadItemIgnore != nil && *entry.List.ResourcePayloadItemIgnore == "" {
+								report = append(report,
+									fmt.Sprintf("sitemap: sitemap list entry option '%s', invalid/missing value",
+										"resource_payload_item_ignore"))
+							}
 							if entry.List.Changefreq != nil {
 								validChangefreq := false
 								if entry.List.Changefreq != nil {
@@ -1042,12 +1034,6 @@ func CheckConfig(c *config) ([]string, error) {
 		}
 		if c.Fetcher.RequestTimeout < 0 {
 			report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_timeout"))
-		}
-		if c.Fetcher.RequestRetry < 0 {
-			report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_retry"))
-		}
-		if c.Fetcher.RequestDelay < 0 {
-			report = append(report, fmt.Sprintf("fetcher: option '%s', invalid/missing value", "request_delay"))
 		}
 		for _, resource := range c.Fetcher.Resources {
 			if resource.Name == "" {
@@ -1229,7 +1215,7 @@ func CheckConfig(c *config) ([]string, error) {
 }
 
 //go:embed templates/init/*
-var template_init embed.FS
+var configTemplatesInit embed.FS
 
 // GenerateConfig creates a default configuration file
 func GenerateConfig() error {
@@ -1248,7 +1234,7 @@ func GenerateConfig() error {
 		return errors.New("data directory already exists")
 	}
 
-	err = fs.WalkDir(template_init, ".", func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(configTemplatesInit, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -1257,7 +1243,7 @@ func GenerateConfig() error {
 			return nil
 		}
 
-		data, err := fs.ReadFile(template_init, path)
+		data, err := fs.ReadFile(configTemplatesInit, path)
 		if err != nil {
 			return err
 		}

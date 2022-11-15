@@ -1,0 +1,12 @@
+{{ if not .Check -}}
+User-agent: *
+Disallow: /
+{{ else -}}
+User-agent: *
+Allow: /
+{{ range $sitemapIndex, $sitemap := .Sitemaps -}}
+{{- if eq $sitemapIndex 0 }}
+{{ end -}}
+Sitemap: {{ $sitemap }}
+{{ end -}}
+{{- end -}}

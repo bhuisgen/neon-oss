@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 
 	"github.com/bhuisgen/neon/internal/app"
@@ -24,7 +25,6 @@ type command interface {
 func main() {
 	commands := []command{
 		NewCheckCommand(),
-		NewHealthcheckCommand(),
 		NewInitCommand(),
 		NewServeCommand(),
 	}
@@ -55,7 +55,14 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("%s version %s, commit %s\n", app.Name, app.Version, app.Commit)
+		fmt.Printf("%s version %s %s/%s\n", app.Name, app.Version, runtime.GOOS, runtime.GOARCH)
+
+		if app.Commit != "" && app.Date != "" {
+			fmt.Println()
+			fmt.Printf("build commit: %s\n", app.Commit)
+			fmt.Printf("build date: %s\n", app.Date)
+		}
+
 		os.Exit(0)
 	}
 

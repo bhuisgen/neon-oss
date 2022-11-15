@@ -15,7 +15,7 @@ import (
 
 type testServerNextRenderer struct{}
 
-func (r testServerNextRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r testServerNextRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 }
 
 func (r testServerNextRenderer) Next(renderer Renderer) {

@@ -39,8 +39,6 @@ type FetcherConfig struct {
 	RequestTLSKeyFile  *string
 	RequestHeaders     map[string]string
 	RequestTimeout     int
-	RequestRetry       int
-	RequestDelay       int
 	Resources          []FetcherResource
 	Templates          []FetcherTemplate
 }
@@ -155,8 +153,7 @@ func (f *fetcher) initialize(fetchRequester FetchRequester) error {
 	}
 
 	if fetchRequester == nil {
-		f.requester = newFetchRequester(f.logger, &client, f.config.RequestHeaders, f.config.RequestRetry,
-			time.Duration(f.config.RequestDelay)*time.Second)
+		f.requester = newFetchRequester(f.logger, &client, f.config.RequestHeaders)
 	}
 
 	for _, r := range f.config.Resources {
@@ -311,14 +308,11 @@ func fetchRequesterIoReadAll(r io.Reader) ([]byte, error) {
 }
 
 // newFetchRequester creates a new fetch requester instance
-func newFetchRequester(logger *log.Logger, client *http.Client, headers map[string]string, retry int,
-	delay time.Duration) *fetchRequester {
+func newFetchRequester(logger *log.Logger, client *http.Client, headers map[string]string) *fetchRequester {
 	return &fetchRequester{
 		logger:                    logger,
 		client:                    client,
 		headers:                   headers,
-		retry:                     retry,
-		delay:                     delay,
 		httpNewRequestWithContext: fetchRequesterHttpNewRequestWithContext,
 		httpClientDo:              fetchRequesterHttpClientDo,
 		ioReadAll:                 fetchRequesterIoReadAll,
@@ -348,51 +342,36 @@ func (r *fetchRequester) Fetch(ctx context.Context, method string, url string, p
 		req.Header.Set(key, value)
 	}
 
-	var attempt int
-	for {
-		attempt += 1
-
-		response, err := r.httpClientDo(r.client, req)
-		if err != nil {
-			r.logger.Printf("Failed to send request: %s %s %s", method, url, err)
-
-			return nil, err
-		}
+	response, err := r.httpClientDo(r.client, req)
+	if response != nil {
 		defer response.Body.Close()
-
-		responseBody, err := r.ioReadAll(response.Body)
-		if err != nil {
-			r.logger.Printf("Failed to read request response: %s", err)
-
-			return nil, err
-		}
-
-		if DEBUG {
-			r.logger.Printf("Fetch request: method=%s, url=%s, code=%d\n", method, req.URL.String(), response.StatusCode)
-		}
-
-		switch response.StatusCode {
-		case 429, 500, 502, 503, 504:
-			if attempt >= r.retry {
-				return nil, fmt.Errorf("request error %d", response.StatusCode)
-			}
-
-			if r.delay > 0 {
-				r.logger.Printf("Retrying request attempt %d/%d, delaying for %d seconds", attempt, r.retry, r.delay)
-
-				time.Sleep(r.delay)
-			} else {
-				r.logger.Printf("Retrying request attempt %d/%d", attempt, r.retry)
-			}
-
-			continue
-
-		default:
-			if response.StatusCode < 200 || response.StatusCode > 299 {
-				return nil, fmt.Errorf("request error %d", response.StatusCode)
-			}
-		}
-
-		return responseBody, nil
 	}
+	if err != nil {
+		r.logger.Printf("Failed to send request: %s %s %s", method, url, err)
+
+		return nil, err
+	}
+
+	responseBody, err := r.ioReadAll(response.Body)
+	if err != nil {
+		r.logger.Printf("Failed to read response: %s", err)
+
+		return nil, err
+	}
+
+	if DEBUG {
+		r.logger.Printf("Fetch request: method=%s, url=%s, code=%d\n", method, req.URL.String(), response.StatusCode)
+	}
+
+	switch response.StatusCode {
+	case 429, 500, 502, 503, 504:
+		return nil, fmt.Errorf("request error %d", response.StatusCode)
+
+	default:
+		if response.StatusCode < 200 || response.StatusCode > 299 {
+			return nil, fmt.Errorf("request error %d", response.StatusCode)
+		}
+	}
+
+	return responseBody, nil
 }

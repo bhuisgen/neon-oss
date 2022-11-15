@@ -34,7 +34,7 @@ func CreateErrorRenderer(config *ErrorRendererConfig) (*errorRenderer, error) {
 }
 
 // Handle implements the renderer
-func (r *errorRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r *errorRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte{})
 

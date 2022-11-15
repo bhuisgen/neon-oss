@@ -16,7 +16,6 @@ import (
 	"reflect"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestCreateFetcher(t *testing.T) {
@@ -733,8 +732,6 @@ func TestNewFetchRequester(t *testing.T) {
 		logger  *log.Logger
 		client  *http.Client
 		headers map[string]string
-		retry   int
-		delay   time.Duration
 	}
 	tests := []struct {
 		name    string
@@ -749,14 +746,12 @@ func TestNewFetchRequester(t *testing.T) {
 				headers: map[string]string{
 					"header": "value",
 				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := newFetchRequester(tt.args.logger, tt.args.client, tt.args.headers, tt.args.retry, tt.args.delay)
+			got := newFetchRequester(tt.args.logger, tt.args.client, tt.args.headers)
 			if (got == nil) != tt.wantNil {
 				t.Errorf("newFetchRequester() got = %v, wantNil %v", got, tt.wantNil)
 			}
@@ -792,8 +787,6 @@ func TestFetchRequesterFetch(t *testing.T) {
 		logger                    *log.Logger
 		client                    *http.Client
 		headers                   map[string]string
-		retry                     int
-		delay                     time.Duration
 		httpNewRequestWithContext func(ctx context.Context, method string, url string,
 			body io.Reader) (*http.Request, error)
 		httpClientDo func(client *http.Client, req *http.Request) (*http.Response, error)
@@ -821,8 +814,6 @@ func TestFetchRequesterFetch(t *testing.T) {
 				headers: map[string]string{
 					"header": "value",
 				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
 				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
 					body io.Reader) (*http.Request, error) {
 					return &http.Request{
@@ -867,8 +858,6 @@ func TestFetchRequesterFetch(t *testing.T) {
 				headers: map[string]string{
 					"header": "value",
 				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
 				httpNewRequestWithContext: func(ctx context.Context, method string, url string,
 					body io.Reader) (*http.Request, error) {
 					return nil, errors.New("test error")
@@ -909,8 +898,6 @@ func TestFetchRequesterFetch(t *testing.T) {
 				headers: map[string]string{
 					"header": "value",
 				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
 				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
 					body io.Reader) (*http.Request, error) {
 					return &http.Request{
@@ -949,8 +936,6 @@ func TestFetchRequesterFetch(t *testing.T) {
 				headers: map[string]string{
 					"header": "value",
 				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
 				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
 					body io.Reader) (*http.Request, error) {
 					return &http.Request{
@@ -995,8 +980,6 @@ func TestFetchRequesterFetch(t *testing.T) {
 				logger:                    tt.fields.logger,
 				client:                    tt.fields.client,
 				headers:                   tt.fields.headers,
-				retry:                     tt.fields.retry,
-				delay:                     tt.fields.delay,
 				httpNewRequestWithContext: tt.fields.httpNewRequestWithContext,
 				httpClientDo:              tt.fields.httpClientDo,
 				ioReadAll:                 tt.fields.ioRealAll,
@@ -1026,8 +1009,6 @@ func TestFetchRequesterFetch_Debug(t *testing.T) {
 		logger                    *log.Logger
 		client                    *http.Client
 		headers                   map[string]string
-		retry                     int
-		delay                     time.Duration
 		httpNewRequestWithContext func(ctx context.Context, method string, url string,
 			body io.Reader) (*http.Request, error)
 		httpClientDo func(client *http.Client, req *http.Request) (*http.Response, error)
@@ -1055,8 +1036,6 @@ func TestFetchRequesterFetch_Debug(t *testing.T) {
 				headers: map[string]string{
 					"header": "value",
 				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
 				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
 					body io.Reader) (*http.Request, error) {
 					return &http.Request{
@@ -1100,8 +1079,6 @@ func TestFetchRequesterFetch_Debug(t *testing.T) {
 				logger:                    tt.fields.logger,
 				client:                    tt.fields.client,
 				headers:                   tt.fields.headers,
-				retry:                     tt.fields.retry,
-				delay:                     tt.fields.delay,
 				httpNewRequestWithContext: tt.fields.httpNewRequestWithContext,
 				httpClientDo:              tt.fields.httpClientDo,
 				ioReadAll:                 tt.fields.ioRealAll,
@@ -1125,8 +1102,6 @@ func TestFetchRequesterFetch_ErrorInvalidCode(t *testing.T) {
 		logger                    *log.Logger
 		client                    *http.Client
 		headers                   map[string]string
-		retry                     int
-		delay                     time.Duration
 		httpNewRequestWithContext func(ctx context.Context, method string, url string,
 			body io.Reader) (*http.Request, error)
 		httpClientDo func(client *http.Client, req *http.Request) (*http.Response, error)
@@ -1154,8 +1129,6 @@ func TestFetchRequesterFetch_ErrorInvalidCode(t *testing.T) {
 				headers: map[string]string{
 					"header": "value",
 				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
 				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
 					body io.Reader) (*http.Request, error) {
 					return &http.Request{
@@ -1199,318 +1172,6 @@ func TestFetchRequesterFetch_ErrorInvalidCode(t *testing.T) {
 				logger:                    tt.fields.logger,
 				client:                    tt.fields.client,
 				headers:                   tt.fields.headers,
-				retry:                     tt.fields.retry,
-				delay:                     tt.fields.delay,
-				httpNewRequestWithContext: tt.fields.httpNewRequestWithContext,
-				httpClientDo:              tt.fields.httpClientDo,
-				ioReadAll:                 tt.fields.ioRealAll,
-			}
-			got, err := r.Fetch(tt.args.ctx, tt.args.method, tt.args.url, tt.args.params, tt.args.headers)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("fetchRequester.Fetch() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("fetchRequester.Fetch() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFetchRequesterFetch_ErrorWithRetrySuccess(t *testing.T) {
-	retryCount := 0
-	retrySuccess := 2
-	response := []byte("response")
-
-	type fields struct {
-		logger                    *log.Logger
-		client                    *http.Client
-		headers                   map[string]string
-		retry                     int
-		delay                     time.Duration
-		httpNewRequestWithContext func(ctx context.Context, method string, url string,
-			body io.Reader) (*http.Request, error)
-		httpClientDo func(client *http.Client, req *http.Request) (*http.Response, error)
-		ioRealAll    func(r io.Reader) ([]byte, error)
-	}
-	type args struct {
-		ctx     context.Context
-		method  string
-		url     string
-		params  map[string]string
-		headers map[string]string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []byte
-		wantErr bool
-	}{
-		{
-			name: "retry with delay",
-			fields: fields{
-				logger: log.Default(),
-				client: http.DefaultClient,
-				headers: map[string]string{
-					"header": "value",
-				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
-				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
-					body io.Reader) (*http.Request, error) {
-					return &http.Request{
-						Method: method,
-						URL:    &url.URL{},
-						Body:   nil,
-						Header: http.Header{},
-					}, nil
-				},
-				httpClientDo: func(client *http.Client, req *http.Request) (*http.Response, error) {
-					retryCount += 1
-					if retryCount >= retrySuccess {
-						return &http.Response{
-							StatusCode: http.StatusOK,
-							Body: &testFetchRequesterRequestResponseBody{
-								response: response,
-								errRead:  false,
-								errClose: false,
-							},
-						}, nil
-					}
-					return &http.Response{
-						StatusCode: http.StatusInternalServerError,
-						Body: &testFetchRequesterRequestResponseBody{
-							errRead:  false,
-							errClose: false,
-						},
-					}, nil
-				},
-				ioRealAll: func(r io.Reader) ([]byte, error) {
-					return response, nil
-				},
-			},
-			args: args{
-				ctx:    context.Background(),
-				method: http.MethodGet,
-				url:    "http://localhost",
-				params: map[string]string{
-					"param1": "value1",
-				},
-				headers: map[string]string{
-					"header1": "value1",
-				},
-			},
-			want:    response,
-			wantErr: false,
-		},
-		{
-			name: "retry without delay",
-			fields: fields{
-				logger: log.Default(),
-				client: http.DefaultClient,
-				headers: map[string]string{
-					"header": "value",
-				},
-				retry: 3,
-				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
-					body io.Reader) (*http.Request, error) {
-					return &http.Request{
-						Method: method,
-						URL:    &url.URL{},
-						Body:   nil,
-						Header: http.Header{},
-					}, nil
-				},
-				httpClientDo: func(client *http.Client, req *http.Request) (*http.Response, error) {
-					retryCount += 1
-					if retryCount >= retrySuccess {
-						return &http.Response{
-							StatusCode: http.StatusOK,
-							Body: &testFetchRequesterRequestResponseBody{
-								response: response,
-								errRead:  false,
-								errClose: false,
-							},
-						}, nil
-					}
-					return &http.Response{
-						StatusCode: http.StatusInternalServerError,
-						Body: &testFetchRequesterRequestResponseBody{
-							errRead:  false,
-							errClose: false,
-						},
-					}, nil
-				},
-				ioRealAll: func(r io.Reader) ([]byte, error) {
-					return response, nil
-				},
-			},
-			args: args{
-				ctx:    context.Background(),
-				method: http.MethodGet,
-				url:    "http://localhost",
-				params: map[string]string{
-					"param1": "value1",
-				},
-				headers: map[string]string{
-					"header1": "value1",
-				},
-			},
-			want:    response,
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &fetchRequester{
-				logger:                    tt.fields.logger,
-				client:                    tt.fields.client,
-				headers:                   tt.fields.headers,
-				retry:                     tt.fields.retry,
-				delay:                     tt.fields.delay,
-				httpNewRequestWithContext: tt.fields.httpNewRequestWithContext,
-				httpClientDo:              tt.fields.httpClientDo,
-				ioReadAll:                 tt.fields.ioRealAll,
-			}
-			got, err := r.Fetch(tt.args.ctx, tt.args.method, tt.args.url, tt.args.params, tt.args.headers)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("fetchRequester.Fetch() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("fetchRequester.Fetch() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFetchRequesterFetch_ErrorWithRetryFailure(t *testing.T) {
-	type fields struct {
-		logger                    *log.Logger
-		client                    *http.Client
-		headers                   map[string]string
-		retry                     int
-		delay                     time.Duration
-		httpNewRequestWithContext func(ctx context.Context, method string, url string,
-			body io.Reader) (*http.Request, error)
-		httpClientDo func(client *http.Client, req *http.Request) (*http.Response, error)
-		ioRealAll    func(r io.Reader) ([]byte, error)
-	}
-	type args struct {
-		ctx     context.Context
-		method  string
-		url     string
-		params  map[string]string
-		headers map[string]string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []byte
-		wantErr bool
-	}{
-		{
-			name: "retry with delay",
-			fields: fields{
-				logger: log.Default(),
-				client: http.DefaultClient,
-				headers: map[string]string{
-					"header": "value",
-				},
-				retry: 3,
-				delay: time.Duration(100) * time.Millisecond,
-				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
-					body io.Reader) (*http.Request, error) {
-					return &http.Request{
-						Method: method,
-						URL:    &url.URL{},
-						Body:   nil,
-						Header: http.Header{},
-					}, nil
-				},
-				httpClientDo: func(client *http.Client, req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: http.StatusInternalServerError,
-						Body: &testFetchRequesterRequestResponseBody{
-							errRead:  false,
-							errClose: false,
-						},
-					}, nil
-				},
-				ioRealAll: func(r io.Reader) ([]byte, error) {
-					return []byte{}, nil
-				},
-			},
-			args: args{
-				ctx:    context.Background(),
-				method: http.MethodGet,
-				url:    "http://localhost",
-				params: map[string]string{
-					"param1": "value1",
-				},
-				headers: map[string]string{
-					"header1": "value1",
-				},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "retry without delay",
-			fields: fields{
-				logger: log.Default(),
-				client: http.DefaultClient,
-				headers: map[string]string{
-					"header": "value",
-				},
-				retry: 3,
-				httpNewRequestWithContext: func(ctx context.Context, method string, u string,
-					body io.Reader) (*http.Request, error) {
-					return &http.Request{
-						Method: method,
-						URL:    &url.URL{},
-						Body:   nil,
-						Header: http.Header{},
-					}, nil
-				},
-				httpClientDo: func(client *http.Client, req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: http.StatusInternalServerError,
-						Body: &testFetchRequesterRequestResponseBody{
-							errRead:  false,
-							errClose: false,
-						},
-					}, nil
-				},
-				ioRealAll: func(r io.Reader) ([]byte, error) {
-					return []byte{}, nil
-				},
-			},
-			args: args{
-				ctx:    context.Background(),
-				method: http.MethodGet,
-				url:    "http://localhost",
-				params: map[string]string{
-					"param1": "value1",
-				},
-				headers: map[string]string{
-					"header1": "value1",
-				},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &fetchRequester{
-				logger:                    tt.fields.logger,
-				client:                    tt.fields.client,
-				headers:                   tt.fields.headers,
-				retry:                     tt.fields.retry,
-				delay:                     tt.fields.delay,
 				httpNewRequestWithContext: tt.fields.httpNewRequestWithContext,
 				httpClientDo:              tt.fields.httpClientDo,
 				ioReadAll:                 tt.fields.ioRealAll,

@@ -169,8 +169,8 @@ func TestIndexRendererInitialize(t *testing.T) {
 			name: "default",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:   "data/index.html",
-					Bundle: stringPtr("data/bundle.js"),
+					HTML:   "dist/index.html",
+					Bundle: stringPtr("dist/bundle.js"),
 					Rules: []IndexRule{
 						{
 							Path: "^/",
@@ -191,8 +191,8 @@ func TestIndexRendererInitialize(t *testing.T) {
 			name: "rule regexp compile error",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:   "data/index.html",
-					Bundle: stringPtr("data/bundle.js"),
+					HTML:   "dist/index.html",
+					Bundle: stringPtr("dist/bundle.js"),
 					Rules: []IndexRule{
 						{
 							Path: "(",
@@ -202,7 +202,7 @@ func TestIndexRendererInitialize(t *testing.T) {
 				logger:  log.Default(),
 				regexps: []*regexp.Regexp{},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte{}, errors.New("test error")
 					}
 					return []byte{}, nil
@@ -278,8 +278,8 @@ func TestIndexRendererHandle(t *testing.T) {
 			name: "render",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
+					HTML:    "dist/index.html",
+					Bundle:  stringPtr("dist/bundle.js"),
 					Timeout: 1,
 				},
 				logger:     log.Default(),
@@ -290,10 +290,10 @@ func TestIndexRendererHandle(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -312,8 +312,8 @@ func TestIndexRendererHandle(t *testing.T) {
 			name: "error render",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
+					HTML:    "dist/index.html",
+					Bundle:  stringPtr("dist/bundle.js"),
 					Timeout: 1,
 				},
 				logger:     log.Default(),
@@ -324,10 +324,10 @@ func TestIndexRendererHandle(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => {	while(true){} })();`), nil
 					}
 					return []byte{}, nil
@@ -346,8 +346,8 @@ func TestIndexRendererHandle(t *testing.T) {
 			name: "redirect",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:    "data/index.html",
-					Bundle:  stringPtr("data/bundle.js"),
+					HTML:    "dist/index.html",
+					Bundle:  stringPtr("dist/bundle.js"),
 					Timeout: 1,
 				},
 				logger:     log.Default(),
@@ -359,10 +359,10 @@ func TestIndexRendererHandle(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.redirect("http://external", 302); })();`), nil
 					}
 					return []byte{}, nil
@@ -519,7 +519,7 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "html",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML: "data/index.html",
+					HTML: "dist/index.html",
 				},
 				logger:  log.Default(),
 				regexps: []*regexp.Regexp{},
@@ -547,17 +547,17 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "html error stat file",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML: "data/index.html",
+					HTML: "dist/index.html",
 				},
 				logger: log.Default(),
 				osStat: func(name string) (fs.FileInfo, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return nil, errors.New("test error")
 					}
 					return testConfigFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte{}, errors.New("test error")
 					}
 					return []byte{}, nil
@@ -576,14 +576,14 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "html error read file",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML: "data/index.html",
+					HTML: "dist/index.html",
 				},
 				logger: log.Default(),
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte{}, errors.New("test error")
 					}
 					return []byte{}, nil
@@ -602,8 +602,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -615,10 +615,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -640,8 +640,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "error bundle stat file",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -650,16 +650,16 @@ func TestIndexRendererRender(t *testing.T) {
 				vmPool:     newVMPool(1),
 				cache:      newCache(),
 				osStat: func(name string) (fs.FileInfo, error) {
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return nil, errors.New("test error")
 					}
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte{}, errors.New("test error")
 					}
 					return []byte{}, nil
@@ -678,8 +678,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "error bundle read file",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -691,10 +691,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte{}, errors.New("test error")
 					}
 					return []byte{}, nil
@@ -713,8 +713,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "error vm configure",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -742,8 +742,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "error vm execute",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -755,10 +755,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => {	while(true){} })();`), nil
 					}
 					return []byte{}, nil
@@ -777,8 +777,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle render",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -791,10 +791,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -816,8 +816,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle redirect",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -830,10 +830,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.redirect("http://external", 302); })();`), nil
 					}
 					return []byte{}, nil
@@ -857,8 +857,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "state with a named capturing group regex",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					State:     "state",
 					Timeout:   1,
@@ -890,10 +890,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -920,8 +920,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "state with an indexed capturing group regex",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					State:     "state",
 					Timeout:   1,
@@ -953,10 +953,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -983,8 +983,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "state without match",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					State:     "state",
 					Timeout:   1,
@@ -1016,10 +1016,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -1041,8 +1041,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "state error fetcher get",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					State:     "state",
 					Timeout:   1,
@@ -1073,10 +1073,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -1102,8 +1102,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "state error fetcher exists",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					State:     "state",
 					Timeout:   1,
@@ -1133,10 +1133,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -1162,8 +1162,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "state error json unmarshal",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					State:     "state",
 					Timeout:   1,
@@ -1195,10 +1195,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -1217,8 +1217,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle with custom container",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "test",
 					State:     "state",
 					Timeout:   1,
@@ -1232,10 +1232,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="test"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil
@@ -1257,8 +1257,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle with title",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -1271,10 +1271,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
 							` serverResponse.setTitle("test"); })();`), nil
 					}
@@ -1297,8 +1297,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle with meta",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -1311,10 +1311,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
 							` serverResponse.setMeta("test", new Map([["name", "test"]])); })();`), nil
 					}
@@ -1337,8 +1337,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle with link",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -1351,10 +1351,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
 							` serverResponse.setLink("test", new Map([["href", "test"],["rel", "test"]])); })();`), nil
 					}
@@ -1377,8 +1377,8 @@ func TestIndexRendererRender(t *testing.T) {
 			name: "bundle with script",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					Timeout:   1,
 				},
@@ -1391,10 +1391,10 @@ func TestIndexRendererRender(t *testing.T) {
 					return testIndexRendererFileInfo{}, nil
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200);` +
 							` serverResponse.setScript("test", new Map([["type", "test"], ["children", "content"]])); })();`), nil
 					}
@@ -1502,8 +1502,8 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 			name: "state with debug",
 			fields: fields{
 				config: &IndexRendererConfig{
-					HTML:      "data/index.html",
-					Bundle:    stringPtr("data/bundle.js"),
+					HTML:      "dist/index.html",
+					Bundle:    stringPtr("dist/bundle.js"),
 					Container: "root",
 					State:     "state",
 					Timeout:   1,
@@ -1535,10 +1535,10 @@ func TestIndexRendererRender_Debug(t *testing.T) {
 					},
 				},
 				osReadFile: func(name string) ([]byte, error) {
-					if name == "data/index.html" {
+					if name == "dist/index.html" {
 						return []byte(`<!doctype html><head><meta charset=utf-8></head><body><div id="root"></div></body>`), nil
 					}
-					if name == "data/bundle.js" {
+					if name == "dist/bundle.js" {
 						return []byte(`(() => { serverResponse.render("<p>test</p>", 200); })();`), nil
 					}
 					return []byte{}, nil

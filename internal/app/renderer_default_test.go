@@ -15,7 +15,7 @@ import (
 
 type testDefaultRendererNextRenderer struct{}
 
-func (r testDefaultRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r testDefaultRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 }
 
 func (r testDefaultRendererNextRenderer) Next(renderer Renderer) {
@@ -34,7 +34,7 @@ func TestCreateDefaultRenderer(t *testing.T) {
 			name: "default",
 			args: args{
 				config: &DefaultRendererConfig{
-					File: "/data/default.html",
+					File: "/dist/default.html",
 				},
 			},
 		},
@@ -73,7 +73,7 @@ func TestDefaultRendererHandle(t *testing.T) {
 			name: "required",
 			fields: fields{
 				config: &DefaultRendererConfig{
-					File: "/data/index.html",
+					File: "/dist/index.html",
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),
@@ -97,7 +97,7 @@ func TestDefaultRendererHandle(t *testing.T) {
 			name: "cache",
 			fields: fields{
 				config: &DefaultRendererConfig{
-					File:     "/data/index.html",
+					File:     "/dist/index.html",
 					Cache:    true,
 					CacheTTL: 60,
 				},
@@ -123,7 +123,7 @@ func TestDefaultRendererHandle(t *testing.T) {
 			name: "error render",
 			fields: fields{
 				config: &DefaultRendererConfig{
-					File: "/data/index.html",
+					File: "/dist/index.html",
 				},
 				logger:     log.Default(),
 				bufferPool: newBufferPool(),

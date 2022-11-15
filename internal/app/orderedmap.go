@@ -22,7 +22,7 @@ type orderedMap struct {
 	keys []interface{}
 	data map[interface{}]interface{}
 	lock sync.RWMutex
-	}
+}
 
 // newOrderedMap returns a new data map
 func newOrderedMap() *orderedMap {

@@ -69,9 +69,9 @@ func (r *staticRenderer) initialize() error {
 }
 
 // Handle implements the renderer
-func (r *staticRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r *staticRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 	if !r.staticFS.Exists(req.URL.Path) {
-		r.next.Handle(w, req, info)
+		r.next.Handle(w, req, i)
 
 		return
 	}

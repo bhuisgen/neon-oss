@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+   xmlns:xhtml="http://www.w3.org/1999/xhtml">
+{{- range $index, $item := .Items }}
+<url>
+<loc>{{ $item.Loc }}</loc>
+{{ if $item.Lastmod -}}
+<lastmod>{{ $item.Lastmod }}</lastmod>
+{{- end }}
+{{ if $item.Changefreq -}}
+<changefreq>{{ $item.Changefreq }}</changefreq>
+{{- end }}
+{{ if $item.Priority -}}
+<priority>{{ $item.Priority }}</priority>
+{{- end }}
+</url>
+{{- end }}
+</urlset>

@@ -12,11 +12,11 @@ server:
             Cache-Control: max-age=31536000
 
     static:
-      dir: data/static
+      dir: dist/static
 
     index:
-      html: data/index.html
-      bundle: data/bundle.js
+      html: dist/index.html
+      bundle: dist/bundle.js
       rules:
         # - path: ^/
         #   state:

@@ -5,11 +5,13 @@
 package app
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"text/template"
 	"time"
 )
 
@@ -17,6 +19,7 @@ import (
 type robotsRenderer struct {
 	config     *RobotsRendererConfig
 	logger     *log.Logger
+	template   *template.Template
 	bufferPool BufferPool
 	cache      Cache
 	next       Renderer
@@ -26,9 +29,9 @@ type robotsRenderer struct {
 type RobotsRendererConfig struct {
 	Path     string
 	Hosts    []string
-	Sitemaps []string
 	Cache    bool
 	CacheTTL int
+	Sitemaps []string
 }
 
 // robotsRender implements a render
@@ -37,24 +40,41 @@ type robotsRender struct {
 	Status int
 }
 
+// robotsTemplateData implements the robots template data
+type robotsTemplateData struct {
+	Check    bool
+	Sitemaps []string
+}
+
 const (
 	robotsLogger string = "server[robots]"
 )
 
+var (
+	//go:embed templates/robots/robots.txt.tmpl
+	robotsTemplate string
+)
+
 // CreateRobotsRenderer creates a new robots renderer
 func CreateRobotsRenderer(config *RobotsRendererConfig) (*robotsRenderer, error) {
+	template, err := template.New("robots").Parse(robotsTemplate)
+	if err != nil {
+		return nil, err
+	}
+
 	return &robotsRenderer{
 		config:     config,
 		logger:     log.New(os.Stderr, fmt.Sprint(robotsLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		template:   template,
 		bufferPool: newBufferPool(),
 		cache:      newCache(),
 	}, nil
 }
 
 // Handle implements the renderer
-func (r *robotsRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r *robotsRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 	if req.URL.Path != r.config.Path {
-		r.next.Handle(w, req, info)
+		r.next.Handle(w, req, i)
 
 		return
 	}
@@ -114,21 +134,13 @@ func (r *robotsRenderer) render(req *http.Request, w io.Writer) error {
 			check = true
 		}
 	}
-	if !check {
-		w.Write([]byte("User-agent: *\n"))
-		w.Write([]byte("Disallow: /\n"))
 
-		return nil
-	}
-
-	w.Write([]byte("User-agent: *\n"))
-	w.Write([]byte("Allow: /\n"))
-
-	for i, s := range r.config.Sitemaps {
-		if i == 0 {
-			w.Write([]byte("\n"))
-		}
-		w.Write([]byte(fmt.Sprintf("Sitemap: %s\n", s)))
+	err := r.template.Execute(w, robotsTemplateData{
+		Check:    check,
+		Sitemaps: r.config.Sitemaps,
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil

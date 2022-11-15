@@ -628,7 +628,7 @@ func TestVMExecute_Debug(t *testing.T) {
 }
 
 func TestNewVMResult(t *testing.T) {
-	render := []byte{'t', 'e', 's', 't'}
+	render := []byte("test")
 	status := http.StatusOK
 	redirect := true
 	redirectURL := "http://redirect"

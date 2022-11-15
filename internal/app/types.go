@@ -33,7 +33,7 @@ type LoaderExecutor interface {
 
 // Renderer
 type Renderer interface {
-	Handle(w http.ResponseWriter, r *http.Request, info *ServerInfo)
+	Handle(w http.ResponseWriter, r *http.Request, i *ServerInfo)
 	Next(next Renderer)
 }
 

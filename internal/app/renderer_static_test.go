@@ -14,7 +14,7 @@ import (
 
 type testStaticRendererNextRenderer struct{}
 
-func (r testStaticRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, info *ServerInfo) {
+func (r testStaticRendererNextRenderer) Handle(w http.ResponseWriter, req *http.Request, i *ServerInfo) {
 }
 
 func (r testStaticRendererNextRenderer) Next(renderer Renderer) {
@@ -70,7 +70,7 @@ func TestCreateStaticRenderer(t *testing.T) {
 			name: "default",
 			args: args{
 				config: &StaticRendererConfig{
-					Dir: "/data/static",
+					Dir: "/dist/static",
 				},
 			},
 		},
@@ -108,7 +108,7 @@ func TestStaticRendererHandle(t *testing.T) {
 			name: "default",
 			fields: fields{
 				config: &StaticRendererConfig{
-					Dir: "data/static",
+					Dir: "dist/static",
 				},
 				logger:        log.Default(),
 				staticFS:      &testStaticFileSystem{},
@@ -129,7 +129,7 @@ func TestStaticRendererHandle(t *testing.T) {
 			name: "static file",
 			fields: fields{
 				config: &StaticRendererConfig{
-					Dir: "data/static",
+					Dir: "dist/static",
 				},
 				logger: log.Default(),
 				staticFS: &testStaticFileSystem{
