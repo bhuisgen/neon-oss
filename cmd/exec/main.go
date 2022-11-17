@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 	"strconv"
 
 	"github.com/bhuisgen/neon/internal/app"
@@ -27,10 +26,11 @@ func main() {
 		NewCheckCommand(),
 		NewInitCommand(),
 		NewServeCommand(),
+		NewVersionCommand(),
 	}
 
 	var showVersion bool
-	flag.BoolVar(&showVersion, "version", false, "Print version information and quit")
+	flag.BoolVar(&showVersion, "v", false, "Print version information and quit")
 
 	flag.Usage = func() {
 		fmt.Println()
@@ -49,20 +49,13 @@ func main() {
 		fmt.Println("Run 'neon COMMAND --help' for more information on a command.")
 		fmt.Println()
 		fmt.Println("To get more help with neon, check out our docs at https://neon.bhexpert.com/docs/latest")
-		os.Exit(2)
+		os.Exit(0)
 	}
 
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("%s version %s %s/%s\n", app.Name, app.Version, runtime.GOOS, runtime.GOARCH)
-
-		if app.Commit != "" && app.Date != "" {
-			fmt.Println()
-			fmt.Printf("build commit: %s\n", app.Commit)
-			fmt.Printf("build date: %s\n", app.Date)
-		}
-
+		fmt.Printf("%s version %s\n", app.Name, app.Version)
 		os.Exit(0)
 	}
 

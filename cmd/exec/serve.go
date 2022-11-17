@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -33,7 +34,7 @@ func NewServeCommand() *serveCommand {
 		fmt.Println()
 		fmt.Println("Options:")
 		c.flagset.PrintDefaults()
-		os.Exit(2)
+		os.Exit(0)
 	}
 
 	return &c
@@ -51,7 +52,18 @@ func (c *serveCommand) Description() string {
 
 // Init initializes the command
 func (c *serveCommand) Init(args []string) error {
-	return c.flagset.Parse(args)
+	err := c.flagset.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	if len(c.flagset.Args()) > 0 {
+		fmt.Println("The command accepts no arguments")
+
+		return errors.New("invalid arguments")
+	}
+
+	return nil
 }
 
 // Execute executes the command
