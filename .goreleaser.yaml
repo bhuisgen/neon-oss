@@ -5,14 +5,6 @@ env:
   - DOCKER_HOST={{.Env.DOCKER_HOST}}
   - DOCKER_TLS_VERIFY={{.Env.DOCKER_TLS_VERIFY}}
 
-gomod:
-  proxy: true
-  env:
-    - GOPROXY=https://proxy.golang.org,direct
-    - GOSUMDB=sum.golang.org
-    - GOPRIVATE=example.com/blah
-  mod: mod
-
 before:
   hooks:
     - go mod tidy
@@ -34,15 +26,15 @@ builds:
       - amd64
       - arm64
     mod_timestamp: "{{.CommitTimestamp}}"
-    hooks:
-      post:
-        - upx "{{.Path}}"
     overrides:
       - goos: linux
         goarch: amd64
         goamd64: v1
         ldflags:
-          - -s -w -extldflags '-static' -X app.version={{.Version}} -X app.commit={{.Commit}} -X app.date={{.Date}}
+          - -s -w -extldflags '-static'
+            -X github.com/bhuisgen/neon/internal/app.Version={{.Version}}
+            -X github.com/bhuisgen/neon/internal/app.Commit={{.Commit}}
+            -X github.com/bhuisgen/neon/internal/app.Date={{.Date}}
       - goos: linux
         goarch: arm64
         goarm: ""
@@ -50,7 +42,10 @@ builds:
           - CC=aarch64-linux-gnu-gcc
           - CXX=aarch64-linux-gnu-g++
         ldflags:
-          - -s -w -X app.version={{.Version}} -X app.commit={{.Commit}} -X app.date={{.Date}}
+          - -s -w
+            -X github.com/bhuisgen/neon/internal/app.Version={{.Version}}
+            -X github.com/bhuisgen/neon/internal/app.Commit={{.Commit}}
+            -X github.com/bhuisgen/neon/internal/app.Date={{.Date}}
       - goos: darwin
         goarch: amd64
         goamd64: v1
@@ -58,7 +53,10 @@ builds:
           - CC=o64-clang
           - CXX=o64-clang++
         ldflags:
-          - -s -w -X app.version={{.Version}} -X app.commit={{.Commit}} -X app.date={{.Date}}
+          - -s -w
+            -X github.com/bhuisgen/neon/internal/app.Version={{.Version}}
+            -X github.com/bhuisgen/neon/internal/app.Commit={{.Commit}}
+            -X github.com/bhuisgen/neon/internal/app.Date={{.Date}}
       - goos: darwin
         goarch: arm64
         goarm: ""
@@ -66,7 +64,10 @@ builds:
           - CC=oa64-clang
           - CXX=oa64-clang++
         ldflags:
-          - -s -w -X app.version={{.Version}} -X app.commit={{.Commit}} -X app.date={{.Date}}
+          - -s -w
+            -X github.com/bhuisgen/neon/internal/app.Version={{.Version}}
+            -X github.com/bhuisgen/neon/internal/app.Commit={{.Commit}}
+            -X github.com/bhuisgen/neon/internal/app.Date={{.Date}}
 
 dockers:
   - use: buildx
@@ -118,6 +119,10 @@ checksum:
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
+release:
+  draft: true
+  replace_existing_draft: true
 
 changelog:
   sort: asc

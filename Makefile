@@ -21,4 +21,5 @@ init:
 dist:
 	docker run --rm -v devcontainer_neon:/workspace -w /workspace/neon \
 		-e DOCKER_CERT_PATH=${DOCKER_CERT_PATH} -e DOCKER_HOST=${DOCKER_HOST} -e DOCKER_TLS_VERIFY=${DOCKER_TLS_VERIFY} \
-		bhuisgen/goreleaser-cross:v1.19.3-amd64 --snapshot --rm-dist
+		-e GITHUB_TOKEN=${GITHUB_TOKEN} \
+		bhuisgen/goreleaser-cross:v1.19.3-amd64 --rm-dist
