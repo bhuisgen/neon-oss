@@ -111,7 +111,7 @@ func (l *loader) Start() error {
 	return nil
 }
 
-// Start stops the loader
+// Stop stops the loader
 func (l *loader) Stop() error {
 	if l.config.ExecInterval > 0 {
 		l.stop <- struct{}{}
