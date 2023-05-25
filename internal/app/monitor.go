@@ -85,7 +85,7 @@ func (m *monitor) Start() {
 				s.NumGC = memstats.NumGC
 
 				data, _ := json.Marshal(s)
-				m.logger.Printf("Status: %s", string(data))
+				m.logger.Print(string(data))
 
 			case <-m.stopLogger:
 				ticker.Stop()
@@ -105,8 +105,13 @@ func (m *monitor) Start() {
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 		tracer := http.Server{
-			Addr:    "0.0.0.0:6060",
-			Handler: mux,
+			Addr:              "0.0.0.0:6060",
+			Handler:           mux,
+			ReadTimeout:       15,
+			ReadHeaderTimeout: 5,
+			WriteTimeout:      15,
+			IdleTimeout:       30,
+			ErrorLog:          m.logger,
 		}
 
 		go tracer.ListenAndServe()
