@@ -108,9 +108,7 @@ func createFetcherWithRequester(config *FetcherConfig, fetchRequester FetchReque
 
 // initialize initializes the fetcher
 func (f *fetcher) initialize(fetchRequester FetchRequester) error {
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
+	tlsConfig := &tls.Config{}
 
 	if f.config.RequestTLSCAFile != nil {
 		ca, err := f.osReadFile(*f.config.RequestTLSCAFile)

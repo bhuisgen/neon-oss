@@ -169,7 +169,6 @@ func (s *server) initialize(renderers ...Renderer) error {
 	if s.config.TLS {
 		tlsConfig := &tls.Config{
 			ClientAuth: tls.RequireAndVerifyClientCert,
-			MinVersion: tls.VersionTLS12,
 		}
 
 		if s.config.TLSCAFile != nil {
