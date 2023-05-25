@@ -1,3 +1,3 @@
-# neon
+# Neon
 
-Boris HUISGEN (<bhuisgen@hbis.fr>)
+Copyright 2022-2023 Boris HUISGEN (<boris.huisgen@bhexpert.fr>)
