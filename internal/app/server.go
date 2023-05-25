@@ -246,13 +246,13 @@ func NewServerHandler(server *server) *serverHandler {
 
 // ServeHTTP implements the HTTP server handler
 func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	id := uuid.New()
+	id := uuid.NewString()
 
-	ctx := context.WithValue(r.Context(), ServerHandlerContextKeyRequestID{}, id.String())
+	ctx := context.WithValue(r.Context(), ServerHandlerContextKeyRequestID{}, id)
 	r = r.WithContext(ctx)
 
 	w.Header().Set(serverHandlerServerHeader, fmt.Sprint("neon/", Version))
-	w.Header().Set(serverHandlerRequestIdHeader, id.String())
+	w.Header().Set(serverHandlerRequestIdHeader, id)
 
 	h.server.renderer.Handle(w, r, h.server.info)
 }
