@@ -8,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/bhuisgen/neon/internal/app"
 )
@@ -19,7 +18,7 @@ type checkCommand struct {
 	verbose bool
 }
 
-// NewCheckCommand creates the command
+// NewCheckCommand creates a command
 func NewCheckCommand() *checkCommand {
 	c := checkCommand{}
 	c.flagset = flag.NewFlagSet("check", flag.ExitOnError)
@@ -29,7 +28,6 @@ func NewCheckCommand() *checkCommand {
 		fmt.Println()
 		fmt.Println("Options:")
 		c.flagset.PrintDefaults()
-		os.Exit(0)
 	}
 
 	return &c

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/bhuisgen/neon/internal/app"
 )
@@ -19,7 +18,7 @@ type initCommand struct {
 	verbose bool
 }
 
-// NewInitCommand creates the command
+// NewInitCommand creates a command
 func NewInitCommand() *initCommand {
 	c := initCommand{}
 	c.flagset = flag.NewFlagSet("init", flag.ExitOnError)
@@ -29,7 +28,6 @@ func NewInitCommand() *initCommand {
 		fmt.Println()
 		fmt.Println("Options:")
 		c.flagset.PrintDefaults()
-		os.Exit(0)
 	}
 
 	return &c

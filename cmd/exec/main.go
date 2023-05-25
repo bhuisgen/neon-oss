@@ -31,12 +31,11 @@ func main() {
 
 	var showVersion bool
 	flag.BoolVar(&showVersion, "v", false, "Print version information and quit")
-
 	flag.Usage = func() {
 		fmt.Println()
 		fmt.Println("Usage: neon [OPTIONS] COMMAND")
 		fmt.Println()
-		fmt.Println("The web server ready for your Javascript application")
+		fmt.Println("The web server ready for serving your Javascript application")
 		fmt.Println()
 		fmt.Println("Options:")
 		flag.PrintDefaults()
@@ -49,7 +48,6 @@ func main() {
 		fmt.Println("Run 'neon COMMAND --help' for more information on a command.")
 		fmt.Println()
 		fmt.Println("To get more help with neon, check out our docs at https://neon.bhexpert.com/docs/latest")
-		os.Exit(0)
 	}
 
 	flag.Parse()
@@ -60,8 +58,9 @@ func main() {
 	}
 
 	args := flag.Args()
-	if len(args) < 1 {
+	if len(args) == 0 {
 		flag.Usage()
+		os.Exit(0)
 	}
 
 	if v, ok := os.LookupEnv("DEBUG"); ok {
@@ -107,4 +106,5 @@ func main() {
 	}
 
 	flag.Usage()
+	os.Exit(1)
 }

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
 	"runtime"
 
 	"github.com/bhuisgen/neon/internal/app"
@@ -20,7 +19,7 @@ type versionCommand struct {
 	verbose bool
 }
 
-// NewVersionCommand creates the command
+// NewVersionCommand creates a command
 func NewVersionCommand() *versionCommand {
 	c := versionCommand{}
 	c.flagset = flag.NewFlagSet("version", flag.ExitOnError)
@@ -30,7 +29,6 @@ func NewVersionCommand() *versionCommand {
 		fmt.Println()
 		fmt.Println("Options:")
 		c.flagset.PrintDefaults()
-		os.Exit(0)
 	}
 
 	return &c

@@ -24,7 +24,7 @@ type serveCommand struct {
 	verbose bool
 }
 
-// NewServeCommand creates the command
+// NewServeCommand creates a command
 func NewServeCommand() *serveCommand {
 	c := serveCommand{}
 	c.flagset = flag.NewFlagSet("serve", flag.ExitOnError)
@@ -34,7 +34,6 @@ func NewServeCommand() *serveCommand {
 		fmt.Println()
 		fmt.Println("Options:")
 		c.flagset.PrintDefaults()
-		os.Exit(0)
 	}
 
 	return &c
@@ -188,7 +187,7 @@ func (c *serveCommand) Execute() error {
 
 	log.Printf("%s version %s, commit %s\n", app.Name, app.Version, app.Commit)
 
-	log.Println("Starting instance")
+	log.Print("Starting instance")
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -204,7 +203,7 @@ func (c *serveCommand) Execute() error {
 	<-exit
 	signal.Stop(exit)
 
-	log.Println("Stopping instance")
+	log.Print("Stopping instance")
 
 	if loader != nil {
 		loader.Stop()
