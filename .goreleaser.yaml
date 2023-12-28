@@ -1,4 +1,7 @@
-project_name: neon
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+project_name: neon-oss
 
 env:
   - DOCKER_CERT_PATH={{.Env.DOCKER_CERT_PATH}}
@@ -10,7 +13,8 @@ before:
     - go mod tidy
 
 builds:
-  - main: ./cmd/exec/
+  - id: neon
+    main: ./cmd/neon
     binary: neon
     flags:
       - -trimpath
@@ -32,9 +36,9 @@ builds:
         goamd64: v1
         ldflags:
           - -s -w -extldflags '-static'
-            -X github.com/bhuisgen/neon/internal/app.Version={{.Version}}
-            -X github.com/bhuisgen/neon/internal/app.Commit={{.Commit}}
-            -X github.com/bhuisgen/neon/internal/app.Date={{.Date}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Version={{.Version}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Commit={{.Commit}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Date={{.Date}}
       - goos: linux
         goarch: arm64
         goarm: ""
@@ -43,9 +47,9 @@ builds:
           - CXX=aarch64-linux-gnu-g++
         ldflags:
           - -s -w
-            -X github.com/bhuisgen/neon/internal/app.Version={{.Version}}
-            -X github.com/bhuisgen/neon/internal/app.Commit={{.Commit}}
-            -X github.com/bhuisgen/neon/internal/app.Date={{.Date}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Version={{.Version}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Commit={{.Commit}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Date={{.Date}}
       - goos: darwin
         goarch: amd64
         goamd64: v1
@@ -54,9 +58,9 @@ builds:
           - CXX=o64-clang++
         ldflags:
           - -s -w
-            -X github.com/bhuisgen/neon/internal/app.Version={{.Version}}
-            -X github.com/bhuisgen/neon/internal/app.Commit={{.Commit}}
-            -X github.com/bhuisgen/neon/internal/app.Date={{.Date}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Version={{.Version}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Commit={{.Commit}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Date={{.Date}}
       - goos: darwin
         goarch: arm64
         goarm: ""
@@ -65,9 +69,54 @@ builds:
           - CXX=oa64-clang++
         ldflags:
           - -s -w
-            -X github.com/bhuisgen/neon/internal/app.Version={{.Version}}
-            -X github.com/bhuisgen/neon/internal/app.Commit={{.Commit}}
-            -X github.com/bhuisgen/neon/internal/app.Date={{.Date}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Version={{.Version}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Commit={{.Commit}}
+            -X github.com/bhuisgen/neon/internal/app/neon.Date={{.Date}}
+  - id: healthcheck
+    main: ./cmd/healthcheck
+    binary: healthcheck
+    flags:
+      - -trimpath
+    tags:
+      - netgo
+      - osusergo
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{.CommitTimestamp}}"
+    overrides:
+      - goos: linux
+        goarch: amd64
+        goamd64: v1
+        ldflags:
+          - -s -w -extldflags '-static'
+      - goos: linux
+        goarch: arm64
+        goarm: ""
+        env:
+          - CC=aarch64-linux-gnu-gcc
+          - CXX=aarch64-linux-gnu-g++
+        ldflags:
+          - -s -w
+      - goos: darwin
+        goarch: amd64
+        goamd64: v1
+        env:
+          - CC=o64-clang
+          - CXX=o64-clang++
+        ldflags:
+          - -s -w
+      - goos: darwin
+        goarch: arm64
+        goarm: ""
+        env:
+          - CC=oa64-clang
+          - CXX=oa64-clang++
+        ldflags:
+          - -s -w
 
 dockers:
   - use: buildx
@@ -83,9 +132,11 @@ dockers:
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/bhuisgen/neon-pro"
+      - "--label=org.opencontainers.image.source=https://github.com/bhuisgen/neon-oss"
       - "--label=org.opencontainers.image.vendor=Boris HUISGEN"
       - "--platform=linux/amd64"
+    extra_files:
+      - share/certs/ca-certificates.crt
   - use: buildx
     image_templates:
       - "{{.ProjectName}}:{{.Version}}-arm64"
@@ -100,9 +151,11 @@ dockers:
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.source=https://github.com/bhuisgen/neon-pro"
+      - "--label=org.opencontainers.image.source=https://github.com/bhuisgen/neon-oss"
       - "--label=org.opencontainers.image.vendor=Boris HUISGEN"
       - "--platform=linux/arm64/v8"
+    extra_files:
+      - share/certs/ca-certificates.crt
 
 # docker_manifests:
 #   - name_template: "{{.ProjectName}}:{{.Version}}"
@@ -130,6 +183,3 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-# modelines, feel free to remove those if you don't want/use them:
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# vim: set ts=2 sw=2 tw=0 fo=cnqoj

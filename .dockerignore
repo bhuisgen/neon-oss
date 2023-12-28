@@ -1,5 +1,5 @@
 /.vscode
-/data
+/dist
 /Makefile
 /neon
 /neon.yaml

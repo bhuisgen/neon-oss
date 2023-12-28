@@ -3,34 +3,30 @@ GIT_COMMIT = $(shell git describe --always)
 GIT_URL = $(shell git config --get remote.origin.url)
 TAG ?= dev
 
+.PHONY: all clean build dist dist-release
+
 all: build
 
-.PHONY: build
-build: init
+clean:
+	rm -fr build/
+
+build:
 	CGO_ENABLED=1 go build -tags netgo,osusergo \
 		-ldflags " \
 			-s -w -extldflags '-static' \
-			-X github.com/bhuisgen/neon/internal/app.version=${TAG} \
-			-X github.com/bhuisgen/neon/internal/app.commit=${GIT_COMMIT} \
-			-X github.com/bhuisgen/neon/internal/app.Date=${DATE} \
+			-X github.com/bhuisgen/neon/internal/app/neon.Version=${TAG} \
+			-X github.com/bhuisgen/neon/internal/app/neon.Commit=${GIT_COMMIT} \
+			-X github.com/bhuisgen/neon/internal/app/neon.Date=${DATE} \
 		" \
-		-o neon cmd/exec/*.go
+		-o neon ./cmd/neon/*
 
-.PHONY: clean
-clean:
-
-.PHONY: init
-init:
-
-.PHONY: dist
 dist:
-	docker run --rm -v devcontainer_neon:/workspace -w /workspace/neon \
+	docker run --rm -v ${DOCKER_VOLUME}:/workspace -w /workspace/neon-oss \
 		-e DOCKER_CERT_PATH=${DOCKER_CERT_PATH} -e DOCKER_HOST=${DOCKER_HOST} -e DOCKER_TLS_VERIFY=${DOCKER_TLS_VERIFY} \
-		bhuisgen/goreleaser-cross:v1.19.3-amd64 --rm-dist --snapshot 
+		goreleaser/goreleaser-cross:v1.21 --snapshot --clean
 
-.PHONY: dist-release
 dist-release:
-	docker run --rm -v devcontainer_neon:/workspace -w /workspace/neon \
+	docker run --rm -v ${DOCKER_VOLUME}:/workspace -w /workspace/neon-oss \
 		-e DOCKER_CERT_PATH=${DOCKER_CERT_PATH} -e DOCKER_HOST=${DOCKER_HOST} -e DOCKER_TLS_VERIFY=${DOCKER_TLS_VERIFY} \
 		-e GITHUB_TOKEN=${GITHUB_TOKEN} \
-		bhuisgen/goreleaser-cross:v1.19.3-amd64 --rm-dist
+		goreleaser/goreleaser-cross:v1.21 --clean
