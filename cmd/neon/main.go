@@ -65,13 +65,13 @@ func run() error {
 		return nil
 	}
 
+	if v, ok := os.LookupEnv("CONFIG_FILE"); ok {
+		core.CONFIG_FILE = v
+	}
 	if v, ok := os.LookupEnv("DEBUG"); ok {
 		if v != "0" {
 			core.DEBUG = true
 		}
-	}
-	if v, ok := os.LookupEnv("CONFIG_FILE"); ok {
-		core.CONFIG_FILE = v
 	}
 
 	for _, c := range commands {
