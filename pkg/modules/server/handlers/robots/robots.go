@@ -16,6 +16,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -133,7 +134,7 @@ func (h *robotsHandler) Load(config map[string]interface{}) error {
 		return err
 	}
 	h.rwPool = render.NewRenderWriterPool()
-	h.cache = cache.NewCache()
+	h.cache = memory.NewMemoryCache()
 
 	return nil
 }

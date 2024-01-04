@@ -17,16 +17,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"golang.org/x/net/html"
 
 	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
-	"github.com/mitchellh/mapstructure"
 )
 
-// appHandler implements the app handler
+// appHandler implements the app handler.
 type appHandler struct {
 	config      *appHandlerConfig
 	logger      *log.Logger
@@ -301,7 +302,7 @@ func (h *appHandler) Load(config map[string]interface{}) error {
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
-	h.cache = cache.NewCache()
+	h.cache = memory.NewMemoryCache()
 
 	return nil
 }

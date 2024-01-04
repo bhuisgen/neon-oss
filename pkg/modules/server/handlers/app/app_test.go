@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -821,7 +822,7 @@ func TestAppHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: cache.NewCache(),
+				cache: memory.NewMemoryCache(),
 			},
 		},
 	}
@@ -897,7 +898,7 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 				logger: log.Default(),
 				rwPool: render.NewRenderWriterPool(),
 				vmPool: newVMPool(1),
-				cache:  cache.NewCache(),
+				cache:  memory.NewMemoryCache(),
 				osReadFile: func(name string) ([]byte, error) {
 					return os.ReadFile(name)
 				},

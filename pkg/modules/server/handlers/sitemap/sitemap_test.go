@@ -15,6 +15,7 @@ import (
 	"text/template"
 
 	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -417,7 +418,6 @@ func TestSitemapHandlerLoad(t *testing.T) {
 	}
 }
 
-
 func TestSitemapHandlerRegister(t *testing.T) {
 	type fields struct {
 		config               *sitemapHandlerConfig
@@ -601,7 +601,7 @@ func TestSitemapHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: cache.NewCache(),
+				cache: memory.NewMemoryCache(),
 			},
 		},
 	}
@@ -661,7 +661,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 				templateSitemapIndex: tmplSitemapIndex,
 				templateSitemap:      tmplSitemap,
 				rwPool:               render.NewRenderWriterPool(),
-				cache:                cache.NewCache(),
+				cache:                memory.NewMemoryCache(),
 			},
 			args: args{
 				w: testSitemapHandlerResponseWriter{},

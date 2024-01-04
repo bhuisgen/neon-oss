@@ -15,6 +15,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -166,7 +167,7 @@ func (h *fileHandler) Load(config map[string]interface{}) error {
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
-	h.cache = cache.NewCache()
+	h.cache = memory.NewMemoryCache()
 
 	return nil
 }
@@ -285,3 +286,5 @@ func (h *fileHandler) render(w render.RenderWriter, r *http.Request) error {
 
 	return nil
 }
+
+var _ core.ServerHandlerModule = (*fileHandler)(nil)

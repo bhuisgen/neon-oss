@@ -14,6 +14,7 @@ import (
 	"text/template"
 
 	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -378,7 +379,7 @@ func TestRobotsHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: cache.NewCache(),
+				cache: memory.NewMemoryCache(),
 			},
 		},
 	}
@@ -428,7 +429,7 @@ func TestRobotsHandlerServeHTTP(t *testing.T) {
 				logger:   log.Default(),
 				template: tmpl,
 				rwPool:   render.NewRenderWriterPool(),
-				cache:    cache.NewCache(),
+				cache:    memory.NewMemoryCache(),
 			},
 			args: args{
 				w: testRobotsHandlerResponseWriter{},

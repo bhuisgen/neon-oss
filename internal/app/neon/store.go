@@ -14,6 +14,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 )
 
@@ -58,13 +59,13 @@ func (s *store) Load(config map[string]interface{}) error {
 	s.config = &c
 	s.logger = log.New(os.Stderr, fmt.Sprint(storeLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 	s.state = &storeState{
-		data: cache.NewCache(),
+		data: memory.NewMemoryCache(),
 	}
 
 	return nil
 }
 
-// Get returns the data.
+// Get returns a resource.
 func (s *store) Get(name string) (*core.Resource, error) {
 	v := s.state.data.Get(name)
 	if v == nil {
@@ -79,7 +80,7 @@ func (s *store) Get(name string) (*core.Resource, error) {
 	return r, nil
 }
 
-// Set stores the data.
+// Set stores a resource.
 func (s *store) Set(name string, resource *core.Resource, ttl time.Duration) error {
 	s.state.data.Set(name, resource, ttl)
 

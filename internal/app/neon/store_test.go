@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 )
 
@@ -87,7 +87,7 @@ func TestStoreLoad(t *testing.T) {
 }
 
 func TestStoreGet(t *testing.T) {
-	data := cache.NewCache()
+	data := memory.NewMemoryCache()
 	data.Set("test", &core.Resource{
 		Data: [][]byte{[]byte("test")},
 		TTL:  0,
@@ -189,7 +189,7 @@ func TestStoreSet(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &storeState{
-					data: cache.NewCache(),
+					data: memory.NewMemoryCache(),
 				},
 			},
 		},

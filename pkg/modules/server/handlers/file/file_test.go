@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/bhuisgen/neon/pkg/cache"
+	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -621,7 +622,7 @@ func TestFileHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: cache.NewCache(),
+				cache: memory.NewMemoryCache(),
 			},
 		},
 	}
@@ -677,7 +678,7 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 				},
 				logger: log.Default(),
 				rwPool: render.NewRenderWriterPool(),
-				cache:  cache.NewCache(),
+				cache:  memory.NewMemoryCache(),
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
 					return nil, nil
 				},
