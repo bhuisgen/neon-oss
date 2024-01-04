@@ -556,6 +556,8 @@ type serverMiddleware struct {
 const (
 	serverMiddlewareHeaderRequestId string = "X-Request-ID"
 	serverMiddlewareHeaderServer    string = "Server"
+
+	serverMiddlewareHeaderServerValue string = "neon"
 )
 
 // newServerMiddleware creates the server middleware.
@@ -579,7 +581,7 @@ func (m *serverMiddleware) Handler(next http.Handler) http.Handler {
 			}
 		}()
 
-		w.Header().Set(serverMiddlewareHeaderServer, fmt.Sprint("neon/", Version))
+		w.Header().Set(serverMiddlewareHeaderServer, serverMiddlewareHeaderServerValue)
 		w.Header().Set(serverMiddlewareHeaderRequestId, uuid.NewString())
 
 		next.ServeHTTP(w, r)
