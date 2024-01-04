@@ -4,10 +4,8 @@
 
 package core
 
-import "time"
-
 // Store
 type Store interface {
 	Get(name string) (*Resource, error)
-	Set(name string, resource *Resource, ttl time.Duration) error
+	Set(name string, resource *Resource) error
 }

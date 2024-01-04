@@ -359,8 +359,7 @@ func (h *appHandler) Stop() {
 
 // ServeHTTP implements the http handler.
 func (h *appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var key string
-	key = r.URL.Path
+	key := r.URL.Path
 
 	if *h.config.Cache {
 		obj := h.cache.Get(key)

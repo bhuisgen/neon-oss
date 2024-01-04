@@ -10,7 +10,6 @@ import (
 	"log"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/bhuisgen/neon/pkg/core"
 )
@@ -27,7 +26,7 @@ func (s *testRawParserStore) Get(name string) (*core.Resource, error) {
 	return nil, nil
 }
 
-func (s *testRawParserStore) Set(name string, resource *core.Resource, ttl time.Duration) error {
+func (s *testRawParserStore) Set(name string, resource *core.Resource) error {
 	if s.errSet {
 		return errors.New("test error")
 	}

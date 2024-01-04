@@ -61,11 +61,6 @@ type vmData struct {
 	scripts        *domElementList
 }
 
-// vmCache implements the VM cache.
-type vmCache struct {
-	bundleCodeCache *v8go.CompilerCachedData
-}
-
 const (
 	vmLogger string = "vm"
 )

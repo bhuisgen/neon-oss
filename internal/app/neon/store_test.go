@@ -8,7 +8,6 @@ import (
 	"log"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
@@ -177,7 +176,6 @@ func TestStoreSet(t *testing.T) {
 	type args struct {
 		name     string
 		resource *core.Resource
-		ttl      time.Duration
 	}
 	tests := []struct {
 		name    string
@@ -192,6 +190,13 @@ func TestStoreSet(t *testing.T) {
 					data: memory.NewMemoryCache(),
 				},
 			},
+			args: args{
+				name: "test",
+				resource: &core.Resource{
+					Data: [][]byte{[]byte("{}")},
+					TTL:  0,
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -201,7 +206,7 @@ func TestStoreSet(t *testing.T) {
 				logger: tt.fields.logger,
 				state:  tt.fields.state,
 			}
-			if err := s.Set(tt.args.name, tt.args.resource, tt.args.ttl); (err != nil) != tt.wantErr {
+			if err := s.Set(tt.args.name, tt.args.resource); (err != nil) != tt.wantErr {
 				t.Errorf("store.Set() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

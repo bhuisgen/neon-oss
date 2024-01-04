@@ -8,7 +8,6 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/bhuisgen/neon/pkg/core"
 )
@@ -81,5 +80,5 @@ type Store interface {
 	Check(config map[string]interface{}) ([]string, error)
 	Load(config map[string]interface{}) error
 	Get(name string) (*core.Resource, error)
-	Set(name string, resource *core.Resource, ttl time.Duration) error
+	Set(name string, resource *core.Resource) error
 }

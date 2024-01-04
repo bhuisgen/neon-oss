@@ -45,7 +45,7 @@ func (s testAppHandlerStore) Get(name string) (*core.Resource, error) {
 	return nil, nil
 }
 
-func (s testAppHandlerStore) Set(name string, resource *core.Resource, ttl time.Duration) error {
+func (s testAppHandlerStore) Set(name string, resource *core.Resource) error {
 	return nil
 }
 

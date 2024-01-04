@@ -109,7 +109,7 @@ func (p *rawParser) Parse(ctx context.Context, store core.Store, fetcher core.Fe
 		return err
 	}
 
-	err = store.Set(resourceName, resource, resource.TTL)
+	err = store.Set(resourceName, resource)
 	if err != nil {
 		return err
 	}

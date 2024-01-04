@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/mitchellh/mapstructure"
 
@@ -81,8 +80,8 @@ func (s *store) Get(name string) (*core.Resource, error) {
 }
 
 // Set stores a resource.
-func (s *store) Set(name string, resource *core.Resource, ttl time.Duration) error {
-	s.state.data.Set(name, resource, ttl)
+func (s *store) Set(name string, resource *core.Resource) error {
+	s.state.data.Set(name, resource, resource.TTL)
 
 	return nil
 }
