@@ -403,7 +403,7 @@ func TestRestProviderFetch(t *testing.T) {
 				logger: log.Default(),
 				httpNewRequestWithContext: func(ctx context.Context, method, url string, body io.Reader) (*http.Request,
 					error) {
-					return nil, errors.New("test")
+					return nil, errors.New("test error")
 				},
 			},
 			args: args{
@@ -425,7 +425,7 @@ func TestRestProviderFetch(t *testing.T) {
 					}, nil
 				},
 				httpClientDo: func(client *http.Client, req *http.Request) (*http.Response, error) {
-					return nil, errors.New("test")
+					return nil, errors.New("test error")
 				},
 			},
 			args: args{
@@ -452,7 +452,7 @@ func TestRestProviderFetch(t *testing.T) {
 					}, nil
 				},
 				ioReadAll: func(r io.Reader) ([]byte, error) {
-					return nil, errors.New("test")
+					return nil, errors.New("test error")
 				},
 			},
 			args: args{
