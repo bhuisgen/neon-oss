@@ -39,7 +39,7 @@ func init() {
 }
 
 // ModuleInfo returns the module information.
-func (e rawParser) ModuleInfo() module.ModuleInfo {
+func (p rawParser) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
 		ID: rawModuleID,
 		NewInstance: func() module.Module {
@@ -49,7 +49,7 @@ func (e rawParser) ModuleInfo() module.ModuleInfo {
 }
 
 // Check checks the parser configuration.
-func (e *rawParser) Check(config map[string]interface{}) ([]string, error) {
+func (p *rawParser) Check(config map[string]interface{}) ([]string, error) {
 	var report []string
 
 	var c rawParserConfig
@@ -71,38 +71,38 @@ func (e *rawParser) Check(config map[string]interface{}) ([]string, error) {
 }
 
 // Load loads the parser.
-func (e *rawParser) Load(config map[string]interface{}) error {
+func (p *rawParser) Load(config map[string]interface{}) error {
 	var c rawParserConfig
 	err := mapstructure.Decode(config, &c)
 	if err != nil {
 		return err
 	}
 
-	e.config = &c
-	e.logger = log.New(os.Stderr, fmt.Sprint(rawLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	p.config = &c
+	p.logger = log.New(os.Stderr, fmt.Sprint(rawLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return nil
 }
 
 // Parse parses a resource.
-func (e *rawParser) Parse(ctx context.Context, store core.Store, fetcher core.Fetcher) error {
+func (p *rawParser) Parse(ctx context.Context, store core.Store, fetcher core.Fetcher) error {
 	var resourceName, resourceProvider string
 	var resourceConfig map[string]interface{}
-	for k := range e.config.Resource {
+	for k := range p.config.Resource {
 		resourceName = k
 		break
 	}
 	if resourceName == "" {
 		return errors.New("failed to parse resource name")
 	}
-	for k := range e.config.Resource[resourceName] {
+	for k := range p.config.Resource[resourceName] {
 		resourceProvider = k
 		break
 	}
 	if resourceProvider == "" {
 		return errors.New("failed to parse resource provider")
 	}
-	resourceConfig, _ = e.config.Resource[resourceName][resourceProvider].(map[string]interface{})
+	resourceConfig, _ = p.config.Resource[resourceName][resourceProvider].(map[string]interface{})
 
 	resource, err := fetcher.Fetch(ctx, resourceName, resourceProvider, resourceConfig)
 	if err != nil {

@@ -51,8 +51,8 @@ func init() {
 	module.Register(jsonParser{})
 }
 
-// ModuleInfo implements module.Module.
-func (e jsonParser) ModuleInfo() module.ModuleInfo {
+// ModuleInfo returns the module information.
+func (p jsonParser) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
 		ID: jsonModuleID,
 		NewInstance: func() module.Module {
@@ -63,8 +63,8 @@ func (e jsonParser) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check implements core.Module.
-func (e *jsonParser) Check(config map[string]interface{}) ([]string, error) {
+// Check checks the parser configuration.
+func (p *jsonParser) Check(config map[string]interface{}) ([]string, error) {
 	var report []string
 
 	var c jsonParserConfig
@@ -92,30 +92,30 @@ func (e *jsonParser) Check(config map[string]interface{}) ([]string, error) {
 }
 
 // Load loads the parser.
-func (e *jsonParser) Load(config map[string]interface{}) error {
+func (p *jsonParser) Load(config map[string]interface{}) error {
 	var c jsonParserConfig
 	err := mapstructure.Decode(config, &c)
 	if err != nil {
 		return err
 	}
 
-	e.config = &c
-	e.logger = log.New(os.Stderr, fmt.Sprint(jsonLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	p.config = &c
+	p.logger = log.New(os.Stderr, fmt.Sprint(jsonLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return nil
 }
 
 // Parse parses a resource.
-func (e *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.Fetcher) error {
+func (p *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.Fetcher) error {
 	var resourceName, resourceProvider string
-	for k := range e.config.Resource {
+	for k := range p.config.Resource {
 		resourceName = k
 		break
 	}
 	if resourceName == "" {
 		return errors.New("failed to parse resource name")
 	}
-	for k := range e.config.Resource[resourceName] {
+	for k := range p.config.Resource[resourceName] {
 		resourceProvider = k
 		break
 	}
@@ -124,7 +124,7 @@ func (e *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 	}
 
 	var resourceConfig map[string]interface{}
-	resourceConfig, _ = e.config.Resource[resourceName][resourceProvider].(map[string]interface{})
+	resourceConfig, _ = p.config.Resource[resourceName][resourceProvider].(map[string]interface{})
 	resource, err := fetcher.Fetch(ctx, resourceName, resourceProvider, resourceConfig)
 	if err != nil {
 		return err
@@ -132,11 +132,11 @@ func (e *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 
 	for _, data := range resource.Data {
 		var jsonData interface{}
-		err = e.jsonUnmarshal(data, &jsonData)
+		err = p.jsonUnmarshal(data, &jsonData)
 		if err != nil {
 			return err
 		}
-		result, err := jsonpath.Get(e.config.Filter, jsonData)
+		result, err := jsonpath.Get(p.config.Filter, jsonData)
 		if err != nil {
 			return err
 		}
@@ -147,7 +147,7 @@ func (e *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 				if !ok {
 					return errors.New("failed to parse item")
 				}
-				err := e.executeResourceFromItem(ctx, store, fetcher, mItem)
+				err := p.executeResourceFromItem(ctx, store, fetcher, mItem)
 				if err != nil {
 					return err
 				}
@@ -164,10 +164,10 @@ func (e *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 }
 
 // executeResourceFromItem loads a resource from the given item.
-func (e *jsonParser) executeResourceFromItem(ctx context.Context, store core.Store, fetcher core.Fetcher,
+func (p *jsonParser) executeResourceFromItem(ctx context.Context, store core.Store, fetcher core.Fetcher,
 	item map[string]interface{}) error {
 	var params map[string]interface{}
-	for k, v := range e.config.ItemParams {
+	for k, v := range p.config.ItemParams {
 		data, err := jsonpath.Get(v, item)
 		if err != nil || data == nil {
 			continue
@@ -180,21 +180,21 @@ func (e *jsonParser) executeResourceFromItem(ctx context.Context, store core.Sto
 
 	var itemResourceName, itemResourceProvider string
 	var itemResourceConfig map[string]interface{}
-	for k := range e.config.ItemResource {
+	for k := range p.config.ItemResource {
 		itemResourceName = k
 		break
 	}
 	if itemResourceName == "" {
 		return errors.New("failed to parse item resource name")
 	}
-	for k := range e.config.ItemResource[itemResourceName] {
+	for k := range p.config.ItemResource[itemResourceName] {
 		itemResourceProvider = k
 		break
 	}
 	if itemResourceProvider == "" {
 		return errors.New("failed to parse item resource provider")
 	}
-	itemResourceConfig, _ = e.config.ItemResource[itemResourceName][itemResourceProvider].(map[string]interface{})
+	itemResourceConfig, _ = p.config.ItemResource[itemResourceName][itemResourceProvider].(map[string]interface{})
 
 	itemResourceName = replaceParameters(itemResourceName, params)
 	itemResourceProvider = replaceParameters(itemResourceProvider, params)
