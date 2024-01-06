@@ -116,9 +116,9 @@ func (m *rewriteMiddleware) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
-func (m *rewriteMiddleware) Register(registry core.ServerRegistry) error {
-	err := registry.RegisterMiddleware(m.Handler)
+// Register registers the middleware.
+func (m *rewriteMiddleware) Register(server core.Server) error {
+	err := server.RegisterMiddleware(m.Handler)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (m *rewriteMiddleware) Register(registry core.ServerRegistry) error {
 }
 
 // Start starts the middleware.
-func (m *rewriteMiddleware) Start(store core.Store, fetcher core.Fetcher) error {
+func (m *rewriteMiddleware) Start() error {
 	for _, rule := range m.config.Rules {
 		re, err := regexp.Compile(rule.Path)
 		if err != nil {

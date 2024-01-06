@@ -22,25 +22,45 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
-type testStaticMiddlewareServerRegistry struct {
-	error bool
+type testStaticMiddlewareServer struct {
+	err bool
 }
 
-func (r testStaticMiddlewareServerRegistry) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
-	if r.error {
+func (s testStaticMiddlewareServer) Name() string {
+	return "test"
+}
+
+func (s testStaticMiddlewareServer) Listeners() []string {
+	return nil
+}
+
+func (s testStaticMiddlewareServer) Hosts() []string {
+	return nil
+}
+
+func (s testStaticMiddlewareServer) Store() core.Store {
+	return nil
+}
+
+func (s testStaticMiddlewareServer) Fetcher() core.Fetcher {
+	return nil
+}
+
+func (s testStaticMiddlewareServer) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (r testStaticMiddlewareServerRegistry) RegisterHandler(handler http.Handler) error {
-	if r.error {
+func (s testStaticMiddlewareServer) RegisterHandler(handler http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.ServerRegistry = (*testStaticMiddlewareServerRegistry)(nil)
+var _ core.Server = (*testStaticMiddlewareServer)(nil)
 
 type testStaticMiddlewareFileInfo struct {
 	name     string
@@ -315,7 +335,7 @@ func TestStaticMiddlewareRegister(t *testing.T) {
 		osStat        func(name string) (fs.FileInfo, error)
 	}
 	type args struct {
-		registry core.ServerRegistry
+		server core.Server
 	}
 	tests := []struct {
 		name    string
@@ -326,14 +346,14 @@ func TestStaticMiddlewareRegister(t *testing.T) {
 		{
 			name: "default",
 			args: args{
-				registry: testStaticMiddlewareServerRegistry{},
+				server: testStaticMiddlewareServer{},
 			},
 		},
 		{
 			name: "error register",
 			args: args{
-				registry: testStaticMiddlewareServerRegistry{
-					error: true,
+				server: testStaticMiddlewareServer{
+					err: true,
 				},
 			},
 			wantErr: true,
@@ -350,7 +370,7 @@ func TestStaticMiddlewareRegister(t *testing.T) {
 				osClose:       tt.fields.osClose,
 				osStat:        tt.fields.osStat,
 			}
-			if err := m.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := m.Register(tt.args.server); (err != nil) != tt.wantErr {
 				t.Errorf("staticMiddleware.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -367,14 +387,9 @@ func TestStaticMiddlewareStart(t *testing.T) {
 		osClose       func(*os.File) error
 		osStat        func(name string) (fs.FileInfo, error)
 	}
-	type args struct {
-		store   core.Store
-		fetcher core.Fetcher
-	}
 	tests := []struct {
 		name    string
 		fields  fields
-		args    args
 		wantErr bool
 	}{
 		{
@@ -398,7 +413,7 @@ func TestStaticMiddlewareStart(t *testing.T) {
 				osClose:       tt.fields.osClose,
 				osStat:        tt.fields.osStat,
 			}
-			if err := m.Start(tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := m.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("staticMiddleware.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

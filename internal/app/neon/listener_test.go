@@ -607,7 +607,7 @@ func TestListenerDescriptor(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &listenerState{
-					registry: &listenerRegistry{},
+					mediator: &listenerMediator{},
 				},
 				update: make(chan struct{}, 1),
 			},
@@ -633,32 +633,7 @@ func TestListenerDescriptor(t *testing.T) {
 	}
 }
 
-func TestListenerRegistryListeners(t *testing.T) {
-	type fields struct {
-		listeners []net.Listener
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   []net.Listener
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &listenerRegistry{
-				listeners: tt.fields.listeners,
-			}
-			if got := r.Listeners(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("listenerRegistry.Listeners() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestListenerRegistryRegisterListener(t *testing.T) {
+func TestListenerMediatorRegisterListener(t *testing.T) {
 	type fields struct {
 		listeners []net.Listener
 	}
@@ -680,11 +655,36 @@ func TestListenerRegistryRegisterListener(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &listenerRegistry{
+			m := &listenerMediator{
 				listeners: tt.fields.listeners,
 			}
-			if err := r.RegisterListener(tt.args.listener); (err != nil) != tt.wantErr {
-				t.Errorf("listenerRegistry.RegisterListener() error = %v, wantErr %v", err, tt.wantErr)
+			if err := m.RegisterListener(tt.args.listener); (err != nil) != tt.wantErr {
+				t.Errorf("listenerMediator.RegisterListener() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestListenerMediatorListeners(t *testing.T) {
+	type fields struct {
+		listeners []net.Listener
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []net.Listener
+	}{
+		{
+			name: "default",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &listenerMediator{
+				listeners: tt.fields.listeners,
+			}
+			if got := m.Listeners(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("listenerMediator.Listeners() = %v, want %v", got, tt.want)
 			}
 		})
 	}

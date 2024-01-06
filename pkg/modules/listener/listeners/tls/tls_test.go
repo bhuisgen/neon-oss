@@ -30,22 +30,26 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-type testTLSListenerServerRegistry struct {
-	error bool
+type testTLSListener struct {
+	errRegister bool
 }
 
-func (r testTLSListenerServerRegistry) Listeners() []net.Listener {
-	return nil
+func (l testTLSListener) Name() string {
+	return "test"
 }
 
-func (r testTLSListenerServerRegistry) RegisterListener(listener net.Listener) error {
-	if r.error {
+func (l testTLSListener) RegisterListener(listener net.Listener) error {
+	if l.errRegister {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.ListenerRegistry = (*testTLSListenerServerRegistry)(nil)
+func (l testTLSListener) Listeners() []net.Listener {
+	return nil
+}
+
+var _ core.Listener = (*testTLSListener)(nil)
 
 type testTLSListenerFileInfo struct {
 	name     string
@@ -442,7 +446,7 @@ func TestTLSListenerRegister(t *testing.T) {
 		httpServerClose                func(server *http.Server) error
 	}
 	type args struct {
-		registry core.ListenerRegistry
+		listener core.Listener
 	}
 	tests := []struct {
 		name    string
@@ -462,7 +466,7 @@ func TestTLSListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testTLSListenerServerRegistry{},
+				listener: testTLSListener{},
 			},
 		},
 		{
@@ -477,7 +481,7 @@ func TestTLSListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testTLSListenerServerRegistry{},
+				listener: testTLSListener{},
 			},
 			wantErr: true,
 		},
@@ -493,8 +497,8 @@ func TestTLSListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testTLSListenerServerRegistry{
-					error: true,
+				listener: testTLSListener{
+					errRegister: true,
 				},
 			},
 			wantErr: true,
@@ -518,7 +522,7 @@ func TestTLSListenerRegister(t *testing.T) {
 				httpServerShutdown:             tt.fields.httpServerShutdown,
 				httpServerClose:                tt.fields.httpServerClose,
 			}
-			if err := l.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := l.Register(tt.args.listener); (err != nil) != tt.wantErr {
 				t.Errorf("tlsListener.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

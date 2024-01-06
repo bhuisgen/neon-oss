@@ -15,24 +15,46 @@ import (
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
-type testCompressMiddlewareServerRegistry struct {
-	error bool
+type testCompressMiddlewareServer struct {
+	err bool
 }
 
-func (r testCompressMiddlewareServerRegistry) RegisterMiddleware(
+func (s testCompressMiddlewareServer) Name() string {
+	return "test"
+}
+
+func (s testCompressMiddlewareServer) Listeners() []string {
+	return nil
+}
+
+func (s testCompressMiddlewareServer) Hosts() []string {
+	return nil
+}
+
+func (s testCompressMiddlewareServer) Store() core.Store {
+	return nil
+}
+
+func (s testCompressMiddlewareServer) Fetcher() core.Fetcher {
+	return nil
+}
+
+func (s testCompressMiddlewareServer) RegisterMiddleware(
 	middleware func(next http.Handler) http.Handler) error {
-	if r.error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (r testCompressMiddlewareServerRegistry) RegisterHandler(handler http.Handler) error {
-	if r.error {
+func (s testCompressMiddlewareServer) RegisterHandler(handler http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
+
+var _ core.Server = (*testCompressMiddlewareServer)(nil)
 
 func TestCompressMiddlewareModuleInfo(t *testing.T) {
 	type fields struct {
@@ -171,7 +193,7 @@ func TestCompressMiddlewareRegister(t *testing.T) {
 		pool   *gzipPool
 	}
 	type args struct {
-		registry core.ServerRegistry
+		server core.Server
 	}
 	tests := []struct {
 		name    string
@@ -182,14 +204,14 @@ func TestCompressMiddlewareRegister(t *testing.T) {
 		{
 			name: "default",
 			args: args{
-				registry: testCompressMiddlewareServerRegistry{},
+				server: testCompressMiddlewareServer{},
 			},
 		},
 		{
 			name: "error register",
 			args: args{
-				registry: testCompressMiddlewareServerRegistry{
-					error: true,
+				server: testCompressMiddlewareServer{
+					err: true,
 				},
 			},
 			wantErr: true,
@@ -202,7 +224,7 @@ func TestCompressMiddlewareRegister(t *testing.T) {
 				logger: tt.fields.logger,
 				pool:   tt.fields.pool,
 			}
-			if err := m.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := m.Register(tt.args.server); (err != nil) != tt.wantErr {
 				t.Errorf("compressMiddleware.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -215,14 +237,9 @@ func TestCompressMiddlewareStart(t *testing.T) {
 		logger *log.Logger
 		pool   *gzipPool
 	}
-	type args struct {
-		store   core.Store
-		fetcher core.Fetcher
-	}
 	tests := []struct {
 		name    string
 		fields  fields
-		args    args
 		wantErr bool
 	}{
 		{
@@ -236,7 +253,7 @@ func TestCompressMiddlewareStart(t *testing.T) {
 				logger: tt.fields.logger,
 				pool:   tt.fields.pool,
 			}
-			if err := m.Start(tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := m.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("compressMiddleware.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

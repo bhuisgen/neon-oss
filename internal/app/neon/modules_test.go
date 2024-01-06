@@ -51,7 +51,7 @@ func (m testListenerModule) Load(config map[string]interface{}) error {
 	return nil
 }
 
-func (m testListenerModule) Register(listenerRegistry core.ListenerRegistry) error {
+func (m testListenerModule) Register(listener core.Listener) error {
 	if m.errRegister {
 		return errors.New("test error")
 	}
@@ -116,14 +116,14 @@ func (m testServerMiddlewareModule) Load(config map[string]interface{}) error {
 	return nil
 }
 
-func (m testServerMiddlewareModule) Register(registry core.ServerRegistry) error {
+func (m testServerMiddlewareModule) Register(server core.Server) error {
 	if m.errRegister {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (m testServerMiddlewareModule) Start(store core.Store, fetcher core.Fetcher) error {
+func (m testServerMiddlewareModule) Start() error {
 	if m.errStart {
 		return errors.New("test error")
 	}
@@ -180,14 +180,14 @@ func (m testServerHandlerModule) Load(config map[string]interface{}) error {
 	return nil
 }
 
-func (m testServerHandlerModule) Register(registry core.ServerRegistry) error {
+func (m testServerHandlerModule) Register(server core.Server) error {
 	if m.errRegister {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (m testServerHandlerModule) Start(store core.Store, fetcher core.Fetcher) error {
+func (m testServerHandlerModule) Start() error {
 	if m.errStart {
 		return errors.New("test error")
 	}

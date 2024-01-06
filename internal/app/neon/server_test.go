@@ -565,55 +565,7 @@ func TestServerDefault(t *testing.T) {
 	}
 }
 
-func TestServerRouter(t *testing.T) {
-	type fields struct {
-		name    string
-		config  *serverConfig
-		logger  *log.Logger
-		state   *serverState
-		fetcher Fetcher
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		want    ServerRouter
-		wantErr bool
-	}{
-		{
-			name: "default",
-			fields: fields{
-				state: &serverState{
-					router: &serverRouter{},
-				},
-			},
-		},
-		{
-			name: "error server not ready",
-			fields: fields{
-				state: &serverState{},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &server{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
-			}
-			_, err := s.Router()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("server.Router() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-		})
-	}
-}
-
-func TestServerRegistryRegisterMiddleware(t *testing.T) {
+func TestServerMediatorRegisterMiddleware(t *testing.T) {
 	type fields struct {
 		server             *server
 		currentRoute       string
@@ -659,7 +611,7 @@ func TestServerRegistryRegisterMiddleware(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &serverRegistry{
+			m := &serverMediator{
 				server:             tt.fields.server,
 				currentRoute:       tt.fields.currentRoute,
 				defaultMiddlewares: tt.fields.defaultMiddlewares,
@@ -667,14 +619,14 @@ func TestServerRegistryRegisterMiddleware(t *testing.T) {
 				routesMiddlewares:  tt.fields.routesMiddlewares,
 				routesHandler:      tt.fields.routesHandler,
 			}
-			if err := r.RegisterMiddleware(tt.args.f); (err != nil) != tt.wantErr {
-				t.Errorf("serverRegistry.RegisterMiddleware() error = %v, wantErr %v", err, tt.wantErr)
+			if err := m.RegisterMiddleware(tt.args.f); (err != nil) != tt.wantErr {
+				t.Errorf("serverMediator.RegisterMiddleware() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestServerRegistryRegisterHandler(t *testing.T) {
+func TestServerMediatorRegisterHandler(t *testing.T) {
 	type fields struct {
 		server             *server
 		currentRoute       string
@@ -716,7 +668,7 @@ func TestServerRegistryRegisterHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &serverRegistry{
+			m := &serverMediator{
 				server:             tt.fields.server,
 				currentRoute:       tt.fields.currentRoute,
 				defaultMiddlewares: tt.fields.defaultMiddlewares,
@@ -724,8 +676,56 @@ func TestServerRegistryRegisterHandler(t *testing.T) {
 				routesMiddlewares:  tt.fields.routesMiddlewares,
 				routesHandler:      tt.fields.routesHandler,
 			}
-			if err := r.RegisterHandler(tt.args.h); (err != nil) != tt.wantErr {
-				t.Errorf("serverRegistry.RegisterHandler() error = %v, wantErr %v", err, tt.wantErr)
+			if err := m.RegisterHandler(tt.args.h); (err != nil) != tt.wantErr {
+				t.Errorf("serverMediator.RegisterHandler() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestServerRouter(t *testing.T) {
+	type fields struct {
+		name    string
+		config  *serverConfig
+		logger  *log.Logger
+		state   *serverState
+		fetcher Fetcher
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    ServerRouter
+		wantErr bool
+	}{
+		{
+			name: "default",
+			fields: fields{
+				state: &serverState{
+					router: &serverRouter{},
+				},
+			},
+		},
+		{
+			name: "error server not ready",
+			fields: fields{
+				state: &serverState{},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &server{
+				name:    tt.fields.name,
+				config:  tt.fields.config,
+				logger:  tt.fields.logger,
+				state:   tt.fields.state,
+				fetcher: tt.fields.fetcher,
+			}
+			_, err := s.Router()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("server.Router() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 		})
 	}

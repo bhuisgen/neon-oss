@@ -125,9 +125,9 @@ func (m *loggerMiddleware) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
-func (m *loggerMiddleware) Register(registry core.ServerRegistry) error {
-	err := registry.RegisterMiddleware(m.Handler)
+// Register registers the middleware.
+func (m *loggerMiddleware) Register(server core.Server) error {
+	err := server.RegisterMiddleware(m.Handler)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (m *loggerMiddleware) Register(registry core.ServerRegistry) error {
 }
 
 // Start starts the middleware.
-func (m *loggerMiddleware) Start(store core.Store, fetcher core.Fetcher) error {
+func (m *loggerMiddleware) Start() error {
 	var logFileWriter LogFileWriter
 	if m.config.File != nil {
 		w, err := CreateLogFileWriter(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)

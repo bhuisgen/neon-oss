@@ -29,25 +29,45 @@ func intPtr(i int) *int {
 	return &i
 }
 
-type testSitemapHandlerServerRegistry struct {
-	error bool
+type testSitemapHandlerServer struct {
+	err bool
 }
 
-func (r testSitemapHandlerServerRegistry) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
-	if r.error {
+func (s testSitemapHandlerServer) Name() string {
+	return "test"
+}
+
+func (s testSitemapHandlerServer) Listeners() []string {
+	return nil
+}
+
+func (s testSitemapHandlerServer) Hosts() []string {
+	return nil
+}
+
+func (s testSitemapHandlerServer) Store() core.Store {
+	return nil
+}
+
+func (s testSitemapHandlerServer) Fetcher() core.Fetcher {
+	return nil
+}
+
+func (s testSitemapHandlerServer) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (r testSitemapHandlerServerRegistry) RegisterHandler(handler http.Handler) error {
-	if r.error {
+func (s testSitemapHandlerServer) RegisterHandler(handler http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.ServerRegistry = (*testSitemapHandlerServerRegistry)(nil)
+var _ core.Server = (*testSitemapHandlerServer)(nil)
 
 type testSitemapHandlerResponseWriter struct {
 	header http.Header
@@ -74,7 +94,7 @@ func TestSitemapHandlerModuleInfo(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
+		server               core.Server
 	}
 	tests := []struct {
 		name   string
@@ -98,7 +118,7 @@ func TestSitemapHandlerModuleInfo(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
 			got := h.ModuleInfo()
 			if got.ID != tt.want.ID {
@@ -119,7 +139,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
+		server               core.Server
 	}
 	type args struct {
 		config map[string]interface{}
@@ -363,7 +383,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
 			got, err := h.Check(tt.args.config)
 			if (err != nil) != tt.wantErr {
@@ -385,7 +405,7 @@ func TestSitemapHandlerLoad(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
+		server               core.Server
 	}
 	type args struct {
 		config map[string]interface{}
@@ -409,7 +429,7 @@ func TestSitemapHandlerLoad(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
 			if err := h.Load(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("sitemapHandler.Load() error = %v, wantErr %v", err, tt.wantErr)
@@ -426,10 +446,10 @@ func TestSitemapHandlerRegister(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
+		server               core.Server
 	}
 	type args struct {
-		registry core.ServerRegistry
+		server core.Server
 	}
 	tests := []struct {
 		name    string
@@ -440,14 +460,14 @@ func TestSitemapHandlerRegister(t *testing.T) {
 		{
 			name: "default",
 			args: args{
-				registry: testSitemapHandlerServerRegistry{},
+				server: testSitemapHandlerServer{},
 			},
 		},
 		{
 			name: "error register",
 			args: args{
-				registry: testSitemapHandlerServerRegistry{
-					error: true,
+				server: testSitemapHandlerServer{
+					err: true,
 				},
 			},
 			wantErr: true,
@@ -462,9 +482,9 @@ func TestSitemapHandlerRegister(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
-			if err := h.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := h.Register(tt.args.server); (err != nil) != tt.wantErr {
 				t.Errorf("sitemapHandler.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -479,16 +499,11 @@ func TestSitemapHandlerStart(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
-	}
-	type args struct {
-		store   core.Store
-		fetcher core.Fetcher
+		server               core.Server
 	}
 	tests := []struct {
 		name    string
 		fields  fields
-		args    args
 		wantErr bool
 	}{
 		{
@@ -504,9 +519,9 @@ func TestSitemapHandlerStart(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
-			if err := h.Start(tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := h.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("sitemapHandler.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -521,7 +536,7 @@ func TestSitemapHandlerMount(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
+		server               core.Server
 	}
 	tests := []struct {
 		name    string
@@ -541,7 +556,7 @@ func TestSitemapHandlerMount(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
 			if err := h.Mount(); (err != nil) != tt.wantErr {
 				t.Errorf("sitemapHandler.Mount() error = %v, wantErr %v", err, tt.wantErr)
@@ -558,7 +573,7 @@ func TestSitemapHandlerUnmount(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
+		server               core.Server
 	}
 	tests := []struct {
 		name   string
@@ -577,7 +592,7 @@ func TestSitemapHandlerUnmount(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
 			h.Unmount()
 		})
@@ -592,7 +607,7 @@ func TestSitemapHandlerStop(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
+		server               core.Server
 	}
 	tests := []struct {
 		name   string
@@ -614,7 +629,7 @@ func TestSitemapHandlerStop(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
 			h.Stop()
 		})
@@ -639,7 +654,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                cache.Cache
-		store                core.Store
+		server               core.Server
 	}
 	type args struct {
 		w http.ResponseWriter
@@ -682,7 +697,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
-				store:                tt.fields.store,
+				server:               tt.fields.server,
 			}
 			h.ServeHTTP(tt.args.w, tt.args.r)
 		})

@@ -18,25 +18,45 @@ import (
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
-type testLoggerMiddlewareServerRegistry struct {
-	error bool
+type testLoggerMiddlewareServer struct {
+	err bool
 }
 
-func (r testLoggerMiddlewareServerRegistry) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
-	if r.error {
+func (s testLoggerMiddlewareServer) Name() string {
+	return "test"
+}
+
+func (s testLoggerMiddlewareServer) Listeners() []string {
+	return nil
+}
+
+func (s testLoggerMiddlewareServer) Hosts() []string {
+	return nil
+}
+
+func (s testLoggerMiddlewareServer) Store() core.Store {
+	return nil
+}
+
+func (s testLoggerMiddlewareServer) Fetcher() core.Fetcher {
+	return nil
+}
+
+func (s testLoggerMiddlewareServer) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (r testLoggerMiddlewareServerRegistry) RegisterHandler(handler http.Handler) error {
-	if r.error {
+func (s testLoggerMiddlewareServer) RegisterHandler(handler http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.ServerRegistry = (*testLoggerMiddlewareServerRegistry)(nil)
+var _ core.Server = (*testLoggerMiddlewareServer)(nil)
 
 type testLoggerMiddlewareFileInfo struct {
 	name     string
@@ -334,7 +354,7 @@ func TestLoggerMiddlewareRegister(t *testing.T) {
 		osStat     func(name string) (fs.FileInfo, error)
 	}
 	type args struct {
-		registry core.ServerRegistry
+		server core.Server
 	}
 	tests := []struct {
 		name    string
@@ -345,14 +365,14 @@ func TestLoggerMiddlewareRegister(t *testing.T) {
 		{
 			name: "default",
 			args: args{
-				registry: testLoggerMiddlewareServerRegistry{},
+				server: testLoggerMiddlewareServer{},
 			},
 		},
 		{
 			name: "error register",
 			args: args{
-				registry: testLoggerMiddlewareServerRegistry{
-					error: true,
+				server: testLoggerMiddlewareServer{
+					err: true,
 				},
 			},
 			wantErr: true,
@@ -368,7 +388,7 @@ func TestLoggerMiddlewareRegister(t *testing.T) {
 				osClose:    tt.fields.osClose,
 				osStat:     tt.fields.osStat,
 			}
-			if err := m.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := m.Register(tt.args.server); (err != nil) != tt.wantErr {
 				t.Errorf("loggerMiddleware.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -384,14 +404,9 @@ func TestLoggerMiddlewareStart(t *testing.T) {
 		osClose    func(f *os.File) error
 		osStat     func(name string) (fs.FileInfo, error)
 	}
-	type args struct {
-		store   core.Store
-		fetcher core.Fetcher
-	}
 	tests := []struct {
 		name    string
 		fields  fields
-		args    args
 		wantErr bool
 	}{
 		{
@@ -411,7 +426,7 @@ func TestLoggerMiddlewareStart(t *testing.T) {
 				osClose:    tt.fields.osClose,
 				osStat:     tt.fields.osStat,
 			}
-			if err := m.Start(tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := m.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("loggerMiddleware.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

@@ -1,5 +1,7 @@
 // Copyright 2022-2023 Boris HUISGEN. All rights reserved.
-// Unauthorized copying of this file, via any medium is strictly prohibited.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 
 package robots
 
@@ -28,25 +30,45 @@ func intPtr(i int) *int {
 	return &i
 }
 
-type testRobotsHandlerServerRegistry struct {
-	error bool
+type testRobotsHandlerServer struct {
+	err bool
 }
 
-func (r testRobotsHandlerServerRegistry) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
-	if r.error {
+func (s testRobotsHandlerServer) Name() string {
+	return "test"
+}
+
+func (s testRobotsHandlerServer) Listeners() []string {
+	return nil
+}
+
+func (s testRobotsHandlerServer) Hosts() []string {
+	return nil
+}
+
+func (s testRobotsHandlerServer) Store() core.Store {
+	return nil
+}
+
+func (s testRobotsHandlerServer) Fetcher() core.Fetcher {
+	return nil
+}
+
+func (s testRobotsHandlerServer) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (r testRobotsHandlerServerRegistry) RegisterHandler(handler http.Handler) error {
-	if r.error {
+func (s testRobotsHandlerServer) RegisterHandler(handler http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.ServerRegistry = (*testRobotsHandlerServerRegistry)(nil)
+var _ core.Server = (*testRobotsHandlerServer)(nil)
 
 type testRobotsHandlerResponseWriter struct {
 	header http.Header
@@ -223,7 +245,7 @@ func TestRobotsHandlerRegister(t *testing.T) {
 		cache    cache.Cache
 	}
 	type args struct {
-		registry core.ServerRegistry
+		server core.Server
 	}
 	tests := []struct {
 		name    string
@@ -234,14 +256,14 @@ func TestRobotsHandlerRegister(t *testing.T) {
 		{
 			name: "default",
 			args: args{
-				registry: testRobotsHandlerServerRegistry{},
+				server: testRobotsHandlerServer{},
 			},
 		},
 		{
 			name: "error register",
 			args: args{
-				registry: testRobotsHandlerServerRegistry{
-					error: true,
+				server: testRobotsHandlerServer{
+					err: true,
 				},
 			},
 			wantErr: true,
@@ -256,7 +278,7 @@ func TestRobotsHandlerRegister(t *testing.T) {
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
 			}
-			if err := h.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := h.Register(tt.args.server); (err != nil) != tt.wantErr {
 				t.Errorf("robotsHandler.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -271,14 +293,9 @@ func TestRobotsHandlerStart(t *testing.T) {
 		rwPool   render.RenderWriterPool
 		cache    cache.Cache
 	}
-	type args struct {
-		store   core.Store
-		fetcher core.Fetcher
-	}
 	tests := []struct {
 		name    string
 		fields  fields
-		args    args
 		wantErr bool
 	}{
 		{
@@ -294,7 +311,7 @@ func TestRobotsHandlerStart(t *testing.T) {
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
 			}
-			if err := h.Start(tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := h.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("robotsHandler.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

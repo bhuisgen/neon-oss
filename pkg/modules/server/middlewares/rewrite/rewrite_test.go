@@ -16,25 +16,45 @@ import (
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
-type testRewriteMiddlewareServerRegistry struct {
-	error bool
+type testRewriteMiddlewareServer struct {
+	err bool
 }
 
-func (r testRewriteMiddlewareServerRegistry) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
-	if r.error {
+func (s testRewriteMiddlewareServer) Name() string {
+	return "test"
+}
+
+func (s testRewriteMiddlewareServer) Listeners() []string {
+	return nil
+}
+
+func (s testRewriteMiddlewareServer) Hosts() []string {
+	return nil
+}
+
+func (s testRewriteMiddlewareServer) Store() core.Store {
+	return nil
+}
+
+func (s testRewriteMiddlewareServer) Fetcher() core.Fetcher {
+	return nil
+}
+
+func (s testRewriteMiddlewareServer) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (r testRewriteMiddlewareServerRegistry) RegisterHandler(handler http.Handler) error {
-	if r.error {
+func (s testRewriteMiddlewareServer) RegisterHandler(handler http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.ServerRegistry = (*testRewriteMiddlewareServerRegistry)(nil)
+var _ core.Server = (*testRewriteMiddlewareServer)(nil)
 
 func TestRewriteMiddlewareModuleInfo(t *testing.T) {
 	type fields struct {
@@ -204,7 +224,7 @@ func TestRewriteMiddlewareRegister(t *testing.T) {
 		regexps []*regexp.Regexp
 	}
 	type args struct {
-		registry core.ServerRegistry
+		server core.Server
 	}
 	tests := []struct {
 		name    string
@@ -215,14 +235,14 @@ func TestRewriteMiddlewareRegister(t *testing.T) {
 		{
 			name: "default",
 			args: args{
-				registry: testRewriteMiddlewareServerRegistry{},
+				server: testRewriteMiddlewareServer{},
 			},
 		},
 		{
 			name: "error register",
 			args: args{
-				registry: testRewriteMiddlewareServerRegistry{
-					error: true,
+				server: testRewriteMiddlewareServer{
+					err: true,
 				},
 			},
 			wantErr: true,
@@ -235,7 +255,7 @@ func TestRewriteMiddlewareRegister(t *testing.T) {
 				logger:  tt.fields.logger,
 				regexps: tt.fields.regexps,
 			}
-			if err := m.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := m.Register(tt.args.server); (err != nil) != tt.wantErr {
 				t.Errorf("rewriteMiddleware.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -248,14 +268,9 @@ func TestRewriteMiddlewareStart(t *testing.T) {
 		logger  *log.Logger
 		regexps []*regexp.Regexp
 	}
-	type args struct {
-		store   core.Store
-		fetcher core.Fetcher
-	}
 	tests := []struct {
 		name    string
 		fields  fields
-		args    args
 		wantErr bool
 	}{
 		{
@@ -291,7 +306,7 @@ func TestRewriteMiddlewareStart(t *testing.T) {
 				logger:  tt.fields.logger,
 				regexps: tt.fields.regexps,
 			}
-			if err := m.Start(tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := m.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("rewriteMiddleware.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

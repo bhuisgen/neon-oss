@@ -1,5 +1,6 @@
 // Copyright 2022-2023 Boris HUISGEN. All rights reserved.
-// Unauthorized copying of this file, via any medium is strictly prohibited.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 package app
 
@@ -39,8 +40,7 @@ type appHandler struct {
 	rwPool      render.RenderWriterPool
 	vmPool      VMPool
 	cache       cache.Cache
-	store       core.Store
-	fetcher     core.Fetcher
+	server      core.Server
 	osOpen      func(name string) (*os.File, error)
 	osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 	osReadFile  func(name string) ([]byte, error)
@@ -307,9 +307,11 @@ func (h *appHandler) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
-func (h *appHandler) Register(registry core.ServerRegistry) error {
-	err := registry.RegisterHandler(h)
+// Register registers the handler.
+func (h *appHandler) Register(server core.Server) error {
+	h.server = server
+
+	err := server.RegisterHandler(h)
 	if err != nil {
 		return err
 	}
@@ -318,10 +320,7 @@ func (h *appHandler) Register(registry core.ServerRegistry) error {
 }
 
 // Start starts the handler.
-func (h *appHandler) Start(store core.Store, fetcher core.Fetcher) error {
-	h.store = store
-	h.fetcher = fetcher
-
+func (h *appHandler) Start() error {
 	for _, rule := range h.config.Rules {
 		re, err := regexp.Compile(rule.Path)
 		if err != nil {
@@ -542,7 +541,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 			}
 
 			var resourceResult appResource
-			resource, err := h.store.Get(resourceKey)
+			resource, err := h.server.Store().Get(resourceKey)
 			if err != nil {
 				resourceResult.Error = appResourceUnknown
 

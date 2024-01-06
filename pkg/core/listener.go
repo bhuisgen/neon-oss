@@ -10,17 +10,18 @@ import (
 	"net/http"
 )
 
+// Listener
+type Listener interface {
+	Name() string
+	RegisterListener(listener net.Listener) error
+	Listeners() []net.Listener
+}
+
 // ListenerModule
 type ListenerModule interface {
 	Module
-	Register(listenerRegistry ListenerRegistry) error
+	Register(listener Listener) error
 	Serve(handler http.Handler) error
 	Shutdown(ctx context.Context) error
 	Close() error
-}
-
-// ListenerRegistry
-type ListenerRegistry interface {
-	Listeners() []net.Listener
-	RegisterListener(listener net.Listener) error
 }

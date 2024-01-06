@@ -36,7 +36,7 @@ type sitemapHandler struct {
 	templateSitemap      *template.Template
 	rwPool               render.RenderWriterPool
 	cache                cache.Cache
-	store                core.Store
+	server               core.Server
 }
 
 // sitemapHandlerConfig implements the sitemap handler configuration.
@@ -341,9 +341,11 @@ func (h *sitemapHandler) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
-func (h *sitemapHandler) Register(registry core.ServerRegistry) error {
-	err := registry.RegisterHandler(h)
+// Register registers the handler.
+func (h *sitemapHandler) Register(server core.Server) error {
+	h.server = server
+
+	err := server.RegisterHandler(h)
 	if err != nil {
 		return err
 	}
@@ -352,9 +354,7 @@ func (h *sitemapHandler) Register(registry core.ServerRegistry) error {
 }
 
 // Start starts the handler.
-func (h *sitemapHandler) Start(store core.Store, fetcher core.Fetcher) error {
-	h.store = store
-
+func (h *sitemapHandler) Start() error {
 	return nil
 }
 
@@ -504,7 +504,7 @@ func (h *sitemapHandler) sitemapTemplateStaticItem(entry SitemapEntry) (sitemapT
 func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemapTemplateSitemapItem, error) {
 	var items []sitemapTemplateSitemapItem
 
-	resource, err := h.store.Get(entry.List.Resource)
+	resource, err := h.server.Store().Get(entry.List.Resource)
 	if err != nil {
 		return nil, err
 	}
@@ -587,3 +587,5 @@ func (h *sitemapHandler) absURL(url string, root string) string {
 	}
 	return fmt.Sprintf("%s%s", root, url)
 }
+
+var _ core.ServerHandlerModule = (*sitemapHandler)(nil)

@@ -1,10 +1,10 @@
 // Copyright 2022-2023 Boris HUISGEN. All rights reserved.
-// Unauthorized copying of this file, via any medium is strictly prohibited.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 package app
 
 import (
-	"context"
 	"errors"
 	"io/fs"
 	"log"
@@ -39,46 +39,45 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-type testAppHandlerStore struct{}
-
-func (s testAppHandlerStore) Get(name string) (*core.Resource, error) {
-	return nil, nil
+type testAppHandlerServer struct {
+	err bool
 }
 
-func (s testAppHandlerStore) Set(name string, resource *core.Resource) error {
+func (s testAppHandlerServer) Name() string {
+	return "test"
+}
+
+func (s testAppHandlerServer) Listeners() []string {
 	return nil
 }
 
-var _ core.Store = (*testAppHandlerStore)(nil)
-
-type testAppHandlerFetcher struct{}
-
-func (f testAppHandlerFetcher) Fetch(ctx context.Context, name string, provider string,
-	config map[string]interface{}) (*core.Resource, error) {
-	return nil, nil
+func (s testAppHandlerServer) Hosts() []string {
+	return nil
 }
 
-var _ core.Fetcher = (*testAppHandlerFetcher)(nil)
-
-type testAppHandlerServerRegistry struct {
-	error bool
+func (s testAppHandlerServer) Store() core.Store {
+	return nil
 }
 
-func (r testAppHandlerServerRegistry) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
-	if r.error {
+func (s testAppHandlerServer) Fetcher() core.Fetcher {
+	return nil
+}
+
+func (s testAppHandlerServer) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (r testAppHandlerServerRegistry) RegisterHandler(handler http.Handler) error {
-	if r.error {
+func (s testAppHandlerServer) RegisterHandler(handler http.Handler) error {
+	if s.err {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.ServerRegistry = (*testAppHandlerServerRegistry)(nil)
+var _ core.Server = (*testAppHandlerServer)(nil)
 
 type testAppHandlerFileInfo struct {
 	name     string
@@ -143,7 +142,7 @@ func TestAppHandlerModuleInfo(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -177,7 +176,7 @@ func TestAppHandlerModuleInfo(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,
@@ -208,7 +207,7 @@ func TestAppHandlerCheck(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -449,7 +448,7 @@ func TestAppHandlerCheck(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,
@@ -481,7 +480,7 @@ func TestAppHandlerLoad(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -515,7 +514,7 @@ func TestAppHandlerLoad(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,
@@ -542,7 +541,7 @@ func TestAppHandlerRegister(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -551,7 +550,7 @@ func TestAppHandlerRegister(t *testing.T) {
 		jsonMarshal func(v any) ([]byte, error)
 	}
 	type args struct {
-		registry core.ServerRegistry
+		server core.Server
 	}
 	tests := []struct {
 		name    string
@@ -562,14 +561,14 @@ func TestAppHandlerRegister(t *testing.T) {
 		{
 			name: "default",
 			args: args{
-				registry: testAppHandlerServerRegistry{},
+				server: testAppHandlerServer{},
 			},
 		},
 		{
 			name: "error register",
 			args: args{
-				registry: testAppHandlerServerRegistry{
-					error: true,
+				server: testAppHandlerServer{
+					err: true,
 				},
 			},
 			wantErr: true,
@@ -588,7 +587,7 @@ func TestAppHandlerRegister(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,
@@ -596,7 +595,7 @@ func TestAppHandlerRegister(t *testing.T) {
 				osStat:      tt.fields.osStat,
 				jsonMarshal: tt.fields.jsonMarshal,
 			}
-			if err := h.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := h.Register(tt.args.server); (err != nil) != tt.wantErr {
 				t.Errorf("appHandler.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -615,7 +614,7 @@ func TestAppHandlerStart(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -623,14 +622,9 @@ func TestAppHandlerStart(t *testing.T) {
 		osStat      func(name string) (fs.FileInfo, error)
 		jsonMarshal func(v any) ([]byte, error)
 	}
-	type args struct {
-		store   core.Store
-		fetcher core.Fetcher
-	}
 	tests := []struct {
 		name    string
 		fields  fields
-		args    args
 		wantErr bool
 	}{
 		{
@@ -650,10 +644,6 @@ func TestAppHandlerStart(t *testing.T) {
 					return os.Stat(name)
 				},
 			},
-			args: args{
-				store:   testAppHandlerStore{},
-				fetcher: testAppHandlerFetcher{},
-			},
 		},
 	}
 	for _, tt := range tests {
@@ -669,7 +659,7 @@ func TestAppHandlerStart(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,
@@ -677,7 +667,7 @@ func TestAppHandlerStart(t *testing.T) {
 				osStat:      tt.fields.osStat,
 				jsonMarshal: tt.fields.jsonMarshal,
 			}
-			if err := h.Start(tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := h.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("appHandler.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -696,7 +686,7 @@ func TestAppHandlerMount(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -726,7 +716,7 @@ func TestAppHandlerMount(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,
@@ -753,7 +743,7 @@ func TestAppHandlerUnmount(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -782,7 +772,7 @@ func TestAppHandlerUnmount(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,
@@ -807,7 +797,7 @@ func TestAppHandlerStop(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -839,7 +829,7 @@ func TestAppHandlerStop(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,
@@ -864,7 +854,7 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       cache.Cache
-		fetcher     core.Fetcher
+		server      core.Server
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile  func(name string) ([]byte, error)
@@ -929,7 +919,7 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
-				fetcher:     tt.fields.fetcher,
+				server:      tt.fields.server,
 				osOpen:      tt.fields.osOpen,
 				osOpenFile:  tt.fields.osOpenFile,
 				osReadFile:  tt.fields.osReadFile,

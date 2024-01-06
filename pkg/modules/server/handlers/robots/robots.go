@@ -1,5 +1,7 @@
 // Copyright 2022-2023 Boris HUISGEN. All rights reserved.
-// Unauthorized copying of this file, via any medium is strictly prohibited.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 
 package robots
 
@@ -139,9 +141,9 @@ func (h *robotsHandler) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
-func (h *robotsHandler) Register(registry core.ServerRegistry) error {
-	err := registry.RegisterHandler(h)
+// Register registers the handler.
+func (h *robotsHandler) Register(server core.Server) error {
+	err := server.RegisterHandler(h)
 	if err != nil {
 		return err
 	}
@@ -150,7 +152,7 @@ func (h *robotsHandler) Register(registry core.ServerRegistry) error {
 }
 
 // Start starts the handler.
-func (h *robotsHandler) Start(store core.Store, fetcher core.Fetcher) error {
+func (h *robotsHandler) Start() error {
 	return nil
 }
 

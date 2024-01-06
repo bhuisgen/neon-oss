@@ -133,9 +133,9 @@ func (m *staticMiddleware) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
-func (m *staticMiddleware) Register(registry core.ServerRegistry) error {
-	err := registry.RegisterMiddleware(m.Handler)
+// Register registers the middleware.
+func (m *staticMiddleware) Register(server core.Server) error {
+	err := server.RegisterMiddleware(m.Handler)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (m *staticMiddleware) Register(registry core.ServerRegistry) error {
 }
 
 // Start starts the middleware.
-func (m *staticMiddleware) Start(store core.Store, fetcher core.Fetcher) error {
+func (m *staticMiddleware) Start() error {
 	path, err := filepath.Abs(m.config.Path)
 	if err != nil {
 		return err

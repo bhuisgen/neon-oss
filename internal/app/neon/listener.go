@@ -37,11 +37,11 @@ type listenerConfig struct {
 
 // listenerState implements the listener state.
 type listenerState struct {
+	servers        map[string]Server
 	listener       string
 	listenerModule core.ListenerModule
+	mediator       *listenerMediator
 	handler        *listenerHandler
-	servers        map[string]Server
-	registry       *listenerRegistry
 }
 
 const (
@@ -133,9 +133,9 @@ func (l *listener) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the listener resources.
+// Register registers the listener.
 func (l *listener) Register(descriptor ListenerDescriptor) error {
-	registry := newListenerRegistry(l)
+	mediator := newListenerMediator(l)
 
 	if descriptor != nil {
 		for _, file := range descriptor.Files() {
@@ -144,16 +144,16 @@ func (l *listener) Register(descriptor ListenerDescriptor) error {
 			if err != nil {
 				return err
 			}
-			registry.listeners = append(registry.listeners, ln)
+			mediator.listeners = append(mediator.listeners, ln)
 		}
 	}
 
-	err := l.state.listenerModule.Register(registry)
+	err := l.state.listenerModule.Register(mediator)
 	if err != nil {
 		return err
 	}
 
-	l.state.registry = registry
+	l.state.mediator = mediator
 	l.state.handler = newListenerHandler(l)
 
 	go l.waitForEvents()
@@ -232,13 +232,41 @@ func (l *listener) Unlink(server Server) error {
 
 // Descriptors returns the listener descriptors.
 func (l *listener) Descriptor() (ListenerDescriptor, error) {
-	if l.state.registry == nil {
+	if l.state.mediator == nil {
 		return nil, errors.New("listener not ready")
 	}
 
-	descriptor, err := l.state.registry.buildDescriptor()
+	descriptor, err := l.buildDescriptor()
 	if err != nil {
 		return nil, errors.New("invalid descriptor")
+	}
+
+	return descriptor, nil
+}
+
+// buildDescriptor builds the listener descriptor.
+func (l *listener) buildDescriptor() (ListenerDescriptor, error) {
+	descriptor := newListenerDescriptor()
+
+	for _, listener := range l.state.mediator.listeners {
+		switch v := listener.(type) {
+		case *net.TCPListener:
+			file, err := v.File()
+			if err != nil {
+				return nil, err
+			}
+			descriptor.addFile(file)
+
+		case *net.UnixListener:
+			file, err := v.File()
+			if err != nil {
+				return nil, err
+			}
+			descriptor.addFile(file)
+
+		default:
+			return nil, errors.New("unsupported listener")
+		}
 	}
 
 	return descriptor, nil
@@ -281,67 +309,43 @@ func (l *listener) updateRouter() error {
 
 var _ Listener = (*listener)(nil)
 
-// listenerRegistry implements the listener registry.
-type listenerRegistry struct {
+// listenerMediator implements the listener mediator.
+type listenerMediator struct {
+	listener  *listener
 	listeners []net.Listener
 	mu        sync.RWMutex
 }
 
-// newListenerRegistry creates a new listener registry.
-func newListenerRegistry(listener *listener) *listenerRegistry {
-	return &listenerRegistry{}
+// newListenerMediator creates a new listener mediator.
+func newListenerMediator(listener *listener) *listenerMediator {
+	return &listenerMediator{
+		listener: listener,
+	}
 }
 
-// Listeners returns the registered listeners.
-func (r *listenerRegistry) Listeners() []net.Listener {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	return r.listeners
+func (m *listenerMediator) Name() string {
+	return m.listener.Name()
 }
 
 // RegisterListener registers a listener.
-func (r *listenerRegistry) RegisterListener(listener net.Listener) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (m *listenerMediator) RegisterListener(listener net.Listener) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	r.listeners = append(r.listeners, listener)
+	m.listeners = append(m.listeners, listener)
 
 	return nil
 }
 
-// buildDescriptor builds the listener descriptor.
-func (r *listenerRegistry) buildDescriptor() (ListenerDescriptor, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+// Listeners returns the registered listeners.
+func (m *listenerMediator) Listeners() []net.Listener {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
-	descriptor := newListenerDescriptor()
-
-	for _, listener := range r.listeners {
-		switch v := listener.(type) {
-		case *net.TCPListener:
-			file, err := v.File()
-			if err != nil {
-				return nil, err
-			}
-			descriptor.addFile(file)
-
-		case *net.UnixListener:
-			file, err := v.File()
-			if err != nil {
-				return nil, err
-			}
-			descriptor.addFile(file)
-
-		default:
-			return nil, errors.New("unsupported listener")
-		}
-	}
-
-	return descriptor, nil
+	return m.listeners
 }
 
-var _ core.ListenerRegistry = (*listenerRegistry)(nil)
+var _ core.Listener = (*listenerMediator)(nil)
 
 // listenerDescriptor implements the listener descriptor.
 type listenerDescriptor struct {

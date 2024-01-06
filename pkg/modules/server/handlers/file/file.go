@@ -1,5 +1,7 @@
 // Copyright 2022-2023 Boris HUISGEN. All rights reserved.
-// Unauthorized copying of this file, via any medium is strictly prohibited.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 
 package file
 
@@ -172,9 +174,9 @@ func (h *fileHandler) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
-func (h *fileHandler) Register(registry core.ServerRegistry) error {
-	err := registry.RegisterHandler(h)
+// Register registers the handler.
+func (h *fileHandler) Register(server core.Server) error {
+	err := server.RegisterHandler(h)
 	if err != nil {
 		return err
 	}
@@ -183,7 +185,7 @@ func (h *fileHandler) Register(registry core.ServerRegistry) error {
 }
 
 // Start starts the handler.
-func (h *fileHandler) Start(store core.Store, fetcher core.Fetcher) error {
+func (h *fileHandler) Start() error {
 	err := h.read()
 	if err != nil {
 		return err

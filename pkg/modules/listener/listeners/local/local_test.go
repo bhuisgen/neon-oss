@@ -25,22 +25,26 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-type testLocalListenerServerRegistry struct {
-	error bool
+type testLocalListener struct {
+	errRegister bool
 }
 
-func (r testLocalListenerServerRegistry) Listeners() []net.Listener {
-	return nil
+func (l testLocalListener) Name() string {
+	return "test"
 }
 
-func (r testLocalListenerServerRegistry) RegisterListener(listener net.Listener) error {
-	if r.error {
+func (l testLocalListener) RegisterListener(listener net.Listener) error {
+	if l.errRegister {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.ListenerRegistry = (*testLocalListenerServerRegistry)(nil)
+func (l testLocalListener) Listeners() []net.Listener {
+	return nil
+}
+
+var _ core.Listener = (*testLocalListener)(nil)
 
 func TestLocalListenerModuleInfo(t *testing.T) {
 	type fields struct {
@@ -234,7 +238,7 @@ func TestLocalListenerRegister(t *testing.T) {
 		httpServerClose    func(server *http.Server) error
 	}
 	type args struct {
-		registry core.ListenerRegistry
+		listener core.Listener
 	}
 	tests := []struct {
 		name    string
@@ -254,7 +258,7 @@ func TestLocalListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testLocalListenerServerRegistry{},
+				listener: testLocalListener{},
 			},
 		},
 		{
@@ -269,7 +273,7 @@ func TestLocalListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testLocalListenerServerRegistry{},
+				listener: testLocalListener{},
 			},
 			wantErr: true,
 		},
@@ -285,8 +289,8 @@ func TestLocalListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testLocalListenerServerRegistry{
-					error: true,
+				listener: testLocalListener{
+					errRegister: true,
 				},
 			},
 			wantErr: true,
@@ -305,7 +309,7 @@ func TestLocalListenerRegister(t *testing.T) {
 				httpServerShutdown: tt.fields.httpServerShutdown,
 				httpServerClose:    tt.fields.httpServerClose,
 			}
-			if err := l.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := l.Register(tt.args.listener); (err != nil) != tt.wantErr {
 				t.Errorf("localListener.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

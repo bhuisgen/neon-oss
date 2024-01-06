@@ -54,9 +54,10 @@ type serverState struct {
 	defaultServer bool
 	routes        []string
 	routesMap     map[string]serverRouteState
+	mediator      *serverMediator
+	router        *serverRouter
 	middleware    *serverMiddleware
 	handler       *serverHandler
-	router        *serverRouter
 }
 
 // serverRouteState implements a server route state.
@@ -219,35 +220,37 @@ func (s *server) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
+// Register registers the middlewares and handlers.
 func (s *server) Register() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	registry := newServerRegistry(s)
+	mediator := newServerMediator(s)
 
 	for _, route := range s.state.routes {
-		registry.setRoute(route)
+		mediator.currentRoute = route
 
 		for _, middleware := range s.state.routesMap[route].middlewares {
-			err := s.state.routesMap[route].middlewaresModules[middleware].Register(registry)
+			err := s.state.routesMap[route].middlewaresModules[middleware].Register(mediator)
 			if err != nil {
 				return err
 			}
 		}
 
-		err := s.state.routesMap[route].handlerModule.Register(registry)
+		err := s.state.routesMap[route].handlerModule.Register(mediator)
 		if err != nil {
 			return err
 		}
 	}
 
-	var err error
-	s.state.router, err = registry.buildRouter()
+	s.state.mediator = mediator
+
+	router, err := s.buildRouter()
 	if err != nil {
 		return err
 	}
 
+	s.state.router = router
 	s.state.middleware = newServerMiddleware(s)
 	s.state.handler = newServerHandler(s)
 
@@ -261,13 +264,13 @@ func (s *server) Start() error {
 
 	for _, route := range s.state.routes {
 		for _, middleware := range s.state.routesMap[route].middlewares {
-			err := s.state.routesMap[route].middlewaresModules[middleware].Start(s.store, s.fetcher)
+			err := s.state.routesMap[route].middlewaresModules[middleware].Start()
 			if err != nil {
 				return err
 			}
 		}
 
-		err := s.state.routesMap[route].handlerModule.Start(s.store, s.fetcher)
+		err := s.state.routesMap[route].handlerModule.Start()
 		if err != nil {
 			return err
 		}
@@ -379,128 +382,58 @@ func (s *server) Router() (ServerRouter, error) {
 	return s.state.router, nil
 }
 
-var _ Server = (*server)(nil)
-
-// serverRegistry implements the server registry.
-type serverRegistry struct {
-	server             *server
-	currentRoute       string
-	defaultMiddlewares []func(http.Handler) http.Handler
-	defaultHandler     http.Handler
-	routesMiddlewares  map[string][]func(http.Handler) http.Handler
-	routesHandler      map[string]http.Handler
-	mu                 sync.RWMutex
-}
-
-// newServerRegistry creates a new server registry.
-func newServerRegistry(server *server) *serverRegistry {
-	return &serverRegistry{
-		server: server,
-	}
-}
-
-// setRoute selects the current route to configure.
-func (r *serverRegistry) setRoute(route string) {
-	r.currentRoute = route
-}
-
-// RegisterMiddleware registers a middleware.
-func (r *serverRegistry) RegisterMiddleware(m func(next http.Handler) http.Handler) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.currentRoute == serverRouteDefault {
-		r.defaultMiddlewares = append(r.defaultMiddlewares, m)
-	} else {
-		if r.routesMiddlewares == nil {
-			r.routesMiddlewares = make(map[string][]func(http.Handler) http.Handler)
-		}
-		if middlewares, ok := r.routesMiddlewares[r.currentRoute]; ok {
-			r.routesMiddlewares[r.currentRoute] = append(middlewares, m)
-		} else {
-			r.routesMiddlewares[r.currentRoute] = []func(http.Handler) http.Handler{m}
-		}
-	}
-
-	return nil
-}
-
-// RegisterHandler registers a handler.
-func (r *serverRegistry) RegisterHandler(h http.Handler) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.currentRoute == serverRouteDefault {
-		r.defaultHandler = h
-	} else {
-		if r.routesHandler == nil {
-			r.routesHandler = make(map[string]http.Handler)
-		}
-		if handler, ok := r.routesHandler[r.currentRoute]; ok {
-			r.routesHandler[r.currentRoute] = handler
-		} else {
-			r.routesHandler[r.currentRoute] = h
-		}
-	}
-
-	return nil
-}
-
 // buildRouter builds the server router.
-func (r *serverRegistry) buildRouter() (*serverRouter, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	routes := make(map[string]http.Handler, len(r.server.state.routes))
+func (s *server) buildRouter() (*serverRouter, error) {
+	routes := make(map[string]http.Handler, len(s.state.routes))
 
 	var findRouteMiddlewares func(route string) []func(http.Handler) http.Handler
 	findRouteMiddlewares = func(route string) []func(http.Handler) http.Handler {
-		if middlewares, ok := r.routesMiddlewares[route]; ok {
+		if middlewares, ok := s.state.mediator.routesMiddlewares[route]; ok {
 			return middlewares
 		}
 		if route == "/" {
-			return r.defaultMiddlewares
+			return s.state.mediator.defaultMiddlewares
 		}
 		return findRouteMiddlewares(path.Dir(route))
 	}
 
-	for _, route := range r.server.state.routes {
+	for _, route := range s.state.routes {
 		if !strings.HasPrefix(route, "/") {
 			continue
 		}
 
 		var handler http.Handler
-		if h, ok := (r.routesHandler[route]); ok {
+		if h, ok := (s.state.mediator.routesHandler[route]); ok {
 			handler = h
 		} else {
-			handler = r.server.state.handler
+			handler = s.state.handler
 		}
 		routeMiddlewares := findRouteMiddlewares(route)
 		for i := len(routeMiddlewares) - 1; i >= 0; i-- {
 			handler = routeMiddlewares[i](handler)
 		}
-		routes[route] = r.server.state.middleware.Handler(handler)
+		routes[route] = s.state.middleware.Handler(handler)
 	}
 
-	if _, ok := r.routesHandler["/"]; !ok {
+	if _, ok := s.state.mediator.routesHandler["/"]; !ok {
 		var handler http.Handler
 
-		if r.defaultHandler != nil {
-			handler = r.defaultHandler
+		if s.state.mediator.defaultHandler != nil {
+			handler = s.state.mediator.defaultHandler
 		} else {
-			handler = r.server.state.handler
+			handler = s.state.handler
 		}
 		routeMiddlewares := findRouteMiddlewares("/")
 		for i := len(routeMiddlewares) - 1; i >= 0; i-- {
 			handler = routeMiddlewares[i](handler)
 		}
-		routes["/"] = r.server.state.middleware.Handler(handler)
+		routes["/"] = s.state.middleware.Handler(handler)
 	}
 
 	router := newServerRouter()
 
-	if len(r.server.state.hosts) > 0 {
-		for _, name := range r.server.state.hosts {
+	if len(s.state.hosts) > 0 {
+		for _, name := range s.state.hosts {
 			for route, handler := range routes {
 				router.addRoute(name+route, handler)
 			}
@@ -514,7 +447,94 @@ func (r *serverRegistry) buildRouter() (*serverRouter, error) {
 	return router, nil
 }
 
-var _ core.ServerRegistry = (*serverRegistry)(nil)
+var _ Server = (*server)(nil)
+
+// serverMediator implements the server mediator.
+type serverMediator struct {
+	server             *server
+	currentRoute       string
+	defaultMiddlewares []func(http.Handler) http.Handler
+	defaultHandler     http.Handler
+	routesMiddlewares  map[string][]func(http.Handler) http.Handler
+	routesHandler      map[string]http.Handler
+	mu                 sync.RWMutex
+}
+
+// newServerMediator creates a new server mediator.
+func newServerMediator(server *server) *serverMediator {
+	return &serverMediator{
+		server: server,
+	}
+}
+
+// Name returns the server name.
+func (m *serverMediator) Name() string {
+	return m.server.name
+}
+
+// Listeners returns the server listeners.
+func (m *serverMediator) Listeners() []string {
+	return m.server.state.listeners
+}
+
+// Hosts returns the server hosts.
+func (m *serverMediator) Hosts() []string {
+	return m.server.state.hosts
+}
+
+// Store returns the server store.
+func (m *serverMediator) Store() core.Store {
+	return m.server.store
+}
+
+// Fetcher returns the server fetcher.
+func (m *serverMediator) Fetcher() core.Fetcher {
+	return m.server.fetcher
+}
+
+// RegisterMiddleware registers a middleware.
+func (m *serverMediator) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.currentRoute == serverRouteDefault {
+		m.defaultMiddlewares = append(m.defaultMiddlewares, middleware)
+	} else {
+		if m.routesMiddlewares == nil {
+			m.routesMiddlewares = make(map[string][]func(http.Handler) http.Handler)
+		}
+		if middlewares, ok := m.routesMiddlewares[m.currentRoute]; ok {
+			m.routesMiddlewares[m.currentRoute] = append(middlewares, middleware)
+		} else {
+			m.routesMiddlewares[m.currentRoute] = []func(http.Handler) http.Handler{middleware}
+		}
+	}
+
+	return nil
+}
+
+// RegisterHandler registers a handler.
+func (m *serverMediator) RegisterHandler(handler http.Handler) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.currentRoute == serverRouteDefault {
+		m.defaultHandler = handler
+	} else {
+		if m.routesHandler == nil {
+			m.routesHandler = make(map[string]http.Handler)
+		}
+		if h, ok := m.routesHandler[m.currentRoute]; ok {
+			m.routesHandler[m.currentRoute] = h
+		} else {
+			m.routesHandler[m.currentRoute] = handler
+		}
+	}
+
+	return nil
+}
+
+var _ core.Server = (*serverMediator)(nil)
 
 // serverRouter implements the server router.
 type serverRouter struct {

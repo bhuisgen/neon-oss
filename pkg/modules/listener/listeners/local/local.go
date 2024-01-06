@@ -198,10 +198,10 @@ func (l *localListener) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the listener resources.
-func (l *localListener) Register(registry core.ListenerRegistry) error {
-	if len(registry.Listeners()) == 1 {
-		l.listener = registry.Listeners()[0]
+// Register registers the listener.
+func (l *localListener) Register(listener core.Listener) error {
+	if len(listener.Listeners()) == 1 {
+		l.listener = listener.Listeners()[0]
 		return nil
 	}
 
@@ -211,7 +211,7 @@ func (l *localListener) Register(registry core.ListenerRegistry) error {
 		return err
 	}
 
-	err = registry.RegisterListener(l.listener)
+	err = listener.RegisterListener(l.listener)
 	if err != nil {
 		return err
 	}

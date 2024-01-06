@@ -111,9 +111,9 @@ func (m *compressMiddleware) Load(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server resources.
-func (m *compressMiddleware) Register(registry core.ServerRegistry) error {
-	err := registry.RegisterMiddleware(m.Handler)
+// Register registers the middleware.
+func (m *compressMiddleware) Register(server core.Server) error {
+	err := server.RegisterMiddleware(m.Handler)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (m *compressMiddleware) Register(registry core.ServerRegistry) error {
 }
 
 // Start starts the middleware.
-func (m *compressMiddleware) Start(store core.Store, fetcher core.Fetcher) error {
+func (m *compressMiddleware) Start() error {
 	return nil
 }
 

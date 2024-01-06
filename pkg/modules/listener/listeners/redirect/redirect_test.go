@@ -25,22 +25,26 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-type testLocalListenerServerRegistry struct {
-	error bool
+type testRedirectListener struct {
+	errRegister bool
 }
 
-var _ core.ListenerRegistry = (*testLocalListenerServerRegistry)(nil)
-
-func (r testLocalListenerServerRegistry) Listeners() []net.Listener {
-	return nil
+func (l testRedirectListener) Name() string {
+	return "test"
 }
 
-func (r testLocalListenerServerRegistry) RegisterListener(listener net.Listener) error {
-	if r.error {
+func (l testRedirectListener) RegisterListener(listener net.Listener) error {
+	if l.errRegister {
 		return errors.New("test error")
 	}
 	return nil
 }
+
+func (l testRedirectListener) Listeners() []net.Listener {
+	return nil
+}
+
+var _ core.Listener = (*testRedirectListener)(nil)
 
 func TestRedirectListenerModuleInfo(t *testing.T) {
 	type fields struct {
@@ -237,7 +241,7 @@ func TestRedirectListenerRegister(t *testing.T) {
 		httpServerClose    func(server *http.Server) error
 	}
 	type args struct {
-		registry core.ListenerRegistry
+		listener core.Listener
 	}
 	tests := []struct {
 		name    string
@@ -257,7 +261,7 @@ func TestRedirectListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testLocalListenerServerRegistry{},
+				listener: testRedirectListener{},
 			},
 		},
 		{
@@ -272,7 +276,7 @@ func TestRedirectListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testLocalListenerServerRegistry{},
+				listener: testRedirectListener{},
 			},
 			wantErr: true,
 		},
@@ -288,8 +292,8 @@ func TestRedirectListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				registry: testLocalListenerServerRegistry{
-					error: true,
+				listener: testRedirectListener{
+					errRegister: true,
 				},
 			},
 			wantErr: true,
@@ -308,7 +312,7 @@ func TestRedirectListenerRegister(t *testing.T) {
 				httpServerShutdown: tt.fields.httpServerShutdown,
 				httpServerClose:    tt.fields.httpServerClose,
 			}
-			if err := l.Register(tt.args.registry); (err != nil) != tt.wantErr {
+			if err := l.Register(tt.args.listener); (err != nil) != tt.wantErr {
 				t.Errorf("redirectListener.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

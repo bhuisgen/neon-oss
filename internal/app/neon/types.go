@@ -28,7 +28,6 @@ type Listener interface {
 	Shutdown(ctx context.Context) error
 	Close() error
 	Remove() error
-
 	Name() string
 	Link(server Server) error
 	Unlink(server Server) error
@@ -63,7 +62,6 @@ type Server interface {
 	Disable(ctx context.Context) error
 	Stop() error
 	Remove() error
-
 	Name() string
 	Listeners() []string
 	Hosts() []string

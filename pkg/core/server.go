@@ -8,11 +8,22 @@ import (
 	"net/http"
 )
 
+// Server
+type Server interface {
+	Name() string
+	Listeners() []string
+	Hosts() []string
+	Store() Store
+	Fetcher() Fetcher
+	RegisterMiddleware(middleware func(next http.Handler) http.Handler) error
+	RegisterHandler(handler http.Handler) error
+}
+
 // ServerHandlerModule
 type ServerHandlerModule interface {
 	Module
-	Register(registry ServerRegistry) error
-	Start(store Store, fetcher Fetcher) error
+	Register(server Server) error
+	Start() error
 	Mount() error
 	Unmount()
 	Stop()
@@ -21,15 +32,9 @@ type ServerHandlerModule interface {
 // ServerMiddlewareModule
 type ServerMiddlewareModule interface {
 	Module
-	Register(registry ServerRegistry) error
-	Start(store Store, fetcher Fetcher) error
+	Register(server Server) error
+	Start() error
 	Mount() error
 	Unmount()
 	Stop()
-}
-
-// ServerRegistry
-type ServerRegistry interface {
-	RegisterMiddleware(middleware func(next http.Handler) http.Handler) error
-	RegisterHandler(handler http.Handler) error
 }
