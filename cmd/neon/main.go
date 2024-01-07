@@ -55,13 +55,14 @@ func run() error {
 		fmt.Println("Run 'neon COMMAND --help' for more information on a command.")
 	}
 	flag.Parse()
-	if len(flag.Args()) == 0 {
-		flag.Usage()
-		return nil
-	}
 
 	if version {
 		fmt.Printf("%s version %s\n", neon.Name, neon.Version)
+		return nil
+	}
+
+	if len(flag.Args()) == 0 {
+		flag.Usage()
 		return nil
 	}
 
