@@ -1,3 +1,3 @@
 # Neon
 
-Copyright 2022-2023 Boris HUISGEN
+Copyright 2022-2024 Boris HUISGEN
