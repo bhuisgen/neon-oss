@@ -59,10 +59,4 @@ func (q *queue) Pop() any {
 	return item
 }
 
-// update updates the priority of an item in the queue.
-func (q *queue) update(i *item, priority int) {
-	i.priority = priority
-	heap.Fix(q, i.index)
-}
-
 var _ heap.Interface = (*queue)(nil)

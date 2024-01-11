@@ -302,7 +302,7 @@ func (h *appHandler) Load(config map[string]interface{}) error {
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
-	h.cache = memory.NewMemoryCache()
+	h.cache = memory.New(time.Duration(*h.config.CacheTTL)*time.Second, 0)
 
 	return nil
 }
@@ -412,7 +412,7 @@ func (h *appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	render := rw.Render()
 
 	if *h.config.Cache {
-		h.cache.Set(key, render, time.Duration(*h.config.CacheTTL)*time.Second)
+		h.cache.Set(key, render)
 	}
 
 	if render.Redirect() {

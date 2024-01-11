@@ -616,7 +616,7 @@ func TestSitemapHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: memory.NewMemoryCache(),
+				cache: memory.New(0, 0),
 			},
 		},
 	}
@@ -676,7 +676,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 				templateSitemapIndex: tmplSitemapIndex,
 				templateSitemap:      tmplSitemap,
 				rwPool:               render.NewRenderWriterPool(),
-				cache:                memory.NewMemoryCache(),
+				cache:                memory.New(0, 0),
 			},
 			args: args{
 				w: testSitemapHandlerResponseWriter{},

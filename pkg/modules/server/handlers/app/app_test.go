@@ -812,7 +812,7 @@ func TestAppHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: memory.NewMemoryCache(),
+				cache: memory.New(0, 0),
 			},
 		},
 	}
@@ -888,7 +888,7 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 				logger: log.Default(),
 				rwPool: render.NewRenderWriterPool(),
 				vmPool: newVMPool(1),
-				cache:  memory.NewMemoryCache(),
+				cache:  memory.New(0, 0),
 				osReadFile: func(name string) ([]byte, error) {
 					return os.ReadFile(name)
 				},

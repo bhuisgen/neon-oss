@@ -4,14 +4,10 @@
 
 package cache
 
-import (
-	"time"
-)
-
 // Cache
 type Cache interface {
 	Get(key string) any
-	Set(key string, value any, ttl time.Duration)
+	Set(key string, value any)
 	Remove(key string)
 	Clear()
 }

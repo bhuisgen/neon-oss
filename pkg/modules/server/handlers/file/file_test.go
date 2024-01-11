@@ -638,7 +638,7 @@ func TestFileHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: memory.NewMemoryCache(),
+				cache: memory.New(0, 0),
 			},
 		},
 	}
@@ -694,7 +694,7 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 				},
 				logger: log.Default(),
 				rwPool: render.NewRenderWriterPool(),
-				cache:  memory.NewMemoryCache(),
+				cache:  memory.New(0, 0),
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
 					return nil, nil
 				},

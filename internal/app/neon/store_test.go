@@ -86,12 +86,12 @@ func TestStoreLoad(t *testing.T) {
 }
 
 func TestStoreGet(t *testing.T) {
-	data := memory.NewMemoryCache()
+	data := memory.New(0, 0)
 	data.Set("test", &core.Resource{
 		Data: [][]byte{[]byte("test")},
 		TTL:  0,
-	}, 0)
-	data.Set("invalid", "invalid", 0)
+	})
+	data.Set("invalid", "invalid")
 
 	type fields struct {
 		config *storeConfig
@@ -187,7 +187,7 @@ func TestStoreSet(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &storeState{
-					data: memory.NewMemoryCache(),
+					data: memory.New(0, 0),
 				},
 			},
 			args: args{

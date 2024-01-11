@@ -395,7 +395,7 @@ func TestRobotsHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: memory.NewMemoryCache(),
+				cache: memory.New(0, 0),
 			},
 		},
 	}
@@ -445,7 +445,7 @@ func TestRobotsHandlerServeHTTP(t *testing.T) {
 				logger:   log.Default(),
 				template: tmpl,
 				rwPool:   render.NewRenderWriterPool(),
-				cache:    memory.NewMemoryCache(),
+				cache:    memory.New(0, 0),
 			},
 			args: args{
 				w: testRobotsHandlerResponseWriter{},

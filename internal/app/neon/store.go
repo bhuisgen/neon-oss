@@ -58,13 +58,13 @@ func (s *store) Load(config map[string]interface{}) error {
 	s.config = &c
 	s.logger = log.New(os.Stderr, fmt.Sprint(storeLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 	s.state = &storeState{
-		data: memory.NewMemoryCache(),
+		data: memory.New(0, 0),
 	}
 
 	return nil
 }
 
-// Get returns a resource.
+// Get loads a resource.
 func (s *store) Get(name string) (*core.Resource, error) {
 	v := s.state.data.Get(name)
 	if v == nil {
@@ -81,7 +81,7 @@ func (s *store) Get(name string) (*core.Resource, error) {
 
 // Set stores a resource.
 func (s *store) Set(name string, resource *core.Resource) error {
-	s.state.data.Set(name, resource, resource.TTL)
+	s.state.data.Set(name, resource)
 
 	return nil
 }
