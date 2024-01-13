@@ -514,7 +514,7 @@ func (v *vm) Configure(config *vmConfig) error {
 		return vmError{"failed to create server response object instance"}
 	}
 
-	//env.Set("ENV", config.Env)
+	env.Set("ENV", config.Env)
 	process.Set("env", env)
 	server.Set("handler", serverHandler)
 	server.Set("request", serverRequest)

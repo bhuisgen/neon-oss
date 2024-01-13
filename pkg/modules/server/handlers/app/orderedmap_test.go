@@ -57,7 +57,7 @@ func TestOrderedMapKeys(t *testing.T) {
 			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
-				lock: sync.RWMutex{},
+				mu:   sync.RWMutex{},
 			}
 			if got := m.Keys(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("orderedMap.Keys() = %v, want %v", got, tt.want)
@@ -101,7 +101,7 @@ func TestOrderedMapGet(t *testing.T) {
 			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
-				lock: sync.RWMutex{},
+				mu:   sync.RWMutex{},
 			}
 			got, got1 := m.Get(tt.args.key)
 			if !reflect.DeepEqual(got, tt.want) {
@@ -145,7 +145,7 @@ func TestOrderedMapSet(t *testing.T) {
 			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
-				lock: sync.RWMutex{},
+				mu:   sync.RWMutex{},
 			}
 			m.Set(tt.args.key, tt.args.value)
 		})
@@ -195,7 +195,7 @@ func TestOrderedMapRemove(t *testing.T) {
 			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
-				lock: sync.RWMutex{},
+				mu:   sync.RWMutex{},
 			}
 			m.Remove(tt.args.key)
 		})
@@ -226,7 +226,7 @@ func TestOrderedMapClear(t *testing.T) {
 			m := &orderedMap{
 				keys: tt.fields.keys,
 				data: tt.fields.data,
-				lock: sync.RWMutex{},
+				mu:   sync.RWMutex{},
 			}
 			m.Clear()
 		})

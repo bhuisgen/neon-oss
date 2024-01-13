@@ -10,15 +10,15 @@ import (
 
 // domElement implement a DOM element.
 type domElement struct {
-	id   string
-	data *orderedMap
+	id string
+	m  *orderedMap
 }
 
 // newDOMElement returns a new DOM element.
 func newDOMElement(id string) *domElement {
 	return &domElement{
-		id:   id,
-		data: newOrderedMap(),
+		id: id,
+		m:  newOrderedMap(),
 	}
 }
 
@@ -30,7 +30,7 @@ func (e *domElement) Id() string {
 // Attributes returns the attributes list.
 func (e *domElement) Attributes() []string {
 	attributes := []string{}
-	for _, k := range e.data.Keys() {
+	for _, k := range e.m.Keys() {
 		attributes = append(attributes, k.(string))
 	}
 	return attributes
@@ -38,7 +38,7 @@ func (e *domElement) Attributes() []string {
 
 // GetAttribute returns the given attribute value.
 func (e *domElement) GetAttribute(name string) string {
-	value, ok := e.data.Get(name)
+	value, ok := e.m.Get(name)
 	if !ok {
 		return ""
 	}
@@ -47,7 +47,7 @@ func (e *domElement) GetAttribute(name string) string {
 
 // SetAttribute sets the given attribute value.
 func (e *domElement) SetAttribute(key string, value string) {
-	e.data.Set(key, value)
+	e.m.Set(key, value)
 }
 
 // domElementList implements a list of DOM elements.

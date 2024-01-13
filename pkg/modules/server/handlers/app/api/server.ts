@@ -11,7 +11,7 @@ export interface Resource {
   /**
    * The resource data.
    */
-  data: string[] | null;
+  data: string[];
 
   /**
    * The resource error.
