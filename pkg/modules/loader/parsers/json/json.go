@@ -155,7 +155,7 @@ func (p *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 		}
 	}
 
-	err = store.Set(resourceName, resource)
+	err = store.StoreResource(resourceName, resource)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (p *jsonParser) executeResourceFromItem(ctx context.Context, store core.Sto
 		return err
 	}
 
-	err = store.Set(itemResourceName, resource)
+	err = store.StoreResource(itemResourceName, resource)
 	if err != nil {
 		return err
 	}

@@ -19,14 +19,14 @@ type testRawParserStore struct {
 	errSet bool
 }
 
-func (s *testRawParserStore) Get(name string) (*core.Resource, error) {
+func (s *testRawParserStore) LoadResource(name string) (*core.Resource, error) {
 	if s.errGet {
 		return nil, errors.New("test error")
 	}
 	return nil, nil
 }
 
-func (s *testRawParserStore) Set(name string, resource *core.Resource) error {
+func (s *testRawParserStore) StoreResource(name string, resource *core.Resource) error {
 	if s.errSet {
 		return errors.New("test error")
 	}

@@ -68,8 +68,6 @@ func newLoader(store Store, fetcher Fetcher) *loader {
 
 // Check checks the loader configuration.
 func (l *loader) Check(config map[string]interface{}) ([]string, error) {
-	l.state = &loaderState{}
-
 	var report []string
 
 	var c loaderConfig

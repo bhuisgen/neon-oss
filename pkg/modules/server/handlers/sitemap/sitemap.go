@@ -504,7 +504,7 @@ func (h *sitemapHandler) sitemapTemplateStaticItem(entry SitemapEntry) (sitemapT
 func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemapTemplateSitemapItem, error) {
 	var items []sitemapTemplateSitemapItem
 
-	resource, err := h.server.Store().Get(entry.List.Resource)
+	resource, err := h.server.Store().LoadResource(entry.List.Resource)
 	if err != nil {
 		return nil, err
 	}

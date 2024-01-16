@@ -20,6 +20,8 @@ import (
 	_ "github.com/bhuisgen/neon/pkg/modules/server/handlers/robots"
 	_ "github.com/bhuisgen/neon/pkg/modules/server/handlers/sitemap"
 
+	_ "github.com/bhuisgen/neon/pkg/modules/store/storage/memory"
+
 	_ "github.com/bhuisgen/neon/pkg/modules/fetcher/providers/rest"
 
 	_ "github.com/bhuisgen/neon/pkg/modules/loader/parsers/json"

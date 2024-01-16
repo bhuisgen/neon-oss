@@ -20,14 +20,14 @@ type testJSONParserStore struct {
 	errSet bool
 }
 
-func (s *testJSONParserStore) Get(name string) (*core.Resource, error) {
+func (s *testJSONParserStore) LoadResource(name string) (*core.Resource, error) {
 	if s.errGet {
 		return nil, errors.New("test error")
 	}
 	return nil, nil
 }
 
-func (s *testJSONParserStore) Set(name string, resource *core.Resource) error {
+func (s *testJSONParserStore) StoreResource(name string, resource *core.Resource) error {
 	if s.errSet {
 		return errors.New("test error")
 	}
@@ -270,7 +270,7 @@ func TestJSONParserParse(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "default",
+			name: "fetch resource",
 			fields: fields{
 				config: &jsonParserConfig{
 					Resource: map[string]map[string]interface{}{

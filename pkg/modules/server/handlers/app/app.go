@@ -541,7 +541,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 			}
 
 			var resourceResult appResource
-			resource, err := h.server.Store().Get(resourceKey)
+			resource, err := h.server.Store().LoadResource(resourceKey)
 			if err != nil {
 				resourceResult.Error = appResourceUnknown
 

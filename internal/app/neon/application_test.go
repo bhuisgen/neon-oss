@@ -43,7 +43,13 @@ func TestApplicationCheck(t *testing.T) {
 							},
 						},
 					},
-					Store:   &configStore{},
+					Store: &configStore{
+						Config: map[string]interface{}{
+							"storage": map[string]map[string]interface{}{
+								"test": {},
+							},
+						},
+					},
 					Fetcher: &configFetcher{},
 					Loader:  &configLoader{},
 				},

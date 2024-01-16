@@ -6,6 +6,13 @@ package core
 
 // Store
 type Store interface {
-	Get(name string) (*Resource, error)
-	Set(name string, resource *Resource) error
+	LoadResource(name string) (*Resource, error)
+	StoreResource(name string, resource *Resource) error
+}
+
+// StoreStorageModule
+type StoreStorageModule interface {
+	Module
+	LoadResource(name string) (*Resource, error)
+	StoreResource(name string, resource *Resource) error
 }

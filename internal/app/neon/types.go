@@ -77,6 +77,6 @@ type ServerRouter interface {
 type Store interface {
 	Check(config map[string]interface{}) ([]string, error)
 	Load(config map[string]interface{}) error
-	Get(name string) (*core.Resource, error)
-	Set(name string, resource *core.Resource) error
+	LoadResource(name string) (*core.Resource, error)
+	StoreResource(name string, resource *core.Resource) error
 }

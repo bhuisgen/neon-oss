@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 )
 
@@ -31,6 +30,37 @@ func TestStoreCheck(t *testing.T) {
 	}{
 		{
 			name: "default",
+			args: args{
+				config: map[string]interface{}{
+					"storage": map[string]interface{}{
+						"test": map[string]interface{}{},
+					},
+				},
+			},
+		},
+		{
+			name: "error no storage",
+			args: args{
+				config: map[string]interface{}{},
+			},
+			want: []string{
+				"store: no storage defined",
+			},
+			wantErr: true,
+		},
+		{
+			name: "error unregistered module",
+			args: args{
+				config: map[string]interface{}{
+					"storage": map[string]interface{}{
+						"unknown": map[string]interface{}{},
+					},
+				},
+			},
+			want: []string{
+				"store: unregistered storage module 'unknown'",
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -69,6 +99,24 @@ func TestStoreLoad(t *testing.T) {
 	}{
 		{
 			name: "default",
+			args: args{
+				config: map[string]interface{}{
+					"storage": map[string]interface{}{
+						"test": map[string]interface{}{},
+					},
+				},
+			},
+		},
+		{
+			name: "error unregistered module",
+			args: args{
+				config: map[string]interface{}{
+					"storage": map[string]interface{}{
+						"unknown": map[string]interface{}{},
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -85,14 +133,7 @@ func TestStoreLoad(t *testing.T) {
 	}
 }
 
-func TestStoreGet(t *testing.T) {
-	data := memory.New(0, 0)
-	data.Set("test", &core.Resource{
-		Data: [][]byte{[]byte("test")},
-		TTL:  0,
-	})
-	data.Set("invalid", "invalid")
-
+func TestStoreLoadResource(t *testing.T) {
 	type fields struct {
 		config *storeConfig
 		logger *log.Logger
@@ -112,7 +153,7 @@ func TestStoreGet(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &storeState{
-					data: data,
+					storageModule: &testStoreStorageModule{},
 				},
 			},
 			args: args{
@@ -124,26 +165,16 @@ func TestStoreGet(t *testing.T) {
 			},
 		},
 		{
-			name: "error no data",
+			name: "error module",
 			fields: fields{
 				state: &storeState{
-					data: data,
+					storageModule: &testStoreStorageModule{
+						errLoadResource: true,
+					},
 				},
 			},
 			args: args{
-				name: "unknown",
-			},
-			wantErr: true,
-		},
-		{
-			name: "error invalid data",
-			fields: fields{
-				state: &storeState{
-					data: data,
-				},
-			},
-			args: args{
-				name: "invalid",
+				name: "test",
 			},
 			wantErr: true,
 		},
@@ -155,19 +186,19 @@ func TestStoreGet(t *testing.T) {
 				logger: tt.fields.logger,
 				state:  tt.fields.state,
 			}
-			got, err := s.Get(tt.args.name)
+			got, err := s.LoadResource(tt.args.name)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("store.Get() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("store.LoadResource() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("store.Get() = %v, want %v", got, tt.want)
+				t.Errorf("store.LoadResource() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestStoreSet(t *testing.T) {
+func TestStoreStoreResource(t *testing.T) {
 	type fields struct {
 		config *storeConfig
 		logger *log.Logger
@@ -187,16 +218,30 @@ func TestStoreSet(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &storeState{
-					data: memory.New(0, 0),
+					storageModule: &testStoreStorageModule{},
 				},
 			},
 			args: args{
 				name: "test",
 				resource: &core.Resource{
-					Data: [][]byte{[]byte("{}")},
+					Data: [][]byte{[]byte("test")},
 					TTL:  0,
 				},
 			},
+		},
+		{
+			name: "error module",
+			fields: fields{
+				state: &storeState{
+					storageModule: &testStoreStorageModule{
+						errStoreResource: true,
+					},
+				},
+			},
+			args: args{
+				name: "test",
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -206,8 +251,8 @@ func TestStoreSet(t *testing.T) {
 				logger: tt.fields.logger,
 				state:  tt.fields.state,
 			}
-			if err := s.Set(tt.args.name, tt.args.resource); (err != nil) != tt.wantErr {
-				t.Errorf("store.Set() error = %v, wantErr %v", err, tt.wantErr)
+			if err := s.StoreResource(tt.args.name, tt.args.resource); (err != nil) != tt.wantErr {
+				t.Errorf("store.StoreResource() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

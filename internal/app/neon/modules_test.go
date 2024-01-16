@@ -256,9 +256,9 @@ func (m testFetcherProviderModule) Fetch(ctx context.Context, name string, confi
 var _ core.FetcherProviderModule = (*testFetcherProviderModule)(nil)
 
 type testLoaderParserModule struct {
-	errCheck   bool
-	errLoad    bool
-	errExecute bool
+	errCheck bool
+	errLoad  bool
+	errParse bool
 }
 
 const (
@@ -289,7 +289,7 @@ func (m testLoaderParserModule) Load(config map[string]interface{}) error {
 }
 
 func (m testLoaderParserModule) Parse(ctx context.Context, store core.Store, fetcher core.Fetcher) error {
-	if m.errExecute {
+	if m.errParse {
 		return errors.New("test error")
 	}
 	return nil
@@ -297,17 +297,72 @@ func (m testLoaderParserModule) Parse(ctx context.Context, store core.Store, fet
 
 var _ core.LoaderParserModule = (*testLoaderParserModule)(nil)
 
+type testStoreStorageModule struct {
+	errCheck         bool
+	errLoad          bool
+	errLoadResource  bool
+	errStoreResource bool
+}
+
+const (
+	testStoreStorageModuleID module.ModuleID = "store.storage.test"
+)
+
+func (m testStoreStorageModule) ModuleInfo() module.ModuleInfo {
+	return module.ModuleInfo{
+		ID: testStoreStorageModuleID,
+		NewInstance: func() module.Module {
+			return &testStoreStorageModule{}
+		},
+	}
+}
+
+func (m testStoreStorageModule) Check(config map[string]interface{}) ([]string, error) {
+	if m.errCheck {
+		return []string{"test"}, errors.New("test error")
+	}
+	return nil, nil
+}
+
+func (m testStoreStorageModule) Load(config map[string]interface{}) error {
+	if m.errLoad {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testStoreStorageModule) LoadResource(name string) (*core.Resource, error) {
+	if m.errLoadResource {
+		return nil, errors.New("test error")
+	}
+	return &core.Resource{
+		Data: [][]byte{[]byte("test")},
+		TTL:  0,
+	}, nil
+}
+
+func (m testStoreStorageModule) StoreResource(name string, resource *core.Resource) error {
+	if m.errStoreResource {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+var _ core.StoreStorageModule = (*testStoreStorageModule)(nil)
+
 func TestMain(m *testing.M) {
 	module.Register(testListenerModule{})
 	module.Register(testServerMiddlewareModule{})
 	module.Register(testServerHandlerModule{})
 	module.Register(testFetcherProviderModule{})
 	module.Register(testLoaderParserModule{})
+	module.Register(testStoreStorageModule{})
 	code := m.Run()
 	module.Unregister(testListenerModule{})
 	module.Unregister(testServerMiddlewareModule{})
 	module.Unregister(testServerHandlerModule{})
 	module.Unregister(testFetcherProviderModule{})
 	module.Unregister(testLoaderParserModule{})
+	module.Unregister(testStoreStorageModule{})
 	os.Exit(code)
 }
