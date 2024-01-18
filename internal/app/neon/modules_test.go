@@ -15,199 +15,58 @@ import (
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
-type testListenerModule struct {
-	errCheck    bool
-	errLoad     bool
-	errRegister bool
-	errServe    bool
-	errShutdown bool
-	errClose    bool
+type testStoreStorageModule struct {
+	errCheck         bool
+	errLoad          bool
+	errLoadResource  bool
+	errStoreResource bool
 }
 
 const (
-	testListenerModuleID module.ModuleID = "listener.test"
+	testStoreStorageModuleID module.ModuleID = "store.storage.test"
 )
 
-func (m testListenerModule) ModuleInfo() module.ModuleInfo {
+func (m testStoreStorageModule) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: testListenerModuleID,
+		ID: testStoreStorageModuleID,
 		NewInstance: func() module.Module {
-			return &testListenerModule{}
+			return &testStoreStorageModule{}
 		},
 	}
 }
 
-func (m testListenerModule) Check(config map[string]interface{}) ([]string, error) {
+func (m testStoreStorageModule) Check(config map[string]interface{}) ([]string, error) {
 	if m.errCheck {
 		return []string{"test"}, errors.New("test error")
 	}
 	return nil, nil
 }
 
-func (m testListenerModule) Load(config map[string]interface{}) error {
+func (m testStoreStorageModule) Load(config map[string]interface{}) error {
 	if m.errLoad {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (m testListenerModule) Register(listener core.Listener) error {
-	if m.errRegister {
+func (m testStoreStorageModule) LoadResource(name string) (*core.Resource, error) {
+	if m.errLoadResource {
+		return nil, errors.New("test error")
+	}
+	return &core.Resource{
+		Data: [][]byte{[]byte("test")},
+		TTL:  0,
+	}, nil
+}
+
+func (m testStoreStorageModule) StoreResource(name string, resource *core.Resource) error {
+	if m.errStoreResource {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (m testListenerModule) Serve(handler http.Handler) error {
-	if m.errServe {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testListenerModule) Shutdown(ctx context.Context) error {
-	if m.errShutdown {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testListenerModule) Close() error {
-	if m.errClose {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-var _ core.ListenerModule = (*testListenerModule)(nil)
-
-type testServerMiddlewareModule struct {
-	errCheck    bool
-	errLoad     bool
-	errRegister bool
-	errStart    bool
-	errMount    bool
-}
-
-const (
-	testServerMiddlewareModuleID module.ModuleID = "server.middleware.test"
-)
-
-func (m testServerMiddlewareModule) ModuleInfo() module.ModuleInfo {
-	return module.ModuleInfo{
-		ID: testServerMiddlewareModuleID,
-		NewInstance: func() module.Module {
-			return &testServerMiddlewareModule{}
-		},
-	}
-}
-
-func (m testServerMiddlewareModule) Check(config map[string]interface{}) ([]string, error) {
-	if m.errCheck {
-		return []string{"test"}, errors.New("test error")
-	}
-	return nil, nil
-}
-
-func (m testServerMiddlewareModule) Load(config map[string]interface{}) error {
-	if m.errLoad {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerMiddlewareModule) Register(server core.Server) error {
-	if m.errRegister {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerMiddlewareModule) Start() error {
-	if m.errStart {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerMiddlewareModule) Mount() error {
-	if m.errMount {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerMiddlewareModule) Unmount() {
-}
-
-func (m testServerMiddlewareModule) Stop() {
-}
-
-var _ core.ServerHandlerModule = (*testServerMiddlewareModule)(nil)
-
-type testServerHandlerModule struct {
-	errCheck    bool
-	errLoad     bool
-	errRegister bool
-	errStart    bool
-	errMount    bool
-}
-
-const (
-	testServerHandlerModuleID module.ModuleID = "server.handler.test"
-)
-
-func (m testServerHandlerModule) ModuleInfo() module.ModuleInfo {
-	return module.ModuleInfo{
-		ID: testServerHandlerModuleID,
-		NewInstance: func() module.Module {
-			return &testServerHandlerModule{}
-		},
-	}
-}
-
-func (m testServerHandlerModule) Check(config map[string]interface{}) ([]string, error) {
-	if m.errCheck {
-		return []string{"test"}, errors.New("test error")
-	}
-	return nil, nil
-}
-
-func (m testServerHandlerModule) Load(config map[string]interface{}) error {
-	if m.errLoad {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerHandlerModule) Register(server core.Server) error {
-	if m.errRegister {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerHandlerModule) Start() error {
-	if m.errStart {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerHandlerModule) Mount() error {
-	if m.errMount {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerHandlerModule) Unmount() {
-}
-
-func (m testServerHandlerModule) Stop() {
-}
-
-var _ core.ServerHandlerModule = (*testServerHandlerModule)(nil)
+var _ core.StoreStorageModule = (*testStoreStorageModule)(nil)
 
 type testFetcherProviderModule struct {
 	errCheck bool
@@ -297,72 +156,213 @@ func (m testLoaderParserModule) Parse(ctx context.Context, store core.Store, fet
 
 var _ core.LoaderParserModule = (*testLoaderParserModule)(nil)
 
-type testStoreStorageModule struct {
-	errCheck         bool
-	errLoad          bool
-	errLoadResource  bool
-	errStoreResource bool
+type testServerListenerModule struct {
+	errCheck    bool
+	errLoad     bool
+	errRegister bool
+	errServe    bool
+	errShutdown bool
+	errClose    bool
 }
 
 const (
-	testStoreStorageModuleID module.ModuleID = "store.storage.test"
+	testServerListenerModuleID module.ModuleID = "server.listener.test"
 )
 
-func (m testStoreStorageModule) ModuleInfo() module.ModuleInfo {
+func (m testServerListenerModule) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: testStoreStorageModuleID,
+		ID: testServerListenerModuleID,
 		NewInstance: func() module.Module {
-			return &testStoreStorageModule{}
+			return &testServerListenerModule{}
 		},
 	}
 }
 
-func (m testStoreStorageModule) Check(config map[string]interface{}) ([]string, error) {
+func (m testServerListenerModule) Check(config map[string]interface{}) ([]string, error) {
 	if m.errCheck {
 		return []string{"test"}, errors.New("test error")
 	}
 	return nil, nil
 }
 
-func (m testStoreStorageModule) Load(config map[string]interface{}) error {
+func (m testServerListenerModule) Load(config map[string]interface{}) error {
 	if m.errLoad {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-func (m testStoreStorageModule) LoadResource(name string) (*core.Resource, error) {
-	if m.errLoadResource {
-		return nil, errors.New("test error")
-	}
-	return &core.Resource{
-		Data: [][]byte{[]byte("test")},
-		TTL:  0,
-	}, nil
-}
-
-func (m testStoreStorageModule) StoreResource(name string, resource *core.Resource) error {
-	if m.errStoreResource {
+func (m testServerListenerModule) Register(listener core.ServerListener) error {
+	if m.errRegister {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.StoreStorageModule = (*testStoreStorageModule)(nil)
+func (m testServerListenerModule) Serve(handler http.Handler) error {
+	if m.errServe {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerListenerModule) Shutdown(ctx context.Context) error {
+	if m.errShutdown {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerListenerModule) Close() error {
+	if m.errClose {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+var _ core.ServerListenerModule = (*testServerListenerModule)(nil)
+
+type testServerSiteMiddlewareModule struct {
+	errCheck    bool
+	errLoad     bool
+	errRegister bool
+	errStart    bool
+	errMount    bool
+}
+
+const (
+	testServerSiteMiddlewareModuleID module.ModuleID = "server.site.middleware.test"
+)
+
+func (m testServerSiteMiddlewareModule) ModuleInfo() module.ModuleInfo {
+	return module.ModuleInfo{
+		ID: testServerSiteMiddlewareModuleID,
+		NewInstance: func() module.Module {
+			return &testServerSiteMiddlewareModule{}
+		},
+	}
+}
+
+func (m testServerSiteMiddlewareModule) Check(config map[string]interface{}) ([]string, error) {
+	if m.errCheck {
+		return []string{"test"}, errors.New("test error")
+	}
+	return nil, nil
+}
+
+func (m testServerSiteMiddlewareModule) Load(config map[string]interface{}) error {
+	if m.errLoad {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerSiteMiddlewareModule) Register(server core.ServerSite) error {
+	if m.errRegister {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerSiteMiddlewareModule) Start() error {
+	if m.errStart {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerSiteMiddlewareModule) Mount() error {
+	if m.errMount {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerSiteMiddlewareModule) Unmount() {
+}
+
+func (m testServerSiteMiddlewareModule) Stop() {
+}
+
+var _ core.ServerSiteHandlerModule = (*testServerSiteMiddlewareModule)(nil)
+
+type testServerSiteHandlerModule struct {
+	errCheck    bool
+	errLoad     bool
+	errRegister bool
+	errStart    bool
+	errMount    bool
+}
+
+const (
+	testServerSiteHandlerModuleID module.ModuleID = "server.site.handler.test"
+)
+
+func (m testServerSiteHandlerModule) ModuleInfo() module.ModuleInfo {
+	return module.ModuleInfo{
+		ID: testServerSiteHandlerModuleID,
+		NewInstance: func() module.Module {
+			return &testServerSiteHandlerModule{}
+		},
+	}
+}
+
+func (m testServerSiteHandlerModule) Check(config map[string]interface{}) ([]string, error) {
+	if m.errCheck {
+		return []string{"test"}, errors.New("test error")
+	}
+	return nil, nil
+}
+
+func (m testServerSiteHandlerModule) Load(config map[string]interface{}) error {
+	if m.errLoad {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerSiteHandlerModule) Register(server core.ServerSite) error {
+	if m.errRegister {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerSiteHandlerModule) Start() error {
+	if m.errStart {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerSiteHandlerModule) Mount() error {
+	if m.errMount {
+		return errors.New("test error")
+	}
+	return nil
+}
+
+func (m testServerSiteHandlerModule) Unmount() {
+}
+
+func (m testServerSiteHandlerModule) Stop() {
+}
+
+var _ core.ServerSiteHandlerModule = (*testServerSiteHandlerModule)(nil)
 
 func TestMain(m *testing.M) {
-	module.Register(testListenerModule{})
-	module.Register(testServerMiddlewareModule{})
-	module.Register(testServerHandlerModule{})
+	module.Register(testStoreStorageModule{})
 	module.Register(testFetcherProviderModule{})
 	module.Register(testLoaderParserModule{})
-	module.Register(testStoreStorageModule{})
+	module.Register(testServerListenerModule{})
+	module.Register(testServerSiteMiddlewareModule{})
+	module.Register(testServerSiteHandlerModule{})
 	code := m.Run()
-	module.Unregister(testListenerModule{})
-	module.Unregister(testServerMiddlewareModule{})
-	module.Unregister(testServerHandlerModule{})
+	module.Unregister(testStoreStorageModule{})
 	module.Unregister(testFetcherProviderModule{})
 	module.Unregister(testLoaderParserModule{})
-	module.Unregister(testStoreStorageModule{})
+	module.Unregister(testServerListenerModule{})
+	module.Unregister(testServerSiteMiddlewareModule{})
+	module.Unregister(testServerSiteHandlerModule{})
 	os.Exit(code)
 }

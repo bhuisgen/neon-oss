@@ -29,18 +29,12 @@ type application struct {
 	store   *store
 	fetcher *fetcher
 	loader  *loader
+	server  *server
 }
 
 // applicationState implements the application state.
 type applicationState struct {
-	listeners           []Listener
-	listenersMap        map[string]Listener
-	listenersConfig     map[string]map[string]interface{}
-	listenersDescriptor map[string]ListenerDescriptor
-	servers             []Server
-	serversMap          map[string]Server
-	serversConfig       map[string]map[string]interface{}
-	serverListeners     map[string][]Listener
+	serverListenersDescriptors map[string]ServerListenerDescriptor
 }
 
 const (
@@ -60,24 +54,7 @@ func (a *application) Check() error {
 	a.store = newStore()
 	a.fetcher = newFetcher()
 	a.loader = newLoader(a.store, a.fetcher)
-
-	var listenersMap map[string]*listener = make(map[string]*listener)
-	var listenersConfigMap map[string]map[string]interface{} = make(map[string]map[string]interface{})
-	for _, configListener := range a.config.Listeners {
-		listener := newListener(configListener.Name)
-
-		listenersMap[configListener.Name] = listener
-		listenersConfigMap[configListener.Name] = configListener.Config
-	}
-
-	var serversMap map[string]*server = make(map[string]*server)
-	var serversConfigMap map[string]map[string]interface{} = make(map[string]map[string]interface{})
-	for _, configServer := range a.config.Servers {
-		server := newServer(configServer.Name, a.store, a.fetcher)
-
-		serversMap[configServer.Name] = server
-		serversConfigMap[configServer.Name] = configServer.Config
-	}
+	a.server = newServer(a.store, a.fetcher, a.loader)
 
 	var report []string
 
@@ -96,24 +73,9 @@ func (a *application) Check() error {
 		report = append(report, r...)
 	}
 
-	if len(a.config.Listeners) == 0 {
-		report = append(report, "no listener defined")
-	}
-	for name, listener := range listenersMap {
-		r, err := a.checkListener(listener, listenersConfigMap[name])
-		if err != nil {
-			report = append(report, r...)
-		}
-	}
-
-	if len(a.config.Servers) == 0 {
-		report = append(report, "no server defined")
-	}
-	for id, server := range serversMap {
-		r, err := a.checkServer(server, serversConfigMap[id])
-		if err != nil {
-			report = append(report, r...)
-		}
+	r, err = a.checkServer(a.server, a.config.Server.Config)
+	if err != nil {
+		report = append(report, r...)
 	}
 
 	if len(report) > 0 {
@@ -134,18 +96,10 @@ func (a *application) Serve() error {
 		a.logger.Print("debug enabled")
 	}
 
-	a.state = &applicationState{
-		listenersMap:        make(map[string]Listener),
-		listenersConfig:     make(map[string]map[string]interface{}),
-		listenersDescriptor: make(map[string]ListenerDescriptor),
-		serversMap:          make(map[string]Server),
-		serversConfig:       make(map[string]map[string]interface{}),
-		serverListeners:     make(map[string][]Listener),
-	}
+	a.state = &applicationState{}
 
 	if _, ok := os.LookupEnv(childEnvKey); ok {
-		err := a.child()
-		if err != nil {
+		if err := a.child(); err != nil {
 			return err
 		}
 	}
@@ -153,61 +107,19 @@ func (a *application) Serve() error {
 	a.store = newStore()
 	a.fetcher = newFetcher()
 	a.loader = newLoader(a.store, a.fetcher)
+	a.server = newServer(a.store, a.fetcher, a.loader)
 
-	if len(a.config.Listeners) == 0 {
-		return errors.New("invalid configuration")
-	}
-	for _, configListener := range a.config.Listeners {
-		listener := newListener(configListener.Name)
-
-		a.state.listeners = append(a.state.listeners, listener)
-		a.state.listenersMap[configListener.Name] = listener
-		a.state.listenersConfig[configListener.Name] = configListener.Config
-	}
-
-	if len(a.config.Servers) == 0 {
-		return errors.New("invalid configuration")
-	}
-	for _, configServer := range a.config.Servers {
-		server := newServer(configServer.Name, a.store, a.fetcher)
-
-		a.state.servers = append(a.state.servers, server)
-		a.state.serversMap[configServer.Name] = server
-		a.state.serversConfig[configServer.Name] = configServer.Config
-	}
-
-	err := a.startStore(a.store, a.config.Store.Config)
-	if err != nil {
+	if err := a.startStore(a.store, a.config.Store.Config); err != nil {
 		return err
 	}
-
-	err = a.startFetcher(a.fetcher, a.config.Fetcher.Config)
-	if err != nil {
+	if err := a.startFetcher(a.fetcher, a.config.Fetcher.Config); err != nil {
 		return err
 	}
-
-	err = a.startLoader(a.loader, a.config.Loader.Config)
-	if err != nil {
+	if err := a.startLoader(a.loader, a.config.Loader.Config); err != nil {
 		return err
 	}
-
-	for name, listener := range a.state.listenersMap {
-		err := a.startListener(listener, a.state.listenersConfig[name])
-		if err != nil {
-			return err
-		}
-	}
-
-	for id, server := range a.state.serversMap {
-		err := a.startServer(server, a.state.serversConfig[id])
-		if err != nil {
-			return err
-		}
-
-		err = a.linkServer(server)
-		if err != nil {
-			return err
-		}
+	if err := a.startServer(a.server, a.config.Server.Config); err != nil {
+		return err
 	}
 
 	exit := make(chan os.Signal, 1)
@@ -221,27 +133,20 @@ func (a *application) Serve() error {
 		select {
 		case <-exit:
 			log.Print("Signal SIGTERM received, stopping instance")
-
-			err := a.stop()
-			if err != nil {
+			if err := a.stop(); err != nil {
 				return err
 			}
 
 		case <-shutdown:
 			log.Print("Signal SIGQUIT received, starting instance shutdown")
-
-			err := a.shutdown()
-			if err != nil {
+			if err := a.shutdown(); err != nil {
 				log.Printf("Failed to shutdown the instance: %s", err)
 			}
 
 		case <-reload:
 			log.Print("Signal SIGHUP received, reloading instance")
-
-			err := a.reload()
-			if err != nil {
+			if err := a.reload(); err != nil {
 				log.Printf("Failed to reload instance: %s", err)
-
 				continue
 			}
 		}
@@ -258,49 +163,18 @@ func (a *application) Serve() error {
 
 // stop stops the application.
 func (a *application) stop() error {
-	for _, server := range a.state.servers {
-		err := a.stopServer(server)
-		if err != nil {
-			return err
-		}
-
-		err = a.unlinkServer(server)
-		if err != nil {
-			return err
-		}
-
-		err = a.removeServer(server)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, listener := range a.state.listeners {
-		err := a.stopListener(listener)
-		if err != nil {
-			return err
-		}
-
-		err = a.removeListener(listener)
-		if err != nil {
-			return err
-		}
-	}
-
-	if a.loader != nil {
-		err := a.stopLoader(a.loader)
-		if err != nil {
-			return err
-		}
-	}
-
-	err := a.stopFetcher(a.fetcher)
-	if err != nil {
+	if err := a.stopServer(a.server); err != nil {
 		return err
 	}
-
-	err = a.stopStore(a.store)
-	if err != nil {
+	if a.loader != nil {
+		if err := a.stopLoader(a.loader); err != nil {
+			return err
+		}
+	}
+	if err := a.stopFetcher(a.fetcher); err != nil {
+		return err
+	}
+	if err := a.stopStore(a.store); err != nil {
 		return err
 	}
 
@@ -314,54 +188,18 @@ func (a *application) shutdown() error {
 		cancel()
 	}()
 
-	for _, server := range a.state.servers {
-		err := a.shutdownServer(ctx, server)
-		if err != nil {
-			return err
-		}
-
-		err = a.stopServer(server)
-		if err != nil {
-			return err
-		}
-
-		err = a.removeServer(server)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, listener := range a.state.listeners {
-		err := a.shutdownListener(ctx, listener)
-		if err != nil {
-			return err
-		}
-
-		err = a.stopListener(listener)
-		if err != nil {
-			return err
-		}
-
-		err = a.removeListener(listener)
-		if err != nil {
-			return err
-		}
-	}
-
-	if a.loader != nil {
-		err := a.stopLoader(a.loader)
-		if err != nil {
-			return err
-		}
-	}
-
-	err := a.stopFetcher(a.fetcher)
-	if err != nil {
+	if err := a.shutdownServer(ctx, a.server); err != nil {
 		return err
 	}
-
-	err = a.stopStore(a.store)
-	if err != nil {
+	if a.loader != nil {
+		if err := a.stopLoader(a.loader); err != nil {
+			return err
+		}
+	}
+	if err := a.stopFetcher(a.fetcher); err != nil {
+		return err
+	}
+	if err := a.stopStore(a.store); err != nil {
 		return err
 	}
 
@@ -392,7 +230,7 @@ func (a *application) reload() error {
 					os.Stdout,
 					os.Stderr,
 				}
-				for _, listener := range a.state.listeners {
+				for _, listener := range a.server.state.listenersMap {
 					descriptor, err := listener.Descriptor()
 					if err != nil {
 						return err
@@ -400,13 +238,12 @@ func (a *application) reload() error {
 					files = append(files, descriptor.Files()...)
 				}
 
-				_, err = os.StartProcess(exe, os.Args, &os.ProcAttr{
+				if _, err = os.StartProcess(exe, os.Args, &os.ProcAttr{
 					Dir:   filepath.Dir(exe),
 					Env:   env,
 					Files: files,
 					Sys:   &syscall.SysProcAttr{},
-				})
-				if err != nil {
+				}); err != nil {
 					return err
 				}
 
@@ -424,15 +261,22 @@ func (a *application) reload() error {
 	}
 }
 
+// checkStore checks the store configuration.
+func (a *application) checkStore(store Store, config map[string]interface{}) ([]string, error) {
+	if r, err := store.Check(config); err != nil {
+		return r, err
+	}
+
+	return nil, nil
+}
+
 // startStore starts the store.
 func (a *application) startStore(store Store, config map[string]interface{}) error {
-	_, err := store.Check(config)
-	if err != nil {
+	if _, err := store.Check(config); err != nil {
 		return err
 	}
 
-	err = store.Load(config)
-	if err != nil {
+	if err := store.Load(config); err != nil {
 		return err
 	}
 
@@ -441,36 +285,6 @@ func (a *application) startStore(store Store, config map[string]interface{}) err
 
 // stopStore stops the store.
 func (a *application) stopStore(store Store) error {
-	return nil
-}
-
-// checkStore checks the store configuration.
-func (a *application) checkStore(store Store, config map[string]interface{}) ([]string, error) {
-	r, err := store.Check(config)
-	if err != nil {
-		return r, err
-	}
-
-	return nil, nil
-}
-
-// startFetcher starts the fetcher.
-func (a *application) startFetcher(fetcher Fetcher, config map[string]interface{}) error {
-	_, err := fetcher.Check(config)
-	if err != nil {
-		return err
-	}
-
-	err = fetcher.Load(config)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// stopFetcher stops the fetcher.
-func (a *application) stopFetcher(fetcher Fetcher) error {
 	return nil
 }
 
@@ -484,20 +298,42 @@ func (a *application) checkFetcher(fetcher Fetcher, config map[string]interface{
 	return nil, nil
 }
 
+// startFetcher starts the fetcher.
+func (a *application) startFetcher(fetcher Fetcher, config map[string]interface{}) error {
+	_, err := fetcher.Check(config)
+	if err != nil {
+		return err
+	}
+	if err := fetcher.Load(config); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// stopFetcher stops the fetcher.
+func (a *application) stopFetcher(fetcher Fetcher) error {
+	return nil
+}
+
+// checkLoader checks the loader configuration.
+func (a *application) checkLoader(loader Loader, config map[string]interface{}) ([]string, error) {
+	if r, err := loader.Check(config); err != nil {
+		return r, err
+	}
+
+	return nil, nil
+}
+
 // startLoader starts the loader.
 func (a *application) startLoader(loader Loader, config map[string]interface{}) error {
-	_, err := loader.Check(config)
-	if err != nil {
+	if _, err := loader.Check(config); err != nil {
 		return err
 	}
-
-	err = loader.Load(config)
-	if err != nil {
+	if err := loader.Load(config); err != nil {
 		return err
 	}
-
-	err = loader.Start()
-	if err != nil {
+	if err := loader.Start(); err != nil {
 		return err
 	}
 
@@ -506,187 +342,9 @@ func (a *application) startLoader(loader Loader, config map[string]interface{}) 
 
 // stopLoader stops the loader.
 func (a *application) stopLoader(loader Loader) error {
-	err := loader.Stop()
-	if err != nil {
+	if err := loader.Stop(); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-// checkLoader checks the loader configuration.
-func (a *application) checkLoader(loader Loader, config map[string]interface{}) ([]string, error) {
-	r, err := loader.Check(config)
-	if err != nil {
-		return r, err
-	}
-
-	return nil, nil
-}
-
-// startListener starts the listener.
-func (a *application) startListener(listener Listener, config map[string]interface{}) error {
-	_, err := listener.Check(config)
-	if err != nil {
-		return err
-	}
-
-	err = listener.Load(config)
-	if err != nil {
-		return err
-	}
-
-	err = listener.Register(a.state.listenersDescriptor[listener.Name()])
-	if err != nil {
-		return err
-	}
-
-	err = listener.Serve()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// stopListener stops the listener.
-func (a *application) stopListener(listener Listener) error {
-	err := listener.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// shutdownListener shutdowns gracefully the listener.
-func (a *application) shutdownListener(ctx context.Context, listener Listener) error {
-	err := listener.Shutdown(ctx)
-	if err != nil {
-		return err
-	}
-
-	err = listener.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// removeListener removes the listener.
-func (a *application) removeListener(listener Listener) error {
-	err := listener.Remove()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// checkListener checks the listener configuration.
-func (a *application) checkListener(listener Listener, config map[string]interface{}) ([]string, error) {
-	r, err := listener.Check(config)
-	if err != nil {
-		return r, err
-	}
-
-	return nil, nil
-}
-
-// startServer starts the server.
-func (a *application) startServer(server Server, config map[string]interface{}) error {
-	_, err := server.Check(config)
-	if err != nil {
-		return err
-	}
-
-	err = server.Load(config)
-	if err != nil {
-		return err
-	}
-
-	err = server.Register()
-	if err != nil {
-		return err
-	}
-
-	err = server.Start()
-	if err != nil {
-		return err
-	}
-
-	err = server.Enable()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// stopServer stops the server.
-func (a *application) stopServer(server Server) error {
-	err := server.Stop()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// shutdownServer shutdowns gracefully the server.
-func (a *application) shutdownServer(ctx context.Context, server Server) error {
-	err := server.Disable(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// removeServer removes the server.
-func (a *application) removeServer(server Server) error {
-	err := server.Remove()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// linkServer links the server to its listeners.
-func (a *application) linkServer(server Server) error {
-	for _, listenerName := range server.Listeners() {
-		if _, ok := a.state.listenersMap[listenerName]; !ok {
-			return errors.New("listener not found")
-		}
-		if _, ok := a.state.serverListeners[server.Name()]; ok {
-			for _, listener := range a.state.serverListeners[server.Name()] {
-				if listener.Name() == listenerName {
-					return errors.New("server already linked to listener")
-				}
-			}
-		}
-
-		a.state.listenersMap[listenerName].Link(server)
-
-		a.state.serverListeners[server.Name()] = append(a.state.serverListeners[server.Name()],
-			a.state.listenersMap[listenerName])
-	}
-
-	return nil
-}
-
-// unlinkServer unlinks the server from its listeners.
-func (a *application) unlinkServer(server Server) error {
-	if _, ok := a.state.serverListeners[server.Name()]; !ok {
-		return errors.New("server not linked")
-	}
-
-	for _, listener := range a.state.serverListeners[server.Name()] {
-		listener.Unlink(server)
-	}
-	delete(a.state.serverListeners, server.Name())
 
 	return nil
 }
@@ -699,6 +357,42 @@ func (a *application) checkServer(server Server, config map[string]interface{}) 
 	}
 
 	return nil, nil
+}
+
+// startServer starts the server.
+func (a *application) startServer(server Server, config map[string]interface{}) error {
+	if _, err := server.Check(config); err != nil {
+		return err
+	}
+	if err := server.Load(config); err != nil {
+		return err
+	}
+	if err := server.Register(a.state.serverListenersDescriptors); err != nil {
+		return err
+	}
+	if err := server.Start(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// stopServer stops the server.
+func (a *application) stopServer(server Server) error {
+	if err := server.Stop(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// shutdownServer shutdowns the server gracefully.
+func (a *application) shutdownServer(ctx context.Context, server Server) error {
+	if err := server.Shutdown(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // childHelloResponse implements the hello message response.
@@ -752,7 +446,7 @@ func (a *application) listenChild(ch chan<- string, errorCh chan<- error) {
 		case childMessageHello:
 			response := childHelloResponse{}
 
-			for _, listener := range a.state.listeners {
+			for _, listener := range a.server.state.listenersMap {
 				helloListener := struct {
 					Name  string   `json:"name"`
 					Files []string `json:"files"`
@@ -878,14 +572,15 @@ func (a *application) child() error {
 		return err
 	}
 
-	var index int = 3
+	var fdsIndex int = 3
+	a.state.serverListenersDescriptors = make(map[string]ServerListenerDescriptor, len(response.Listeners))
 	for _, listener := range response.Listeners {
-		descriptor := newListenerDescriptor()
+		descriptor := newServerListenerDescriptor()
 		for _, file := range listener.Files {
-			descriptor.addFile(os.NewFile(uintptr(index), file))
-			index++
+			descriptor.addFile(os.NewFile(uintptr(fdsIndex), file))
+			fdsIndex++
 		}
-		a.state.listenersDescriptor[listener.Name] = descriptor
+		a.state.serverListenersDescriptors[listener.Name] = descriptor
 	}
 
 	wg.Add(1)

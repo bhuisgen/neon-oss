@@ -17,6 +17,7 @@ func TestApplicationCheck(t *testing.T) {
 		store   *store
 		fetcher *fetcher
 		loader  *loader
+		server  *server
 	}
 	tests := []struct {
 		name    string
@@ -27,22 +28,6 @@ func TestApplicationCheck(t *testing.T) {
 			name: "default",
 			fields: fields{
 				config: &config{
-					Listeners: []*configListener{
-						{
-							Name: "listener",
-							Config: map[string]interface{}{
-								"test": map[string]interface{}{},
-							},
-						},
-					},
-					Servers: []*configServer{
-						{
-							Name: "server",
-							Config: map[string]interface{}{
-								"listeners": []string{"default"},
-							},
-						},
-					},
 					Store: &configStore{
 						Config: map[string]interface{}{
 							"storage": map[string]map[string]interface{}{
@@ -52,11 +37,25 @@ func TestApplicationCheck(t *testing.T) {
 					},
 					Fetcher: &configFetcher{},
 					Loader:  &configLoader{},
+					Server: &configServer{
+						Config: map[string]interface{}{
+							"listeners": map[string]map[string]interface{}{
+								"test": {},
+							},
+							"sites": map[string]map[string]interface{}{
+								"default": {
+									"listeners": []string{"test"},
+									"routes":    map[string]interface{}{},
+								},
+							},
+						},
+					},
 				},
 				logger:  log.Default(),
 				store:   &store{},
 				fetcher: &fetcher{},
 				loader:  &loader{},
+				server:  &server{},
 			},
 		},
 	}
@@ -69,6 +68,7 @@ func TestApplicationCheck(t *testing.T) {
 				store:   tt.fields.store,
 				fetcher: tt.fields.fetcher,
 				loader:  tt.fields.loader,
+				server:  tt.fields.server,
 			}
 			if err := a.Check(); (err != nil) != tt.wantErr {
 				t.Errorf("application.Check() error = %v, wantErr %v", err, tt.wantErr)

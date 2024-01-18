@@ -6,6 +6,10 @@ package core
 
 import "context"
 
+// Loader
+type Loader interface {
+}
+
 // LoaderParserModule
 type LoaderParserModule interface {
 	Module

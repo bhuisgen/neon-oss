@@ -5,36 +5,56 @@
 package core
 
 import (
+	"context"
+	"net"
 	"net/http"
 )
 
 // Server
 type Server interface {
+}
+
+// ServerListener
+type ServerListener interface {
+	Name() string
+	Listeners() []net.Listener
+	RegisterListener(listener net.Listener) error
+}
+
+// ServerListenerModule
+type ServerListenerModule interface {
+	Module
+	Register(listener ServerListener) error
+	Serve(handler http.Handler) error
+	Shutdown(ctx context.Context) error
+	Close() error
+}
+
+// ServerSite
+type ServerSite interface {
 	Name() string
 	Listeners() []string
 	Hosts() []string
 	Store() Store
 	Fetcher() Fetcher
+	Loader() Loader
+	Server() Server
 	RegisterMiddleware(middleware func(next http.Handler) http.Handler) error
 	RegisterHandler(handler http.Handler) error
 }
 
-// ServerHandlerModule
-type ServerHandlerModule interface {
+// ServerSiteHandlerModule
+type ServerSiteHandlerModule interface {
 	Module
-	Register(server Server) error
+	Register(server ServerSite) error
 	Start() error
-	Mount() error
-	Unmount()
 	Stop()
 }
 
-// ServerMiddlewareModule
-type ServerMiddlewareModule interface {
+// ServerSiteMiddlewareModule
+type ServerSiteMiddlewareModule interface {
 	Module
-	Register(server Server) error
+	Register(server ServerSite) error
 	Start() error
-	Mount() error
-	Unmount()
 	Stop()
 }

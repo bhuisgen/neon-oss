@@ -57,8 +57,8 @@ func (f *fetcher) Check(config map[string]interface{}) ([]string, error) {
 		return report, err
 	}
 
-	for provider, p := range c.Providers {
-		for moduleName, moduleConfig := range p {
+	for provider, providerConfig := range c.Providers {
+		for moduleName, moduleConfig := range providerConfig {
 			moduleInfo, err := module.Lookup(module.ModuleID("fetcher.provider." + moduleName))
 			if err != nil {
 				report = append(report, fmt.Sprintf("fetcher: provider '%s', unregistered provider module '%s'", provider,
@@ -79,6 +79,8 @@ func (f *fetcher) Check(config map[string]interface{}) ([]string, error) {
 				}
 				continue
 			}
+
+			break
 		}
 	}
 
@@ -121,6 +123,8 @@ func (f *fetcher) Load(config map[string]interface{}) error {
 
 			f.state.providers[provider] = moduleName
 			f.state.providersModules[moduleName] = module
+
+			break
 		}
 	}
 

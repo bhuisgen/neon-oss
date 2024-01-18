@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -20,25 +21,12 @@ import (
 
 // config implements the configuration.
 type config struct {
-	Listeners  []*configListener
-	Servers    []*configServer
 	Store      *configStore
 	Fetcher    *configFetcher
 	Loader     *configLoader
+	Server     *configServer
 	parser     configParser
 	osReadFile func(name string) ([]byte, error)
-}
-
-// configListener implements the configuration of a listener.
-type configListener struct {
-	Name   string
-	Config map[string]interface{}
-}
-
-// configServer implements the configuration of a server.
-type configServer struct {
-	Name   string
-	Config map[string]interface{}
 }
 
 // configStore implements the configuration of the store.
@@ -53,6 +41,11 @@ type configFetcher struct {
 
 // configLoader implements the configuration of the loader.
 type configLoader struct {
+	Config map[string]interface{}
+}
+
+// configServer implements the configuration of the server.
+type configServer struct {
 	Config map[string]interface{}
 }
 
@@ -86,11 +79,10 @@ type configParserYAML struct {
 type (
 	// yamlConfig implements the main configuration for the parser.
 	yamlConfig struct {
-		Listeners map[string]map[string]interface{}
-		Servers   map[string]map[string]interface{}
-		Store     map[string]interface{}
-		Fetcher   map[string]interface{}
-		Loader    map[string]interface{}
+		Store   map[string]interface{}
+		Fetcher map[string]interface{}
+		Loader  map[string]interface{}
+		Server  map[string]interface{}
 	}
 )
 
@@ -109,18 +101,6 @@ func (p *configParserYAML) parse(data []byte, c *config) error {
 		return err
 	}
 
-	for name, listener := range y.Listeners {
-		c.Listeners = append(c.Listeners, &configListener{
-			Name:   name,
-			Config: listener,
-		})
-	}
-	for name, server := range y.Servers {
-		c.Servers = append(c.Servers, &configServer{
-			Name:   name,
-			Config: server,
-		})
-	}
 	c.Store = &configStore{
 		Config: y.Store,
 	}
@@ -129,6 +109,9 @@ func (p *configParserYAML) parse(data []byte, c *config) error {
 	}
 	c.Loader = &configLoader{
 		Config: y.Loader,
+	}
+	c.Server = &configServer{
+		Config: y.Server,
 	}
 
 	return nil
@@ -144,11 +127,10 @@ type configParserTOML struct {
 type (
 	// tomlConfig implements the main configuration for the parser.
 	tomlConfig struct {
-		Listeners map[string]map[string]interface{}
-		Servers   map[string]map[string]interface{}
-		Store     map[string]interface{}
-		Fetcher   map[string]interface{}
-		Loader    map[string]interface{}
+		Store   map[string]interface{}
+		Fetcher map[string]interface{}
+		Loader  map[string]interface{}
+		Server  map[string]interface{}
 	}
 )
 
@@ -167,18 +149,6 @@ func (p *configParserTOML) parse(data []byte, c *config) error {
 		return err
 	}
 
-	for name, listener := range t.Listeners {
-		c.Listeners = append(c.Listeners, &configListener{
-			Name:   name,
-			Config: listener,
-		})
-	}
-	for name, server := range t.Servers {
-		c.Servers = append(c.Servers, &configServer{
-			Name:   name,
-			Config: server,
-		})
-	}
 	c.Store = &configStore{
 		Config: t.Store,
 	}
@@ -187,6 +157,9 @@ func (p *configParserTOML) parse(data []byte, c *config) error {
 	}
 	c.Loader = &configLoader{
 		Config: t.Loader,
+	}
+	c.Server = &configServer{
+		Config: t.Server,
 	}
 
 	return nil
@@ -202,11 +175,10 @@ type configParserJSON struct {
 type (
 	// jsonConfig implements the main configuration for the parser.
 	jsonConfig struct {
-		Listeners map[string]map[string]interface{}
-		Servers   map[string]map[string]interface{}
-		Store     map[string]interface{}
-		Fetcher   map[string]interface{}
-		Loader    map[string]interface{}
+		Store   map[string]interface{}
+		Fetcher map[string]interface{}
+		Loader  map[string]interface{}
+		Server  map[string]interface{}
 	}
 )
 
@@ -225,18 +197,6 @@ func (p *configParserJSON) parse(data []byte, c *config) error {
 		return err
 	}
 
-	for name, listener := range j.Listeners {
-		c.Listeners = append(c.Listeners, &configListener{
-			Name:   name,
-			Config: listener,
-		})
-	}
-	for name, server := range j.Servers {
-		c.Servers = append(c.Servers, &configServer{
-			Name:   name,
-			Config: server,
-		})
-	}
 	c.Store = &configStore{
 		Config: j.Store,
 	}
@@ -245,6 +205,9 @@ func (p *configParserJSON) parse(data []byte, c *config) error {
 	}
 	c.Loader = &configLoader{
 		Config: j.Loader,
+	}
+	c.Server = &configServer{
+		Config: j.Server,
 	}
 
 	return nil
@@ -294,7 +257,7 @@ func GenerateConfig(template string) error {
 
 	_, err := os.Stat(name)
 	if err == nil {
-		return errors.New("configuration file already exists")
+		return fmt.Errorf("configuration file '%s' already exists", name)
 	}
 
 	err = fs.WalkDir(configTemplatesInit, ".", func(path string, d fs.DirEntry, err error) error {

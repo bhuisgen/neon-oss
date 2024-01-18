@@ -12,36 +12,19 @@ import (
 	"github.com/bhuisgen/neon/pkg/core"
 )
 
+// Store
+type Store interface {
+	Check(config map[string]interface{}) ([]string, error)
+	Load(config map[string]interface{}) error
+	LoadResource(name string) (*core.Resource, error)
+	StoreResource(name string, resource *core.Resource) error
+}
+
 // Fetcher
 type Fetcher interface {
 	Check(config map[string]interface{}) ([]string, error)
 	Load(config map[string]interface{}) error
 	Fetch(ctx context.Context, name string, provider string, config map[string]interface{}) (*core.Resource, error)
-}
-
-// Listener
-type Listener interface {
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
-	Register(descriptor ListenerDescriptor) error
-	Serve() error
-	Shutdown(ctx context.Context) error
-	Close() error
-	Remove() error
-	Name() string
-	Link(server Server) error
-	Unlink(server Server) error
-	Descriptor() (ListenerDescriptor, error)
-}
-
-// ListenerRouter
-type ListenerRouter interface {
-	http.Handler
-}
-
-// ListenerDescriptor
-type ListenerDescriptor interface {
-	Files() []*os.File
 }
 
 // Loader
@@ -56,27 +39,51 @@ type Loader interface {
 type Server interface {
 	Check(config map[string]interface{}) ([]string, error)
 	Load(config map[string]interface{}) error
+	Register(descriptors map[string]ServerListenerDescriptor) error
+	Start() error
+	Stop() error
+	Shutdown(ctx context.Context) error
+}
+
+// ServerListener
+type ServerListener interface {
+	Check(config map[string]interface{}) ([]string, error)
+	Load(config map[string]interface{}) error
+	Register(descriptor ServerListenerDescriptor) error
+	Serve() error
+	Shutdown(ctx context.Context) error
+	Close() error
+	Remove() error
+	Name() string
+	Link(site ServerSite) error
+	Unlink(site ServerSite) error
+	Descriptor() (ServerListenerDescriptor, error)
+}
+
+// ServerListenerRouter
+type ServerListenerRouter interface {
+	http.Handler
+}
+
+// ServerListenerDescriptor
+type ServerListenerDescriptor interface {
+	Files() []*os.File
+}
+
+// ServerSite
+type ServerSite interface {
+	Check(config map[string]interface{}) ([]string, error)
+	Load(config map[string]interface{}) error
 	Register() error
 	Start() error
-	Enable() error
-	Disable(ctx context.Context) error
 	Stop() error
-	Remove() error
 	Name() string
 	Listeners() []string
 	Hosts() []string
-	Router() (ServerRouter, error)
+	Router() (ServerSiteRouter, error)
 }
 
-// ServerRouter
-type ServerRouter interface {
+// ServerSiteRouter
+type ServerSiteRouter interface {
 	Routes() map[string]http.Handler
-}
-
-// Store
-type Store interface {
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
-	LoadResource(name string) (*core.Resource, error)
-	StoreResource(name string, resource *core.Resource) error
 }

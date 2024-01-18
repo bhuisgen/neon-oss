@@ -10,11 +10,12 @@ import (
 	"log"
 	"os"
 
+	"github.com/mitchellh/mapstructure"
+
 	"github.com/bhuisgen/neon/pkg/cache"
 	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
-	"github.com/mitchellh/mapstructure"
 )
 
 // memoryStorage implements the memory storage.
