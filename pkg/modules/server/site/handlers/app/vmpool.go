@@ -5,6 +5,7 @@
 package app
 
 import (
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -25,9 +26,9 @@ type vmPool struct {
 }
 
 // newVMPool creates a new VM pool.
-func newVMPool(max int32) *vmPool {
+func newVMPool(max int) *vmPool {
 	if max < 0 {
-		max = 1
+		max = runtime.GOMAXPROCS(0)
 	}
 
 	p := &vmPool{

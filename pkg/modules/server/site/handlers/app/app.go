@@ -237,7 +237,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *log.Logger) err
 		errInit = true
 	}
 	if h.config.MaxVMs == nil {
-		defaultValue := runtime.NumCPU() * 2
+		defaultValue := runtime.GOMAXPROCS(0)
 		h.config.MaxVMs = &defaultValue
 	}
 	if *h.config.MaxVMs < 0 {
@@ -304,7 +304,7 @@ func (h *appHandler) Start() error {
 		}
 		h.regexps = append(h.regexps, re)
 	}
-	h.vmPool = newVMPool(int32(*h.config.MaxVMs))
+	h.vmPool = newVMPool(*h.config.MaxVMs)
 
 	err := h.read()
 	if err != nil {

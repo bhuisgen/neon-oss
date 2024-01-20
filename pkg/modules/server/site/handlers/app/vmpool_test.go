@@ -13,7 +13,7 @@ import (
 
 func TestNewVMPool(t *testing.T) {
 	type args struct {
-		max int32
+		max int
 	}
 	tests := []struct {
 		name    string
