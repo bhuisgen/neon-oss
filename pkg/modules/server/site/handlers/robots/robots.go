@@ -7,10 +7,8 @@ package robots
 import (
 	_ "embed"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"text/template"
 	"time"
 
@@ -48,7 +46,6 @@ type robotsTemplateData struct {
 
 const (
 	robotsModuleID module.ModuleID = "server.site.handler.robots"
-	robotsLogger   string          = "handler[robots]"
 
 	robotsConfigDefaultCache    bool = false
 	robotsConfigDefaultCacheTTL int  = 60
@@ -74,53 +71,23 @@ func (h robotsHandler) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the handler configuration.
-func (h *robotsHandler) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the handler.
+func (h *robotsHandler) Init(config map[string]interface{}, logger *log.Logger) error {
+	h.logger = logger
 
-	var c robotsHandlerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	for _, item := range c.Hosts {
-		if item == "" {
-			report = append(report, fmt.Sprintf("option '%s', missing option or value", "Hosts"))
-		}
-	}
-	if c.CacheTTL == nil {
-		defaultValue := robotsConfigDefaultCacheTTL
-		c.CacheTTL = &defaultValue
-	}
-	if *c.CacheTTL < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "CacheTTL", *c.CacheTTL))
-	}
-	for _, item := range c.Sitemaps {
-		if item == "" {
-			report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "Sitemaps", item))
-		}
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the handler.
-func (h *robotsHandler) Load(config map[string]interface{}) error {
-	var c robotsHandlerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &h.config); err != nil {
+		h.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	h.config = &c
-	h.logger = log.New(os.Stderr, fmt.Sprint(robotsLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
+	for _, item := range h.config.Hosts {
+		if item == "" {
+			h.logger.Printf("option '%s', missing option or value", "Hosts")
+			errInit = true
+		}
+	}
 	if h.config.Cache == nil {
 		defaultValue := robotsConfigDefaultCache
 		h.config.Cache = &defaultValue
@@ -129,11 +96,27 @@ func (h *robotsHandler) Load(config map[string]interface{}) error {
 		defaultValue := robotsConfigDefaultCacheTTL
 		h.config.CacheTTL = &defaultValue
 	}
+	if *h.config.CacheTTL < 0 {
+		h.logger.Printf("option '%s', invalid value '%d'", "CacheTTL", *h.config.CacheTTL)
+		errInit = true
+	}
+	for _, item := range h.config.Sitemaps {
+		if item == "" {
+			h.logger.Printf("option '%s', invalid value '%s'", "Sitemaps", item)
+			errInit = true
+		}
+	}
 
+	if errInit {
+		return errors.New("init error")
+	}
+
+	var err error
 	h.template, err = template.New("robots").Parse(robotsTemplate)
 	if err != nil {
 		return err
 	}
+
 	h.rwPool = render.NewRenderWriterPool()
 	h.cache = memory.New(time.Duration(*h.config.CacheTTL)*time.Second, 0)
 

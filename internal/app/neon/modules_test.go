@@ -7,6 +7,7 @@ package neon
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"testing"
@@ -16,8 +17,7 @@ import (
 )
 
 type testStoreStorageModule struct {
-	errCheck         bool
-	errLoad          bool
+	errInit          bool
 	errLoadResource  bool
 	errStoreResource bool
 }
@@ -35,15 +35,8 @@ func (m testStoreStorageModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testStoreStorageModule) Check(config map[string]interface{}) ([]string, error) {
-	if m.errCheck {
-		return []string{"test"}, errors.New("test error")
-	}
-	return nil, nil
-}
-
-func (m testStoreStorageModule) Load(config map[string]interface{}) error {
-	if m.errLoad {
+func (m testStoreStorageModule) Init(config map[string]interface{}, logger *log.Logger) error {
+	if m.errInit {
 		return errors.New("test error")
 	}
 	return nil
@@ -69,8 +62,7 @@ func (m testStoreStorageModule) StoreResource(name string, resource *core.Resour
 var _ core.StoreStorageModule = (*testStoreStorageModule)(nil)
 
 type testFetcherProviderModule struct {
-	errCheck bool
-	errLoad  bool
+	errInit  bool
 	errFetch bool
 }
 
@@ -87,15 +79,8 @@ func (m testFetcherProviderModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testFetcherProviderModule) Check(config map[string]interface{}) ([]string, error) {
-	if m.errCheck {
-		return []string{"test"}, errors.New("test error")
-	}
-	return nil, nil
-}
-
-func (m testFetcherProviderModule) Load(config map[string]interface{}) error {
-	if m.errLoad {
+func (m testFetcherProviderModule) Init(config map[string]interface{}, logger *log.Logger) error {
+	if m.errInit {
 		return errors.New("test error")
 	}
 	return nil
@@ -115,8 +100,7 @@ func (m testFetcherProviderModule) Fetch(ctx context.Context, name string, confi
 var _ core.FetcherProviderModule = (*testFetcherProviderModule)(nil)
 
 type testLoaderParserModule struct {
-	errCheck bool
-	errLoad  bool
+	errInit  bool
 	errParse bool
 }
 
@@ -133,15 +117,8 @@ func (m testLoaderParserModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testLoaderParserModule) Check(config map[string]interface{}) ([]string, error) {
-	if m.errCheck {
-		return []string{"test"}, errors.New("test error")
-	}
-	return nil, nil
-}
-
-func (m testLoaderParserModule) Load(config map[string]interface{}) error {
-	if m.errLoad {
+func (m testLoaderParserModule) Init(config map[string]interface{}, logger *log.Logger) error {
+	if m.errInit {
 		return errors.New("test error")
 	}
 	return nil
@@ -157,8 +134,7 @@ func (m testLoaderParserModule) Parse(ctx context.Context, store core.Store, fet
 var _ core.LoaderParserModule = (*testLoaderParserModule)(nil)
 
 type testServerListenerModule struct {
-	errCheck    bool
-	errLoad     bool
+	errInit     bool
 	errRegister bool
 	errServe    bool
 	errShutdown bool
@@ -178,15 +154,8 @@ func (m testServerListenerModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerListenerModule) Check(config map[string]interface{}) ([]string, error) {
-	if m.errCheck {
-		return []string{"test"}, errors.New("test error")
-	}
-	return nil, nil
-}
-
-func (m testServerListenerModule) Load(config map[string]interface{}) error {
-	if m.errLoad {
+func (m testServerListenerModule) Init(config map[string]interface{}, logger *log.Logger) error {
+	if m.errInit {
 		return errors.New("test error")
 	}
 	return nil
@@ -223,11 +192,9 @@ func (m testServerListenerModule) Close() error {
 var _ core.ServerListenerModule = (*testServerListenerModule)(nil)
 
 type testServerSiteMiddlewareModule struct {
-	errCheck    bool
-	errLoad     bool
+	errInit     bool
 	errRegister bool
 	errStart    bool
-	errMount    bool
 }
 
 const (
@@ -243,15 +210,8 @@ func (m testServerSiteMiddlewareModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerSiteMiddlewareModule) Check(config map[string]interface{}) ([]string, error) {
-	if m.errCheck {
-		return []string{"test"}, errors.New("test error")
-	}
-	return nil, nil
-}
-
-func (m testServerSiteMiddlewareModule) Load(config map[string]interface{}) error {
-	if m.errLoad {
+func (m testServerSiteMiddlewareModule) Init(config map[string]interface{}, logger *log.Logger) error {
+	if m.errInit {
 		return errors.New("test error")
 	}
 	return nil
@@ -271,27 +231,15 @@ func (m testServerSiteMiddlewareModule) Start() error {
 	return nil
 }
 
-func (m testServerSiteMiddlewareModule) Mount() error {
-	if m.errMount {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerSiteMiddlewareModule) Unmount() {
-}
-
 func (m testServerSiteMiddlewareModule) Stop() {
 }
 
 var _ core.ServerSiteHandlerModule = (*testServerSiteMiddlewareModule)(nil)
 
 type testServerSiteHandlerModule struct {
-	errCheck    bool
-	errLoad     bool
+	errInit     bool
 	errRegister bool
 	errStart    bool
-	errMount    bool
 }
 
 const (
@@ -307,15 +255,8 @@ func (m testServerSiteHandlerModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerSiteHandlerModule) Check(config map[string]interface{}) ([]string, error) {
-	if m.errCheck {
-		return []string{"test"}, errors.New("test error")
-	}
-	return nil, nil
-}
-
-func (m testServerSiteHandlerModule) Load(config map[string]interface{}) error {
-	if m.errLoad {
+func (m testServerSiteHandlerModule) Init(config map[string]interface{}, logger *log.Logger) error {
+	if m.errInit {
 		return errors.New("test error")
 	}
 	return nil
@@ -333,16 +274,6 @@ func (m testServerSiteHandlerModule) Start() error {
 		return errors.New("test error")
 	}
 	return nil
-}
-
-func (m testServerSiteHandlerModule) Mount() error {
-	if m.errMount {
-		return errors.New("test error")
-	}
-	return nil
-}
-
-func (m testServerSiteHandlerModule) Unmount() {
 }
 
 func (m testServerSiteHandlerModule) Stop() {

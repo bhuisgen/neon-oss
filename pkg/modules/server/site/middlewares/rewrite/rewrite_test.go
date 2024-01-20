@@ -8,7 +8,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"reflect"
 	"regexp"
 	"testing"
 
@@ -101,7 +100,7 @@ func TestRewriteMiddlewareModuleInfo(t *testing.T) {
 	}
 }
 
-func TestRewriteMiddlewareCheck(t *testing.T) {
+func TestRewriteMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config  *rewriteMiddlewareConfig
 		logger  *log.Logger
@@ -109,17 +108,20 @@ func TestRewriteMiddlewareCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
 			name: "minimal",
-			args: args{},
+			args: args{
+				config: map[string]interface{}{},
+				logger: log.Default(),
+			},
 		},
 		{
 			name: "full",
@@ -133,6 +135,7 @@ func TestRewriteMiddlewareCheck(t *testing.T) {
 						},
 					},
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -147,11 +150,7 @@ func TestRewriteMiddlewareCheck(t *testing.T) {
 						},
 					},
 				},
-			},
-			want: []string{
-				"rule option 'Path', missing option or value",
-				"rule option 'Replacement', missing option or value",
-				"rule option 'Flag', invalid value ''",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -166,9 +165,7 @@ func TestRewriteMiddlewareCheck(t *testing.T) {
 						},
 					},
 				},
-			},
-			want: []string{
-				"rule option 'Path', invalid regular expression '('",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -180,46 +177,8 @@ func TestRewriteMiddlewareCheck(t *testing.T) {
 				logger:  tt.fields.logger,
 				regexps: tt.fields.regexps,
 			}
-			got, err := m.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("rewriteMiddleware.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("rewriteMiddleware.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestRewriteMiddlewareLoad(t *testing.T) {
-	type fields struct {
-		config  *rewriteMiddlewareConfig
-		logger  *log.Logger
-		regexps []*regexp.Regexp
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &rewriteMiddleware{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				regexps: tt.fields.regexps,
-			}
-			if err := m.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("rewriteMiddleware.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := m.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("rewriteMiddleware.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

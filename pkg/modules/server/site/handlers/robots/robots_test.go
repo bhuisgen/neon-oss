@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"reflect"
 	"testing"
 	"text/template"
 
@@ -135,7 +134,7 @@ func TestRobotsHandlerModuleInfo(t *testing.T) {
 	}
 }
 
-func TestRobotsHandlerCheck(t *testing.T) {
+func TestRobotsHandlerInit(t *testing.T) {
 	type fields struct {
 		config   *robotsHandlerConfig
 		logger   *log.Logger
@@ -145,17 +144,20 @@ func TestRobotsHandlerCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
 			name: "minimal",
-			args: args{},
+			args: args{
+				config: map[string]interface{}{},
+				logger: log.Default(),
+			},
 		},
 		{
 			name: "full",
@@ -166,6 +168,7 @@ func TestRobotsHandlerCheck(t *testing.T) {
 					"CacheTTL": 60,
 					"Sitemaps": []string{"http://test/sitemap.xml"},
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -176,11 +179,7 @@ func TestRobotsHandlerCheck(t *testing.T) {
 					"CacheTTL": -1,
 					"Sitemaps": []string{""},
 				},
-			},
-			want: []string{
-				"option 'Hosts', missing option or value",
-				"option 'CacheTTL', invalid value '-1'",
-				"option 'Sitemaps', invalid value ''",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -194,50 +193,8 @@ func TestRobotsHandlerCheck(t *testing.T) {
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
 			}
-			got, err := h.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("robotsHandler.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("robotsHandler.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestRobotsHandlerLoad(t *testing.T) {
-	type fields struct {
-		config   *robotsHandlerConfig
-		logger   *log.Logger
-		template *template.Template
-		rwPool   render.RenderWriterPool
-		cache    cache.Cache
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &robotsHandler{
-				config:   tt.fields.config,
-				logger:   tt.fields.logger,
-				template: tt.fields.template,
-				rwPool:   tt.fields.rwPool,
-				cache:    tt.fields.cache,
-			}
-			if err := h.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("robotsHandler.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := h.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("robotsHandler.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

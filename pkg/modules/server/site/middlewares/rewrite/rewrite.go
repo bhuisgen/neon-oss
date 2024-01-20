@@ -6,10 +6,8 @@ package rewrite
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
@@ -41,7 +39,6 @@ type RewriteRule struct {
 
 const (
 	rewriteModuleID module.ModuleID = "server.site.middleware.rewrite"
-	rewriteLogger   string          = "middleware[rewrite]"
 
 	rewriteRuleFlagRedirect  string = "redirect"
 	rewriteRuleFlagPermanent string = "permanent"
@@ -62,56 +59,46 @@ func (m rewriteMiddleware) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the middleware configuration.
-func (m *rewriteMiddleware) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the middleware.
+func (m *rewriteMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+	m.logger = logger
 
-	var c rewriteMiddlewareConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
+	if err := mapstructure.Decode(config, &m.config); err != nil {
+		m.logger.Print("failed to parse configuration")
+		return err
 	}
 
-	for _, rule := range c.Rules {
+	var errInit bool
+
+	for _, rule := range m.config.Rules {
 		if rule.Path == "" {
-			report = append(report, fmt.Sprintf("rule option '%s', missing option or value", "Path"))
+			m.logger.Printf("rule option '%s', missing option or value", "Path")
+			errInit = true
 		} else {
 			_, err := regexp.Compile(rule.Path)
 			if err != nil {
-				report = append(report, fmt.Sprintf("rule option '%s', invalid regular expression '%s'", "Path", rule.Path))
+				m.logger.Printf("rule option '%s', invalid regular expression '%s'", "Path", rule.Path)
+				errInit = true
 			}
 		}
 		if rule.Replacement == "" {
-			report = append(report, fmt.Sprintf("rule option '%s', missing option or value", "Replacement"))
+			m.logger.Printf("rule option '%s', missing option or value", "Replacement")
+			errInit = true
 		}
 		if rule.Flag != nil {
 			switch *rule.Flag {
 			case rewriteRuleFlagPermanent:
 			case rewriteRuleFlagRedirect:
 			default:
-				report = append(report, fmt.Sprintf("rule option '%s', invalid value '%s'", "Flag", *rule.Flag))
+				m.logger.Printf("rule option '%s', invalid value '%s'", "Flag", *rule.Flag)
+				errInit = true
 			}
 		}
 	}
 
-	if len(report) > 0 {
-		return report, errors.New("check failure")
+	if errInit {
+		return errors.New("init error")
 	}
-
-	return nil, nil
-}
-
-// Load loads the middleware.
-func (m *rewriteMiddleware) Load(config map[string]interface{}) error {
-	var c rewriteMiddlewareConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		return err
-	}
-
-	m.config = &c
-	m.logger = log.New(os.Stderr, fmt.Sprint(rewriteLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 
 	return nil
 }

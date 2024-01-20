@@ -45,7 +45,6 @@ type localListenerConfig struct {
 
 const (
 	localModuleID module.ModuleID = "server.listener.local"
-	localLogger   string          = "listener[local]"
 
 	localConfigDefaultListenAddr        string = ""
 	localConfigDefaultListenPort        int    = 80
@@ -101,74 +100,16 @@ func (l localListener) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the listener configuration.
-func (l *localListener) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the listener.
+func (l *localListener) Init(config map[string]interface{}, logger *log.Logger) error {
+	l.logger = logger
 
-	var c localListenerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.ListenAddr == nil {
-		defaultValue := localConfigDefaultListenAddr
-		c.ListenAddr = &defaultValue
-	}
-	if c.ListenPort == nil {
-		defaultValue := localConfigDefaultListenPort
-		c.ListenPort = &defaultValue
-	}
-	if *c.ListenPort < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "ListenPort", *c.ListenPort))
-	}
-	if c.ReadTimeout == nil {
-		defaultValue := localConfigDefaultReadTimeout
-		c.ReadTimeout = &defaultValue
-	}
-	if *c.ReadTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "ReadTimeout", *c.ReadTimeout))
-	}
-	if c.ReadHeaderTimeout == nil {
-		defaultValue := localConfigDefaultReadHeaderTimeout
-		c.ReadHeaderTimeout = &defaultValue
-	}
-	if *c.ReadHeaderTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "ReadHeaderTimeout", *c.ReadHeaderTimeout))
-	}
-	if c.WriteTimeout == nil {
-		defaultValue := localConfigDefaultWriteTimeout
-		c.WriteTimeout = &defaultValue
-	}
-	if *c.WriteTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "WriteTimeout", *c.WriteTimeout))
-	}
-	if c.IdleTimeout == nil {
-		defaultValue := localConfigDefaultIdleTimeout
-		c.IdleTimeout = &defaultValue
-	}
-	if *c.IdleTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "IdleTimeout", *c.IdleTimeout))
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the listener.
-func (l *localListener) Load(config map[string]interface{}) error {
-	var c localListenerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &l.config); err != nil {
+		l.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	l.config = &c
-	l.logger = log.New(os.Stderr, fmt.Sprint(localLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
 	if l.config.ListenAddr == nil {
 		defaultValue := localConfigDefaultListenAddr
@@ -178,21 +119,45 @@ func (l *localListener) Load(config map[string]interface{}) error {
 		defaultValue := localConfigDefaultListenPort
 		l.config.ListenPort = &defaultValue
 	}
+	if *l.config.ListenPort < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ListenPort", *l.config.ListenPort)
+		errInit = true
+	}
 	if l.config.ReadTimeout == nil {
 		defaultValue := localConfigDefaultReadTimeout
 		l.config.ReadTimeout = &defaultValue
+	}
+	if *l.config.ReadTimeout < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ReadTimeout", *l.config.ReadTimeout)
+		errInit = true
 	}
 	if l.config.ReadHeaderTimeout == nil {
 		defaultValue := localConfigDefaultReadHeaderTimeout
 		l.config.ReadHeaderTimeout = &defaultValue
 	}
+	if *l.config.ReadHeaderTimeout < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ReadHeaderTimeout", *l.config.ReadHeaderTimeout)
+		errInit = true
+	}
 	if l.config.WriteTimeout == nil {
 		defaultValue := localConfigDefaultWriteTimeout
 		l.config.WriteTimeout = &defaultValue
 	}
+	if *l.config.WriteTimeout < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "WriteTimeout", *l.config.WriteTimeout)
+		errInit = true
+	}
 	if l.config.IdleTimeout == nil {
 		defaultValue := localConfigDefaultIdleTimeout
 		l.config.IdleTimeout = &defaultValue
+	}
+	if *l.config.IdleTimeout < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "IdleTimeout", *l.config.IdleTimeout)
+		errInit = true
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	return nil

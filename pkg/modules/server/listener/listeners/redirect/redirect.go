@@ -47,7 +47,6 @@ type redirectListenerConfig struct {
 
 const (
 	redirectModuleID module.ModuleID = "server.listener.redirect"
-	redirectLogger   string          = "listener[redirect]"
 
 	redirectConfigDefaultListenAddr        string = ""
 	redirectConfigDefaultListenPort        int    = 80
@@ -103,77 +102,16 @@ func (l redirectListener) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the listener configuration.
-func (l *redirectListener) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the listener.
+func (l *redirectListener) Init(config map[string]interface{}, logger *log.Logger) error {
+	l.logger = logger
 
-	var c redirectListenerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.ListenAddr == nil {
-		defaultValue := redirectConfigDefaultListenAddr
-		c.ListenAddr = &defaultValue
-	}
-	if c.ListenPort == nil {
-		defaultValue := redirectConfigDefaultListenPort
-		c.ListenPort = &defaultValue
-	}
-	if *c.ListenPort < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "ListenPort", *c.ListenPort))
-	}
-	if c.ReadTimeout == nil {
-		defaultValue := redirectConfigDefaultReadTimeout
-		c.ReadTimeout = &defaultValue
-	}
-	if *c.ReadTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "ReadTimeout", *c.ReadTimeout))
-	}
-	if c.ReadHeaderTimeout == nil {
-		defaultValue := redirectConfigDefaultReadHeaderTimeout
-		c.ReadHeaderTimeout = &defaultValue
-	}
-	if *c.ReadHeaderTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "ReadHeaderTimeout", *c.ReadHeaderTimeout))
-	}
-	if c.WriteTimeout == nil {
-		defaultValue := redirectConfigDefaultWriteTimeout
-		c.WriteTimeout = &defaultValue
-	}
-	if *c.WriteTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "WriteTimeout", *c.WriteTimeout))
-	}
-	if c.IdleTimeout == nil {
-		defaultValue := redirectConfigDefaultIdleTimeout
-		c.IdleTimeout = &defaultValue
-	}
-	if *c.IdleTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "IdleTimeout", *c.IdleTimeout))
-	}
-	if c.RedirectPort != nil && *c.RedirectPort < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "RedirectPort", *c.RedirectPort))
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the listener.
-func (l *redirectListener) Load(config map[string]interface{}) error {
-	var c redirectListenerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &l.config); err != nil {
+		l.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	l.config = &c
-	l.logger = log.New(os.Stderr, fmt.Sprint(redirectLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
 	if l.config.ListenAddr == nil {
 		defaultValue := redirectConfigDefaultListenAddr
@@ -183,21 +121,49 @@ func (l *redirectListener) Load(config map[string]interface{}) error {
 		defaultValue := redirectConfigDefaultListenPort
 		l.config.ListenPort = &defaultValue
 	}
+	if *l.config.ListenPort < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ListenPort", *l.config.ListenPort)
+		errInit = true
+	}
 	if l.config.ReadTimeout == nil {
 		defaultValue := redirectConfigDefaultReadTimeout
 		l.config.ReadTimeout = &defaultValue
+	}
+	if *l.config.ReadTimeout < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ReadTimeout", *l.config.ReadTimeout)
+		errInit = true
 	}
 	if l.config.ReadHeaderTimeout == nil {
 		defaultValue := redirectConfigDefaultReadHeaderTimeout
 		l.config.ReadHeaderTimeout = &defaultValue
 	}
+	if *l.config.ReadHeaderTimeout < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ReadHeaderTimeout", *l.config.ReadHeaderTimeout)
+		errInit = true
+	}
 	if l.config.WriteTimeout == nil {
 		defaultValue := redirectConfigDefaultWriteTimeout
 		l.config.WriteTimeout = &defaultValue
 	}
+	if *l.config.WriteTimeout < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "WriteTimeout", *l.config.WriteTimeout)
+		errInit = true
+	}
 	if l.config.IdleTimeout == nil {
 		defaultValue := redirectConfigDefaultIdleTimeout
 		l.config.IdleTimeout = &defaultValue
+	}
+	if *l.config.IdleTimeout < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "IdleTimeout", *l.config.IdleTimeout)
+		errInit = true
+	}
+	if l.config.RedirectPort != nil && *l.config.RedirectPort < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "RedirectPort", *l.config.RedirectPort)
+		errInit = true
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	return nil

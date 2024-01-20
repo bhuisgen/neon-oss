@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"reflect"
 	"testing"
 	"text/template"
 
@@ -139,7 +138,7 @@ func TestSitemapHandlerModuleInfo(t *testing.T) {
 	}
 }
 
-func TestSitemapHandlerCheck(t *testing.T) {
+func TestSitemapHandlerInit(t *testing.T) {
 	type fields struct {
 		config               *sitemapHandlerConfig
 		logger               *log.Logger
@@ -151,12 +150,12 @@ func TestSitemapHandlerCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -175,6 +174,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 						},
 					},
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -195,6 +195,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 						},
 					},
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -213,6 +214,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 						},
 					},
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -246,6 +248,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 						},
 					},
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -256,11 +259,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 					"CacheTTL": -1,
 					"Kind":     "",
 				},
-			},
-			want: []string{
-				"option 'Root', missing option or value",
-				"option 'CacheTTL', invalid value '-1'",
-				"option 'Kind', missing option or value",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -271,9 +270,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 					"Root": "http://localhost",
 					"Kind": "sitemapIndex",
 				},
-			},
-			want: []string{
-				"sitemapIndex entry is missing",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -290,9 +287,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 						},
 					},
 				},
-			},
-			want: []string{
-				"sitemapIndex entry option 'Type', missing option or value",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -312,9 +307,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 						},
 					},
 				},
-			},
-			want: []string{
-				"sitemapIndex static entry option 'Loc', missing option or value",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -325,9 +318,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 					"Root": "http://localhost",
 					"Kind": "sitemap",
 				},
-			},
-			want: []string{
-				"sitemap entry is missing",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -363,21 +354,7 @@ func TestSitemapHandlerCheck(t *testing.T) {
 						},
 					},
 				},
-			},
-			want: []string{
-				"sitemap entry option 'Name', missing option or value",
-				"sitemap static entry option 'Loc', missing option or value",
-				"sitemap static entry option 'Lastmod', invalid value ''",
-				"sitemap static entry option 'Changefreq', invalid value ''",
-				"sitemap static entry option 'Priority', invalid value '-1.0'",
-				"sitemap entry option 'Name', missing option or value",
-				"sitemap list entry option 'Resource', missing option or value",
-				"sitemap list entry option 'Filter', missing option or value",
-				"sitemap list entry option 'ItemLoc', missing option or value",
-				"sitemap list entry option 'ItemLastmod', invalid value ''",
-				"sitemap list entry option 'ItemIgnore', invalid value ''",
-				"sitemap list entry option 'Changefreq', invalid value ''",
-				"sitemap list entry option 'Priority', invalid value '-1.0'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -393,54 +370,8 @@ func TestSitemapHandlerCheck(t *testing.T) {
 				cache:                tt.fields.cache,
 				site:                 tt.fields.site,
 			}
-			got, err := h.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("sitemapHandler.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("sitemapHandler.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSitemapHandlerLoad(t *testing.T) {
-	type fields struct {
-		config               *sitemapHandlerConfig
-		logger               *log.Logger
-		templateSitemapIndex *template.Template
-		templateSitemap      *template.Template
-		rwPool               render.RenderWriterPool
-		cache                cache.Cache
-		site                 core.ServerSite
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &sitemapHandler{
-				config:               tt.fields.config,
-				logger:               tt.fields.logger,
-				templateSitemapIndex: tt.fields.templateSitemapIndex,
-				templateSitemap:      tt.fields.templateSitemap,
-				rwPool:               tt.fields.rwPool,
-				cache:                tt.fields.cache,
-				site:                 tt.fields.site,
-			}
-			if err := h.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("sitemapHandler.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := h.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("sitemapHandler.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

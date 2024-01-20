@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"reflect"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/core"
@@ -51,7 +50,7 @@ func (f *testJSONParserFetcher) Fetch(ctx context.Context, name string, provider
 
 var _ core.Fetcher = (*testJSONParserFetcher)(nil)
 
-func TestJSONParserCheck(t *testing.T) {
+func TestJSONParserInit(t *testing.T) {
 	type fields struct {
 		config        *jsonParserConfig
 		logger        *log.Logger
@@ -59,6 +58,7 @@ func TestJSONParserCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
@@ -83,56 +83,20 @@ func TestJSONParserCheck(t *testing.T) {
 						},
 					},
 				},
+				logger: log.Default(),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &jsonParser{
+			p := &jsonParser{
 				config:        tt.fields.config,
 				logger:        tt.fields.logger,
 				jsonUnmarshal: tt.fields.jsonUnmarshal,
 			}
-			got, err := e.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("jsonParser.Check() error = %v, wantErr %v", err, tt.wantErr)
+			if err := p.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("restProvider.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("jsonParser.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestJSONParserLoad(t *testing.T) {
-	type fields struct {
-		config        *jsonParserConfig
-		logger        *log.Logger
-		jsonUnmarshal func(data []byte, v any) error
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := &jsonParser{
-				config:        tt.fields.config,
-				logger:        tt.fields.logger,
-				jsonUnmarshal: tt.fields.jsonUnmarshal,
-			}
-			if err := e.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("jsonParser.Load() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -302,12 +266,12 @@ func TestJSONParserParse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &jsonParser{
+			p := &jsonParser{
 				config:        tt.fields.config,
 				logger:        tt.fields.logger,
 				jsonUnmarshal: tt.fields.jsonUnmarshal,
 			}
-			if err := e.Parse(tt.args.ctx, tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := p.Parse(tt.args.ctx, tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
 				t.Errorf("jsonParser.Parse() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

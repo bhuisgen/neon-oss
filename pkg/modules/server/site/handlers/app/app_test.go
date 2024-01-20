@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -203,7 +202,7 @@ func TestAppHandlerModuleInfo(t *testing.T) {
 	}
 }
 
-func TestAppHandlerCheck(t *testing.T) {
+func TestAppHandlerInit(t *testing.T) {
 	type fields struct {
 		config      *appHandlerConfig
 		logger      *log.Logger
@@ -225,12 +224,12 @@ func TestAppHandlerCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -251,6 +250,7 @@ func TestAppHandlerCheck(t *testing.T) {
 					"Index":  "index.html",
 					"Bundle": "bundle.js",
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -290,6 +290,7 @@ func TestAppHandlerCheck(t *testing.T) {
 						},
 					},
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -307,10 +308,7 @@ func TestAppHandlerCheck(t *testing.T) {
 			},
 			args: args{
 				config: map[string]interface{}{},
-			},
-			want: []string{
-				"option 'Index', missing option or value",
-				"option 'Bundle', missing option or value",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -349,19 +347,7 @@ func TestAppHandlerCheck(t *testing.T) {
 						},
 					},
 				},
-			},
-			want: []string{
-				"option 'Index', missing option or value",
-				"option 'Bundle', missing option or value",
-				"option 'Env', invalid value ''",
-				"option 'Container', invalid value ''",
-				"option 'State', invalid value ''",
-				"option 'Timeout', invalid value '-1'",
-				"option 'MaxVMs', invalid value '-1'",
-				"option 'CacheTTL', invalid value '-1'",
-				"rule option 'Path', missing option or value",
-				"rule state option 'Key', missing option or value",
-				"rule state option 'Resource', missing option or value",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -383,10 +369,7 @@ func TestAppHandlerCheck(t *testing.T) {
 					"Index":  "file1",
 					"Bundle": "file2",
 				},
-			},
-			want: []string{
-				"option 'Index', failed to open file 'file1'",
-				"option 'Bundle', failed to open file 'file2'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -408,10 +391,7 @@ func TestAppHandlerCheck(t *testing.T) {
 					"Index":  "file1",
 					"Bundle": "file2",
 				},
-			},
-			want: []string{
-				"option 'Index', failed to stat file 'file1'",
-				"option 'Bundle', failed to stat file 'file2'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -435,10 +415,7 @@ func TestAppHandlerCheck(t *testing.T) {
 					"Index":  "dir1",
 					"Bundle": "dir2",
 				},
-			},
-			want: []string{
-				"option 'Index', 'dir1' is a directory",
-				"option 'Bundle', 'dir2' is a directory",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -464,74 +441,8 @@ func TestAppHandlerCheck(t *testing.T) {
 				osStat:      tt.fields.osStat,
 				jsonMarshal: tt.fields.jsonMarshal,
 			}
-			got, err := h.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("appHandler.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("appHandler.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestAppHandlerLoad(t *testing.T) {
-	type fields struct {
-		config      *appHandlerConfig
-		logger      *log.Logger
-		regexps     []*regexp.Regexp
-		index       []byte
-		indexInfo   *time.Time
-		bundle      string
-		bundleInfo  *time.Time
-		rwPool      render.RenderWriterPool
-		vmPool      VMPool
-		cache       cache.Cache
-		site        core.ServerSite
-		osOpen      func(name string) (*os.File, error)
-		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
-		osReadFile  func(name string) ([]byte, error)
-		osClose     func(*os.File) error
-		osStat      func(name string) (fs.FileInfo, error)
-		jsonMarshal func(v any) ([]byte, error)
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &appHandler{
-				config:      tt.fields.config,
-				logger:      tt.fields.logger,
-				regexps:     tt.fields.regexps,
-				index:       tt.fields.index,
-				indexInfo:   tt.fields.indexInfo,
-				bundle:      tt.fields.bundle,
-				bundleInfo:  tt.fields.bundleInfo,
-				rwPool:      tt.fields.rwPool,
-				vmPool:      tt.fields.vmPool,
-				cache:       tt.fields.cache,
-				site:        tt.fields.site,
-				osOpen:      tt.fields.osOpen,
-				osOpenFile:  tt.fields.osOpenFile,
-				osReadFile:  tt.fields.osReadFile,
-				osClose:     tt.fields.osClose,
-				osStat:      tt.fields.osStat,
-				jsonMarshal: tt.fields.jsonMarshal,
-			}
-			if err := h.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("appHandler.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := h.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("appHandler.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

@@ -43,8 +43,8 @@ type loaderConfig struct {
 
 // loaderState implements the loader state.
 type loaderState struct {
-	parsersModules map[string]core.LoaderParserModule
-	failsafe       bool
+	parsers  map[string]core.LoaderParserModule
+	failsafe bool
 }
 
 const (
@@ -61,155 +61,114 @@ const (
 // newLoader creates a new loader.
 func newLoader(store Store, fetcher Fetcher) *loader {
 	return &loader{
+		logger: log.New(os.Stderr, fmt.Sprint(loaderLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		state: &loaderState{
+			parsers: make(map[string]core.LoaderParserModule),
+		},
 		store:   store,
 		fetcher: fetcher,
+		stop:    make(chan struct{}),
 	}
 }
 
-// Check checks the loader configuration.
-func (l *loader) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
-
-	var c loaderConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "loader: failed to parse configuration")
-		return report, err
-	}
-
-	if c.ExecStartup == nil {
-		defaultValue := loaderConfigDefaultExecStartup
-		c.ExecStartup = &defaultValue
-	}
-	if *c.ExecStartup < 0 {
-		report = append(report, fmt.Sprintf("loader: option '%s', invalid value '%d'", "ExecStartup", *c.ExecStartup))
-	}
-	if c.ExecInterval == nil {
-		defaultValue := loaderConfigDefaultExecInterval
-		c.ExecInterval = &defaultValue
-	}
-	if *c.ExecInterval < 0 {
-		report = append(report, fmt.Sprintf("loader: option '%s', invalid value '%d'", "ExecInterval", *c.ExecInterval))
-	}
-	if c.ExecFailsafeInterval == nil {
-		defaultValue := loaderConfigDefaultExecFailsafeInterval
-		c.ExecFailsafeInterval = &defaultValue
-	}
-	if *c.ExecFailsafeInterval < 0 {
-		report = append(report, fmt.Sprintf("loader: option '%s', invalid value '%d'", "ExecFailsafeInterval",
-			*c.ExecFailsafeInterval))
-	}
-	if c.ExecWorkers == nil {
-		defaultValue := loaderConfigDefaultExecWorkers
-		c.ExecWorkers = &defaultValue
-	}
-	if *c.ExecWorkers < 0 {
-		report = append(report, fmt.Sprintf("loader: option '%s', invalid value '%d'", "ExecWorkers", *c.ExecWorkers))
-	}
-	if c.ExecMaxOps == nil {
-		defaultValue := loaderConfigDefaultExecMaxOps
-		c.ExecMaxOps = &defaultValue
-	}
-	if *c.ExecMaxOps < 0 {
-		report = append(report, fmt.Sprintf("loader: option '%s', invalid value '%d'", "ExecMaxOps", *c.ExecMaxOps))
-	}
-	if c.ExecMaxDelay == nil {
-		defaultValue := loaderConfigDefaultExecMaxDelay
-		c.ExecMaxDelay = &defaultValue
-	}
-	if *c.ExecMaxDelay < 0 {
-		report = append(report, fmt.Sprintf("loader: option '%s', invalid value '%d'", "ExecMaxDelay", *c.ExecMaxDelay))
-	}
-	for ruleName, ruleConfig := range c.Rules {
-		for moduleName, moduleConfig := range ruleConfig {
-			moduleInfo, err := module.Lookup(module.ModuleID("loader.parser." + moduleName))
-			if err != nil {
-				report = append(report, fmt.Sprintf("loader: rule '%s', unregistered parser module '%s'", ruleName,
-					moduleName))
-				continue
-			}
-			module, ok := moduleInfo.NewInstance().(core.LoaderParserModule)
-			if !ok {
-				report = append(report, fmt.Sprintf("loader: rule '%s', invalid parser module '%s'", ruleName, moduleName))
-				continue
-			}
-			r, err := module.Check(moduleConfig)
-			if err != nil {
-				for _, line := range r {
-					report = append(report, fmt.Sprintf("loader: rule '%s', failed to check configuration: %s", ruleName, line))
-				}
-				continue
-			}
-
-			break
+// Init initializes the loader.
+func (l *loader) Init(config map[string]interface{}) error {
+	if config == nil {
+		l.config = &loaderConfig{}
+	} else {
+		if err := mapstructure.Decode(config, &l.config); err != nil {
+			l.logger.Printf("failed to parse configuration")
+			return err
 		}
 	}
 
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the loader.
-func (l *loader) Load(config map[string]interface{}) error {
-	var c loaderConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		return err
-	}
-
-	l.config = &c
-	l.logger = log.New(os.Stderr, fmt.Sprint(loaderLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-	l.state = &loaderState{
-		parsersModules: make(map[string]core.LoaderParserModule),
-	}
-	l.stop = make(chan struct{})
+	var errInit bool
 
 	if l.config.ExecStartup == nil {
 		defaultValue := loaderConfigDefaultExecStartup
 		l.config.ExecStartup = &defaultValue
 	}
+	if *l.config.ExecStartup < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ExecStartup", *l.config.ExecStartup)
+		errInit = true
+	}
 	if l.config.ExecInterval == nil {
 		defaultValue := loaderConfigDefaultExecInterval
 		l.config.ExecInterval = &defaultValue
+	}
+	if *l.config.ExecInterval < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ExecInterval", *l.config.ExecInterval)
+		errInit = true
 	}
 	if l.config.ExecFailsafeInterval == nil {
 		defaultValue := loaderConfigDefaultExecFailsafeInterval
 		l.config.ExecFailsafeInterval = &defaultValue
 	}
+	if *l.config.ExecFailsafeInterval < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ExecFailsafeInterval", *l.config.ExecFailsafeInterval)
+		errInit = true
+	}
 	if l.config.ExecWorkers == nil {
 		defaultValue := loaderConfigDefaultExecWorkers
 		l.config.ExecWorkers = &defaultValue
+	}
+	if *l.config.ExecWorkers < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ExecWorkers", *l.config.ExecWorkers)
+		errInit = true
 	}
 	if l.config.ExecMaxOps == nil {
 		defaultValue := loaderConfigDefaultExecMaxOps
 		l.config.ExecMaxOps = &defaultValue
 	}
+	if *l.config.ExecMaxOps < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ExecMaxOps", *l.config.ExecMaxOps)
+		errInit = true
+	}
 	if l.config.ExecMaxDelay == nil {
 		defaultValue := loaderConfigDefaultExecMaxDelay
 		l.config.ExecMaxDelay = &defaultValue
 	}
-	for ruleName, ruleConfig := range c.Rules {
+	if *l.config.ExecMaxDelay < 0 {
+		l.logger.Printf("option '%s', invalid value '%d'", "ExecMaxDelay", *l.config.ExecMaxDelay)
+		errInit = true
+	}
+
+	for ruleName, ruleConfig := range l.config.Rules {
 		for moduleName, moduleConfig := range ruleConfig {
 			moduleInfo, err := module.Lookup(module.ModuleID("loader.parser." + moduleName))
 			if err != nil {
-				return err
+				l.logger.Printf("rule '%s', unregistered parser module '%s'", ruleName, moduleName)
+				errInit = true
+				continue
 			}
 			module, ok := moduleInfo.NewInstance().(core.LoaderParserModule)
 			if !ok {
-				return fmt.Errorf("rule '%s', invalid parser module '%s'", ruleName, moduleName)
-			}
-			err = module.Load(moduleConfig)
-			if err != nil {
-				return err
+				l.logger.Printf("rule '%s', invalid parser module '%s'", ruleName, moduleName)
+				errInit = true
+				continue
 			}
 
-			l.state.parsersModules[ruleName] = module
+			if moduleConfig == nil {
+				moduleConfig = map[string]interface{}{}
+			}
+			if err := module.Init(
+				moduleConfig,
+				log.New(os.Stderr, fmt.Sprint(l.logger.Prefix(), "rule[", ruleName, "] parser[", moduleName, "]: "),
+					log.LstdFlags|log.Lmsgprefix),
+			); err != nil {
+				l.logger.Printf("rule '%s', failed to init parser module '%s'", ruleName, moduleName)
+				errInit = true
+				continue
+			}
+
+			l.state.parsers[ruleName] = module
 
 			break
 		}
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	return nil
@@ -250,7 +209,7 @@ func (l *loader) execute(stop <-chan struct{}) {
 
 		worker := func(ctx context.Context, id int, jobs <-chan string, results chan<- error) {
 			for ruleName := range jobs {
-				parser, ok := l.state.parsersModules[ruleName]
+				parser, ok := l.state.parsers[ruleName]
 				if !ok {
 					err := fmt.Errorf("parser module not found")
 					l.logger.Printf("rule '%s', parser error: %s", ruleName, err)

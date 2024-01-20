@@ -8,7 +8,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/core"
@@ -101,7 +100,7 @@ func TestCompressMiddlewareModuleInfo(t *testing.T) {
 	}
 }
 
-func TestCompressMiddlewareCheck(t *testing.T) {
+func TestCompressMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config *compressMiddlewareConfig
 		logger *log.Logger
@@ -109,17 +108,20 @@ func TestCompressMiddlewareCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
 			name: "minimal",
-			args: args{},
+			args: args{
+				config: map[string]interface{}{},
+				logger: log.Default(),
+			},
 		},
 		{
 			name: "full",
@@ -127,6 +129,7 @@ func TestCompressMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Level": -1,
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -135,9 +138,7 @@ func TestCompressMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Level": 100,
 				},
-			},
-			want: []string{
-				"option 'Level', invalid value '100'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -149,46 +150,9 @@ func TestCompressMiddlewareCheck(t *testing.T) {
 				logger: tt.fields.logger,
 				pool:   tt.fields.pool,
 			}
-			got, err := m.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("compressMiddleware.Check() error = %v, wantErr %v", err, tt.wantErr)
+			if err := m.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("compressMiddleware.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("compressMiddleware.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestCompressMiddlewareLoad(t *testing.T) {
-	type fields struct {
-		config *compressMiddlewareConfig
-		logger *log.Logger
-		pool   *gzipPool
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &compressMiddleware{
-				config: tt.fields.config,
-				logger: tt.fields.logger,
-				pool:   tt.fields.pool,
-			}
-			if err := m.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("compressMiddleware.Load() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

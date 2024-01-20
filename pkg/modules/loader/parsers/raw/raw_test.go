@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"reflect"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/core"
@@ -49,19 +48,19 @@ func (f *testRawParserFetcher) Fetch(ctx context.Context, name string, provider 
 
 var _ core.Fetcher = (*testRawParserFetcher)(nil)
 
-func TestRawParserCheck(t *testing.T) {
+func TestRawParserInit(t *testing.T) {
 	type fields struct {
 		config *rawParserConfig
 		logger *log.Logger
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -74,53 +73,18 @@ func TestRawParserCheck(t *testing.T) {
 						},
 					},
 				},
+				logger: log.Default(),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &rawParser{
+			p := &rawParser{
 				config: tt.fields.config,
 				logger: tt.fields.logger,
 			}
-			got, err := e.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("rawParser.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("rawParser.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestRawParserLoad(t *testing.T) {
-	type fields struct {
-		config *rawParserConfig
-		logger *log.Logger
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := &rawParser{
-				config: tt.fields.config,
-				logger: tt.fields.logger,
-			}
-			if err := e.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("rawParser.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := p.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("rawParser.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -242,11 +206,11 @@ func TestRawParserParse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &rawParser{
+			p := &rawParser{
 				config: tt.fields.config,
 				logger: tt.fields.logger,
 			}
-			if err := e.Parse(tt.args.ctx, tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
+			if err := p.Parse(tt.args.ctx, tt.args.store, tt.args.fetcher); (err != nil) != tt.wantErr {
 				t.Errorf("rawParser.Parse() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

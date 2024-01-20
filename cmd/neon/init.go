@@ -23,7 +23,7 @@ type initCommand struct {
 func NewInitCommand() *initCommand {
 	c := initCommand{}
 	c.flagset = flag.NewFlagSet("init", flag.ExitOnError)
-	c.flagset.StringVar(&c.template, "template", "static", "Template name")
+	c.flagset.StringVar(&c.template, "template", "default", "Template name")
 	c.flagset.BoolVar(&c.verbose, "verbose", false, "Use verbose output")
 	c.flagset.Usage = func() {
 		fmt.Println("Usage: neon init [OPTIONS]")

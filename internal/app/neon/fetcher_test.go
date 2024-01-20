@@ -13,74 +13,7 @@ import (
 	"github.com/bhuisgen/neon/pkg/core"
 )
 
-func TestFetcherCheck(t *testing.T) {
-	type fields struct {
-		config *fetcherConfig
-		logger *log.Logger
-		state  *fetcherState
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []string
-		wantErr bool
-	}{
-		{
-			name: "minimal",
-		},
-		{
-			name: "full",
-			args: args{
-				config: map[string]interface{}{
-					"providers": map[string]interface{}{
-						"name": map[string]interface{}{
-							"test": map[string]interface{}{},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "error unregistered provider module",
-			args: args{
-				config: map[string]interface{}{
-					"providers": map[string]interface{}{
-						"name": map[string]interface{}{
-							"unknown": map[string]interface{}{},
-						},
-					},
-				},
-			},
-			want: []string{
-				"fetcher: provider 'name', unregistered provider module 'unknown'",
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			f := &fetcher{
-				config: tt.fields.config,
-				logger: tt.fields.logger,
-				state:  tt.fields.state,
-			}
-			got, err := f.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("fetcher.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("fetcher.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFetcherLoad(t *testing.T) {
+func TestFetcherInit(t *testing.T) {
 	type fields struct {
 		config *fetcherConfig
 		logger *log.Logger
@@ -96,14 +29,40 @@ func TestFetcherLoad(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "minimal",
+			name: "no configuration",
+			fields: fields{
+				logger: log.Default(),
+				state: &fetcherState{
+					providers: map[string]core.FetcherProviderModule{},
+				},
+			},
+		},
+		{
+			name: "empty configuration",
+			fields: fields{
+				logger: log.Default(),
+				state: &fetcherState{
+					providers: map[string]core.FetcherProviderModule{},
+				},
+			},
+			args: args{
+				config: map[string]interface{}{},
+			},
 		},
 		{
 			name: "full",
+			fields: fields{
+				logger: log.Default(),
+				state: &fetcherState{
+					providers: map[string]core.FetcherProviderModule{
+						"default": testFetcherProviderModule{},
+					},
+				},
+			},
 			args: args{
 				config: map[string]interface{}{
 					"providers": map[string]interface{}{
-						"name": map[string]interface{}{
+						"default": map[string]interface{}{
 							"test": map[string]interface{}{},
 						},
 					},
@@ -112,10 +71,14 @@ func TestFetcherLoad(t *testing.T) {
 		},
 		{
 			name: "error unregistered provider module",
+			fields: fields{
+				logger: log.Default(),
+				state:  &fetcherState{},
+			},
 			args: args{
 				config: map[string]interface{}{
 					"providers": map[string]interface{}{
-						"name": map[string]interface{}{
+						"default": map[string]interface{}{
 							"unknown": map[string]interface{}{},
 						},
 					},
@@ -131,8 +94,8 @@ func TestFetcherLoad(t *testing.T) {
 				logger: tt.fields.logger,
 				state:  tt.fields.state,
 			}
-			if err := f.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("fetcher.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := f.Init(tt.args.config); (err != nil) != tt.wantErr {
+				t.Errorf("fetcher.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -161,11 +124,8 @@ func TestFetcherFetch(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &fetcherState{
-					providers: map[string]string{
-						"test": "module",
-					},
-					providersModules: map[string]core.FetcherProviderModule{
-						"module": testFetcherProviderModule{},
+					providers: map[string]core.FetcherProviderModule{
+						"test": testFetcherProviderModule{},
 					},
 				},
 			},
@@ -195,7 +155,7 @@ func TestFetcherFetch(t *testing.T) {
 			name: "error provider not found",
 			fields: fields{
 				state: &fetcherState{
-					providers: map[string]string{},
+					providers: map[string]core.FetcherProviderModule{},
 				},
 			},
 			args: args{
@@ -209,10 +169,7 @@ func TestFetcherFetch(t *testing.T) {
 			name: "error module not found",
 			fields: fields{
 				state: &fetcherState{
-					providers: map[string]string{
-						"test": "module",
-					},
-					providersModules: map[string]core.FetcherProviderModule{},
+					providers: map[string]core.FetcherProviderModule{},
 				},
 			},
 			args: args{
@@ -226,11 +183,8 @@ func TestFetcherFetch(t *testing.T) {
 			name: "error fetch",
 			fields: fields{
 				state: &fetcherState{
-					providers: map[string]string{
-						"test": "module",
-					},
-					providersModules: map[string]core.FetcherProviderModule{
-						"module": testFetcherProviderModule{
+					providers: map[string]core.FetcherProviderModule{
+						"test": testFetcherProviderModule{
 							errFetch: true,
 						},
 					},

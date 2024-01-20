@@ -33,8 +33,7 @@ type fetcherConfig struct {
 
 // fetcherState implements the fetcher state.
 type fetcherState struct {
-	providers        map[string]string
-	providersModules map[string]core.FetcherProviderModule
+	providers map[string]core.FetcherProviderModule
 }
 
 const (
@@ -43,104 +42,74 @@ const (
 
 // newFetcher creates a new fetcher.
 func newFetcher() *fetcher {
-	return &fetcher{}
+	return &fetcher{
+		logger: log.New(os.Stderr, fmt.Sprint(fetcherLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		state: &fetcherState{
+			providers: make(map[string]core.FetcherProviderModule),
+		},
+	}
 }
 
-// Check checks the fetcher configuration.
-func (f *fetcher) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
-
-	var c fetcherConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "fetcher: failed to parse configuration")
-		return report, err
+// Init initializes the fetcher.
+func (f *fetcher) Init(config map[string]interface{}) error {
+	if config == nil {
+		f.config = &fetcherConfig{}
+	} else {
+		if err := mapstructure.Decode(config, &f.config); err != nil {
+			f.logger.Print("failed to parse configuration")
+			return err
+		}
 	}
 
-	for provider, providerConfig := range c.Providers {
+	var errInit bool
+
+	for provider, providerConfig := range f.config.Providers {
 		for moduleName, moduleConfig := range providerConfig {
 			moduleInfo, err := module.Lookup(module.ModuleID("fetcher.provider." + moduleName))
 			if err != nil {
-				report = append(report, fmt.Sprintf("fetcher: provider '%s', unregistered provider module '%s'", provider,
-					moduleName))
+				f.logger.Printf("provider '%s', unregistered module '%s'", provider, moduleName)
+				errInit = true
 				continue
 			}
 			module, ok := moduleInfo.NewInstance().(core.FetcherProviderModule)
 			if !ok {
-				report = append(report, fmt.Sprintf("fetcher: provider '%s', invalid provider module '%s'", provider,
-					moduleName))
+				f.logger.Printf("provider '%s', invalid module '%s'", provider, moduleName)
+				errInit = true
 				continue
 			}
-			r, err := module.Check(moduleConfig)
-			if err != nil {
-				for _, line := range r {
-					report = append(report, fmt.Sprintf("fetcher: provider '%s', failed to check configuration: %s", provider,
-						line))
-				}
+
+			if moduleConfig == nil {
+				moduleConfig = map[string]interface{}{}
+			}
+			if err := module.Init(
+				moduleConfig,
+				log.New(os.Stderr, fmt.Sprint(f.logger.Prefix(), "provider[", provider, "]: "), log.LstdFlags|log.Lmsgprefix),
+			); err != nil {
+				f.logger.Printf("provider '%s', failed to init module '%s'", provider, moduleName)
+				errInit = true
 				continue
 			}
+
+			f.state.providers[provider] = module
 
 			break
 		}
 	}
 
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the fetcher.
-func (f *fetcher) Load(config map[string]interface{}) error {
-	var c fetcherConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		return err
-	}
-
-	f.config = &c
-	f.logger = log.New(os.Stderr, fmt.Sprint(fetcherLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-	f.state = &fetcherState{
-		providers:        make(map[string]string),
-		providersModules: make(map[string]core.FetcherProviderModule),
-	}
-
-	for provider, providerConfig := range c.Providers {
-		for moduleName, moduleConfig := range providerConfig {
-			moduleInfo, err := module.Lookup(module.ModuleID("fetcher.provider." + moduleName))
-			if err != nil {
-				return err
-			}
-			module, ok := moduleInfo.NewInstance().(core.FetcherProviderModule)
-			if !ok {
-				return fmt.Errorf("provider '%s', invalid provider module '%s'", provider, moduleName)
-			}
-			err = module.Load(moduleConfig)
-			if err != nil {
-				return err
-			}
-
-			f.state.providers[provider] = moduleName
-			f.state.providersModules[moduleName] = module
-
-			break
-		}
+	if errInit {
+		return errors.New("init error")
 	}
 
 	return nil
 }
 
-// Fetch fetches a registered resource.
-func (f *fetcher) Fetch(ctx context.Context, name string, provider string, config map[string]interface{}) (*core.Resource, error) {
+// Fetch fetches a resource.
+func (f *fetcher) Fetch(ctx context.Context, name string, provider string, config map[string]interface{}) (
+	*core.Resource, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	providerModule, ok := f.state.providers[provider]
-	if !ok {
-		return nil, fmt.Errorf("provider not found")
-	}
-	module, ok := f.state.providersModules[providerModule]
+	module, ok := f.state.providers[provider]
 	if !ok {
 		return nil, fmt.Errorf("provider module not found")
 	}

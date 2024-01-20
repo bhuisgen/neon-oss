@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -56,7 +55,7 @@ func (fi testRestProviderFileInfo) Sys() any {
 
 var _ os.FileInfo = (*testRestProviderFileInfo)(nil)
 
-func TestRestProviderCheck(t *testing.T) {
+func TestRestProviderInit(t *testing.T) {
 	type fields struct {
 		config                         *restProviderConfig
 		logger                         *log.Logger
@@ -73,12 +72,12 @@ func TestRestProviderCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -94,6 +93,10 @@ func TestRestProviderCheck(t *testing.T) {
 					return testRestProviderFileInfo{}, nil
 				},
 			},
+			args: args{
+				config: map[string]interface{}{},
+				logger: log.Default(),
+			},
 		},
 		{
 			name: "full",
@@ -106,6 +109,15 @@ func TestRestProviderCheck(t *testing.T) {
 				},
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testRestProviderFileInfo{}, nil
+				},
+				osReadFile: func(name string) ([]byte, error) {
+					return []byte{}, nil
+				},
+				x509CertPoolAppendCertsFromPEM: func(pool *x509.CertPool, pemCerts []byte) bool {
+					return true
+				},
+				tlsLoadX509KeyPair: func(certFile, keyFile string) (tls.Certificate, error) {
+					return tls.Certificate{}, nil
 				},
 			},
 			args: args{
@@ -161,20 +173,7 @@ func TestRestProviderCheck(t *testing.T) {
 						"": "",
 					},
 				},
-			},
-			want: []string{
-				"option 'TLSCAFiles', invalid value ''",
-				"option 'TLSCertFiles', invalid value ''",
-				"option 'TLSKeyFiles', invalid value ''",
-				"option 'Timeout', invalid value '-1'",
-				"option 'MaxConnsPerHost', invalid value '-1'",
-				"option 'MaxIdleConns', invalid value '-1'",
-				"option 'MaxIdleConnsPerHost', invalid value '-1'",
-				"option 'IdleConnTimeout', invalid value '-1'",
-				"option 'Retry', invalid value '-1'",
-				"option 'RetryDelay', invalid value '-1'",
-				"option 'Headers', invalid key ''",
-				"option 'Params', invalid key ''",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -197,11 +196,7 @@ func TestRestProviderCheck(t *testing.T) {
 					"TLSCertFiles": []string{"cert.pem"},
 					"TLSKeyFiles":  []string{"key.pem"},
 				},
-			},
-			want: []string{
-				"option 'TLSCAFiles', failed to open file 'ca.pem'",
-				"option 'TLSCertFiles', failed to open file 'cert.pem'",
-				"option 'TLSKeyFiles', failed to open file 'key.pem'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -224,11 +219,7 @@ func TestRestProviderCheck(t *testing.T) {
 					"TLSCertFiles": []string{"cert.pem"},
 					"TLSKeyFiles":  []string{"key.pem"},
 				},
-			},
-			want: []string{
-				"option 'TLSCAFiles', failed to stat file 'ca.pem'",
-				"option 'TLSCertFiles', failed to stat file 'cert.pem'",
-				"option 'TLSKeyFiles', failed to stat file 'key.pem'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -253,11 +244,7 @@ func TestRestProviderCheck(t *testing.T) {
 					"TLSCertFiles": []string{"cert.pem"},
 					"TLSKeyFiles":  []string{"key.pem"},
 				},
-			},
-			want: []string{
-				"option 'TLSCAFiles', 'ca.pem' is a directory",
-				"option 'TLSCertFiles', 'cert.pem' is a directory",
-				"option 'TLSKeyFiles', 'key.pem' is a directory",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -278,64 +265,9 @@ func TestRestProviderCheck(t *testing.T) {
 				httpClientDo:                   tt.fields.httpClientDo,
 				ioReadAll:                      tt.fields.ioReadAll,
 			}
-			got, err := p.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("restProvider.Check() error = %v, wantErr %v", err, tt.wantErr)
+			if err := p.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("restProvider.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("restProvider.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestRestProviderLoad(t *testing.T) {
-	type fields struct {
-		config                         *restProviderConfig
-		logger                         *log.Logger
-		client                         http.Client
-		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
-		osReadFile                     func(name string) ([]byte, error)
-		osClose                        func(f *os.File) error
-		osStat                         func(name string) (fs.FileInfo, error)
-		x509CertPoolAppendCertsFromPEM func(pool *x509.CertPool, pemCerts []byte) bool
-		tlsLoadX509KeyPair             func(certFile, keyFile string) (tls.Certificate, error)
-		httpNewRequestWithContext      func(ctx context.Context, method string, url string, body io.Reader) (*http.Request, error)
-		httpClientDo                   func(client *http.Client, req *http.Request) (*http.Response, error)
-		ioReadAll                      func(r io.Reader) ([]byte, error)
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &restProvider{
-				config:                         tt.fields.config,
-				logger:                         tt.fields.logger,
-				client:                         tt.fields.client,
-				osOpenFile:                     tt.fields.osOpenFile,
-				osReadFile:                     tt.fields.osReadFile,
-				osClose:                        tt.fields.osClose,
-				osStat:                         tt.fields.osStat,
-				x509CertPoolAppendCertsFromPEM: tt.fields.x509CertPoolAppendCertsFromPEM,
-				tlsLoadX509KeyPair:             tt.fields.tlsLoadX509KeyPair,
-				httpNewRequestWithContext:      tt.fields.httpNewRequestWithContext,
-				httpClientDo:                   tt.fields.httpClientDo,
-				ioReadAll:                      tt.fields.ioReadAll,
-			}
-			if err := p.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("restProvider.Load() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

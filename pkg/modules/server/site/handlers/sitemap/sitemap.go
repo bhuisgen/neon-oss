@@ -12,7 +12,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -113,7 +112,6 @@ type sitemapTemplateSitemapItem struct {
 
 const (
 	sitemapModuleID module.ModuleID = "server.site.handler.sitemap"
-	sitemapLogger   string          = "handler[sitemap]"
 
 	sitemapKindSitemapIndex            string = "sitemapIndex"
 	sitemapKindSitemap                 string = "sitemap"
@@ -154,170 +152,20 @@ func (h sitemapHandler) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the handler configuration.
-func (h *sitemapHandler) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the handler.
+func (h *sitemapHandler) Init(config map[string]interface{}, logger *log.Logger) error {
+	h.logger = logger
 
-	var c sitemapHandlerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.Root == "" {
-		report = append(report, fmt.Sprintf("option '%s', missing option or value", "Root"))
-	}
-	if c.CacheTTL == nil {
-		defaultValue := sitemapConfigDefaultCacheTTL
-		c.CacheTTL = &defaultValue
-	}
-	if *c.CacheTTL < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "CacheTTL", *c.CacheTTL))
-	}
-	var sitemapIndex, sitemap bool
-	switch c.Kind {
-	case "":
-		report = append(report, fmt.Sprintf("option '%s', missing option or value", "Kind"))
-	case sitemapKindSitemapIndex:
-		sitemapIndex = true
-	case sitemapKindSitemap:
-		sitemap = true
-	default:
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "Kind", c.Kind))
-	}
-
-	if sitemapIndex {
-		if len(c.SitemapIndex) == 0 {
-			report = append(report, "sitemapIndex entry is missing")
-		} else {
-			for _, entry := range c.SitemapIndex {
-				if entry.Name == "" {
-					report = append(report, fmt.Sprintf("sitemapIndex entry option '%s', missing option or value", "Name"))
-				}
-				switch entry.Type {
-				case "":
-					report = append(report, fmt.Sprintf("sitemapIndex entry option '%s', missing option or value", "Type"))
-				case sitemapEntrySitemapIndexTypeStatic:
-				default:
-					report = append(report, fmt.Sprintf("sitemapIndex entry option '%s', invalid value '%s'", "Type",
-						entry.Type))
-				}
-
-				if entry.Type == sitemapEntrySitemapIndexTypeStatic {
-					if entry.Static.Loc == "" {
-						report = append(report, fmt.Sprintf("sitemapIndex static entry option '%s', missing option or value",
-							"Loc"))
-					}
-				}
-			}
-		}
-	}
-
-	if sitemap {
-		if len(c.Sitemap) == 0 {
-			report = append(report, "sitemap entry is missing")
-		} else {
-			for _, entry := range c.Sitemap {
-				if entry.Name == "" {
-					report = append(report, fmt.Sprintf("sitemap entry option '%s', missing option or value", "Name"))
-				}
-				switch entry.Type {
-				case "":
-					report = append(report, fmt.Sprintf("sitemap entry option '%s', missing option or value", "Type"))
-				case sitemapEntrySitemapTypeStatic:
-				case sitemapEntrySitemapTypeList:
-				default:
-					report = append(report, fmt.Sprintf("sitemap entry option '%s', invalid value '%s'", "Type", entry.Type))
-				}
-
-				if entry.Type == sitemapEntrySitemapTypeStatic {
-					if entry.Static.Loc == "" {
-						report = append(report, fmt.Sprintf("sitemap static entry option '%s', missing option or value", "Loc"))
-					}
-					if entry.Static.Lastmod != nil && *entry.Static.Lastmod == "" {
-						report = append(report, fmt.Sprintf("sitemap static entry option '%s', invalid value '%s'", "Lastmod",
-							*entry.Static.Lastmod))
-					}
-					if entry.Static.Changefreq != nil {
-						switch *entry.Static.Changefreq {
-						case sitemapChangefreqAlways:
-						case sitemapChangefreqHourly:
-						case sitemapChangefreqDaily:
-						case sitemapChangefreqWeekly:
-						case sitemapChangefreqMonthly:
-						case sitemapChangefreqYearly:
-						case sitemapChangefreqNever:
-						default:
-							report = append(report, fmt.Sprintf("sitemap static entry option '%s', invalid value '%s'", "Changefreq",
-								*entry.Static.Changefreq))
-						}
-					}
-					if entry.Static.Priority != nil && (*entry.Static.Priority < 0 || *entry.Static.Priority > 1) {
-						report = append(report, fmt.Sprintf("sitemap static entry option '%s', invalid value '%.1f'", "Priority",
-							*entry.Static.Priority))
-					}
-				}
-
-				if entry.Type == sitemapEntrySitemapTypeList {
-					if entry.List.Resource == "" {
-						report = append(report, fmt.Sprintf("sitemap list entry option '%s', missing option or value", "Resource"))
-					}
-					if entry.List.Filter == "" {
-						report = append(report, fmt.Sprintf("sitemap list entry option '%s', missing option or value", "Filter"))
-					}
-					if entry.List.ItemLoc == "" {
-						report = append(report, fmt.Sprintf("sitemap list entry option '%s', missing option or value", "ItemLoc"))
-					}
-					if entry.List.ItemLastmod != nil && *entry.List.ItemLastmod == "" {
-						report = append(report, fmt.Sprintf("sitemap list entry option '%s', invalid value '%s'", "ItemLastmod",
-							*entry.List.ItemLastmod))
-					}
-					if entry.List.ItemIgnore != nil && *entry.List.ItemIgnore == "" {
-						report = append(report, fmt.Sprintf("sitemap list entry option '%s', invalid value '%s'", "ItemIgnore",
-							*entry.List.ItemIgnore))
-					}
-					if entry.List.Changefreq != nil {
-						switch *entry.List.Changefreq {
-						case sitemapChangefreqAlways:
-						case sitemapChangefreqHourly:
-						case sitemapChangefreqDaily:
-						case sitemapChangefreqWeekly:
-						case sitemapChangefreqMonthly:
-						case sitemapChangefreqYearly:
-						case sitemapChangefreqNever:
-						default:
-							report = append(report, fmt.Sprintf("sitemap list entry option '%s', invalid value '%s'", "Changefreq",
-								*entry.List.Changefreq))
-						}
-					}
-					if entry.List.Priority != nil && (*entry.List.Priority < 0 || *entry.List.Priority > 1) {
-						report = append(report, fmt.Sprintf("sitemap list entry option '%s', invalid value '%.1f'", "Priority",
-							*entry.List.Priority))
-					}
-				}
-			}
-		}
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the handler.
-func (h *sitemapHandler) Load(config map[string]interface{}) error {
-	var c sitemapHandlerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &h.config); err != nil {
+		h.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	h.config = &c
-	h.logger = log.New(os.Stderr, fmt.Sprint(sitemapLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
+	if h.config.Root == "" {
+		h.logger.Printf("option '%s', missing option or value", "Root")
+	}
 	if h.config.Cache == nil {
 		defaultValue := sitemapConfigDefaultCache
 		h.config.Cache = &defaultValue
@@ -326,7 +174,150 @@ func (h *sitemapHandler) Load(config map[string]interface{}) error {
 		defaultValue := sitemapConfigDefaultCacheTTL
 		h.config.CacheTTL = &defaultValue
 	}
+	if *h.config.CacheTTL < 0 {
+		h.logger.Printf("option '%s', invalid value '%d'", "CacheTTL", *h.config.CacheTTL)
+		errInit = true
+	}
+	var sitemapIndex, sitemap bool
+	switch h.config.Kind {
+	case "":
+		h.logger.Printf("option '%s', missing option or value", "Kind")
+		errInit = true
+	case sitemapKindSitemapIndex:
+		sitemapIndex = true
+	case sitemapKindSitemap:
+		sitemap = true
+	default:
+		h.logger.Printf("option '%s', invalid value '%s'", "Kind", h.config.Kind)
+		errInit = true
+	}
 
+	if sitemapIndex {
+		if len(h.config.SitemapIndex) == 0 {
+			h.logger.Print("sitemapIndex entry is missing")
+			errInit = true
+		}
+		for _, entry := range h.config.SitemapIndex {
+			if entry.Name == "" {
+				h.logger.Printf("sitemapIndex entry option '%s', missing option or value", "Name")
+				errInit = true
+			}
+			switch entry.Type {
+			case "":
+				h.logger.Printf("sitemapIndex entry option '%s', missing option or value", "Type")
+				errInit = true
+			case sitemapEntrySitemapIndexTypeStatic:
+			default:
+				h.logger.Printf("sitemapIndex entry option '%s', invalid value '%s'", "Type", entry.Type)
+				errInit = true
+			}
+
+			if entry.Type == sitemapEntrySitemapIndexTypeStatic {
+				if entry.Static.Loc == "" {
+					h.logger.Printf("sitemapIndex static entry option '%s', missing option or value", "Loc")
+					errInit = true
+				}
+			}
+		}
+	}
+
+	if sitemap {
+		if len(h.config.Sitemap) == 0 {
+			h.logger.Print("sitemap entry is missing")
+			errInit = true
+		}
+		for _, entry := range h.config.Sitemap {
+			if entry.Name == "" {
+				h.logger.Printf("sitemap entry option '%s', missing option or value", "Name")
+			}
+			switch entry.Type {
+			case "":
+				h.logger.Printf("sitemap entry option '%s', missing option or value", "Type")
+			case sitemapEntrySitemapTypeStatic:
+			case sitemapEntrySitemapTypeList:
+			default:
+				h.logger.Printf("sitemap entry option '%s', invalid value '%s'", "Type", entry.Type)
+			}
+
+			if entry.Type == sitemapEntrySitemapTypeStatic {
+				if entry.Static.Loc == "" {
+					h.logger.Printf("sitemap static entry option '%s', missing option or value", "Loc")
+					errInit = true
+				}
+				if entry.Static.Lastmod != nil && *entry.Static.Lastmod == "" {
+					h.logger.Printf("sitemap static entry option '%s', invalid value '%s'", "Lastmod", *entry.Static.Lastmod)
+					errInit = true
+				}
+				if entry.Static.Changefreq != nil {
+					switch *entry.Static.Changefreq {
+					case sitemapChangefreqAlways:
+					case sitemapChangefreqHourly:
+					case sitemapChangefreqDaily:
+					case sitemapChangefreqWeekly:
+					case sitemapChangefreqMonthly:
+					case sitemapChangefreqYearly:
+					case sitemapChangefreqNever:
+					default:
+						h.logger.Printf("sitemap static entry option '%s', invalid value '%s'", "Changefreq",
+							*entry.Static.Changefreq)
+						errInit = true
+					}
+				}
+				if entry.Static.Priority != nil && (*entry.Static.Priority < 0 || *entry.Static.Priority > 1) {
+					h.logger.Printf("sitemap static entry option '%s', invalid value '%.1f'", "Priority", *entry.Static.Priority)
+					errInit = true
+				}
+			}
+
+			if entry.Type == sitemapEntrySitemapTypeList {
+				if entry.List.Resource == "" {
+					h.logger.Printf("sitemap list entry option '%s', missing option or value", "Resource")
+					errInit = true
+				}
+				if entry.List.Filter == "" {
+					h.logger.Printf("sitemap list entry option '%s', missing option or value", "Filter")
+					errInit = true
+				}
+				if entry.List.ItemLoc == "" {
+					h.logger.Printf("sitemap list entry option '%s', missing option or value", "ItemLoc")
+					errInit = true
+				}
+				if entry.List.ItemLastmod != nil && *entry.List.ItemLastmod == "" {
+					h.logger.Printf("sitemap list entry option '%s', invalid value '%s'", "ItemLastmod",
+						*entry.List.ItemLastmod)
+					errInit = true
+				}
+				if entry.List.ItemIgnore != nil && *entry.List.ItemIgnore == "" {
+					h.logger.Printf("sitemap list entry option '%s', invalid value '%s'", "ItemIgnore", *entry.List.ItemIgnore)
+					errInit = true
+				}
+				if entry.List.Changefreq != nil {
+					switch *entry.List.Changefreq {
+					case sitemapChangefreqAlways:
+					case sitemapChangefreqHourly:
+					case sitemapChangefreqDaily:
+					case sitemapChangefreqWeekly:
+					case sitemapChangefreqMonthly:
+					case sitemapChangefreqYearly:
+					case sitemapChangefreqNever:
+					default:
+						h.logger.Printf("sitemap list entry option '%s', invalid value '%s'", "Changefreq", *entry.List.Changefreq)
+						errInit = true
+					}
+				}
+				if entry.List.Priority != nil && (*entry.List.Priority < 0 || *entry.List.Priority > 1) {
+					h.logger.Printf("sitemap list entry option '%s', invalid value '%.1f'", "Priority", *entry.List.Priority)
+					errInit = true
+				}
+			}
+		}
+	}
+
+	if errInit {
+		return errors.New("init error")
+	}
+
+	var err error
 	h.templateSitemapIndex, err = template.New("sitemapIndex").Parse(sitemapTemplateSitemapIndex)
 	if err != nil {
 		return err
@@ -335,6 +326,7 @@ func (h *sitemapHandler) Load(config map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+
 	h.rwPool = render.NewRenderWriterPool()
 	h.cache = memory.New(time.Duration(*h.config.CacheTTL)*time.Second, 0)
 

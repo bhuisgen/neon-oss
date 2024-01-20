@@ -6,7 +6,6 @@ package file
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -46,7 +45,6 @@ type fileHandlerConfig struct {
 
 const (
 	fileModuleID module.ModuleID = "server.site.handler.file"
-	fileLogger   string          = "handler[file]"
 
 	fileConfigDefaultStatusCode int  = 200
 	fileConfigDefaultCache      bool = false
@@ -93,70 +91,45 @@ func (h fileHandler) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the handler configuration.
-func (h *fileHandler) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the handler.
+func (h *fileHandler) Init(config map[string]interface{}, logger *log.Logger) error {
+	h.logger = logger
 
-	var c fileHandlerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.Path == "" {
-		report = append(report, fmt.Sprintf("option '%s', missing option or value", "Path"))
-	} else {
-		f, err := h.osOpenFile(c.Path, os.O_RDONLY, 0)
-		if err != nil {
-			report = append(report, fmt.Sprintf("option '%s', failed to open file '%s'", "Path", c.Path))
-		} else {
-			h.osClose(f)
-			fi, err := h.osStat(c.Path)
-			if err != nil {
-				report = append(report, fmt.Sprintf("option '%s', failed to stat file '%s'", "Path", c.Path))
-			}
-			if err == nil && fi.IsDir() {
-				report = append(report, fmt.Sprintf("option '%s', '%s' is a directory", "Path", c.Path))
-			}
-		}
-	}
-	if c.StatusCode == nil {
-		defaultValue := fileConfigDefaultStatusCode
-		c.StatusCode = &defaultValue
-	}
-	if *c.StatusCode < 100 || *c.StatusCode > 599 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "StatusCode", *c.StatusCode))
-	}
-	if c.CacheTTL == nil {
-		defaultValue := fileConfigDefaultCacheTTL
-		c.CacheTTL = &defaultValue
-	}
-	if *c.CacheTTL < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "CacheTTL", *c.CacheTTL))
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the handler.
-func (h *fileHandler) Load(config map[string]interface{}) error {
-	var c fileHandlerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &h.config); err != nil {
+		h.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	h.config = &c
-	h.logger = log.New(os.Stderr, fmt.Sprint(fileLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
+	if h.config.Path == "" {
+		h.logger.Printf("option '%s', missing option or value", "Path")
+		errInit = true
+	} else {
+		f, err := h.osOpenFile(h.config.Path, os.O_RDONLY, 0)
+		if err != nil {
+			h.logger.Printf("option '%s', failed to open file '%s'", "Path", h.config.Path)
+			errInit = true
+		} else {
+			h.osClose(f)
+			fi, err := h.osStat(h.config.Path)
+			if err != nil {
+				h.logger.Printf("option '%s', failed to stat file '%s'", "Path", h.config.Path)
+				errInit = true
+			}
+			if err == nil && fi.IsDir() {
+				h.logger.Printf("option '%s', '%s' is a directory", "Path", h.config.Path)
+				errInit = true
+			}
+		}
+	}
 	if h.config.StatusCode == nil {
 		defaultValue := fileConfigDefaultStatusCode
 		h.config.StatusCode = &defaultValue
+	}
+	if *h.config.StatusCode < 100 || *h.config.StatusCode > 599 {
+		h.logger.Printf("option '%s', invalid value '%d'", "StatusCode", *h.config.StatusCode)
+		errInit = true
 	}
 	if h.config.Cache == nil {
 		defaultValue := fileConfigDefaultCache
@@ -165,6 +138,13 @@ func (h *fileHandler) Load(config map[string]interface{}) error {
 	if h.config.CacheTTL == nil {
 		defaultValue := fileConfigDefaultCacheTTL
 		h.config.CacheTTL = &defaultValue
+	}
+	if *h.config.CacheTTL < 0 {
+		h.logger.Printf("option '%s', invalid value '%d'", "CacheTTL", *h.config.CacheTTL)
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	h.rwPool = render.NewRenderWriterPool()

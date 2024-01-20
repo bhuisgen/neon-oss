@@ -72,7 +72,6 @@ type restResourceConfig struct {
 
 const (
 	restModuleID module.ModuleID = "fetcher.provider.rest"
-	restLogger   string          = "fetcher.provider[rest]"
 
 	restConfigDefaultTimeout             int = 30
 	restConfigDefaultMaxConnsPerHost     int = 100
@@ -159,196 +158,179 @@ func (p restProvider) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the provider configuration.
-func (p *restProvider) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the provider.
+func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) error {
+	p.logger = logger
 
-	var c restProviderConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.TLSCAFiles != nil {
-		for _, item := range *c.TLSCAFiles {
-			if item == "" {
-				report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "TLSCAFiles", item))
-			} else {
-				file, err := p.osOpenFile(item, os.O_RDONLY, 0)
-				if err != nil {
-					report = append(report, fmt.Sprintf("option '%s', failed to open file '%s'", "TLSCAFiles", item))
-				} else {
-					p.osClose(file)
-					fi, err := p.osStat(item)
-					if err != nil {
-						report = append(report, fmt.Sprintf("option '%s', failed to stat file '%s'", "TLSCAFiles", item))
-					}
-					if err == nil && fi.IsDir() {
-						report = append(report, fmt.Sprintf("option '%s', '%s' is a directory", "TLSCAFiles", item))
-					}
-				}
-			}
-		}
-	}
-	if c.TLSCertFiles != nil {
-		for _, item := range *c.TLSCertFiles {
-			if item == "" {
-				report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "TLSCertFiles", item))
-			} else {
-				file, err := p.osOpenFile(item, os.O_RDONLY, 0)
-				if err != nil {
-					report = append(report, fmt.Sprintf("option '%s', failed to open file '%s'", "TLSCertFiles", item))
-				} else {
-					p.osClose(file)
-					fi, err := p.osStat(item)
-					if err != nil {
-						report = append(report, fmt.Sprintf("option '%s', failed to stat file '%s'", "TLSCertFiles", item))
-					}
-					if err == nil && fi.IsDir() {
-						report = append(report, fmt.Sprintf("option '%s', '%s' is a directory", "TLSCertFiles", item))
-					}
-				}
-			}
-		}
-	}
-	if c.TLSKeyFiles != nil {
-		if c.TLSCertFiles == nil || len(*c.TLSKeyFiles) != len(*c.TLSCertFiles) {
-			report = append(report, fmt.Sprintf("option '%s', missing value(s)", "TLSKeyFiles"))
-		}
-		for _, item := range *c.TLSKeyFiles {
-			if item == "" {
-				report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "TLSKeyFiles", item))
-			} else {
-				file, err := p.osOpenFile(item, os.O_RDONLY, 0)
-				if err != nil {
-					report = append(report, fmt.Sprintf("option '%s', failed to open file '%s'", "TLSKeyFiles", item))
-				} else {
-					p.osClose(file)
-					fi, err := p.osStat(item)
-					if err != nil {
-						report = append(report, fmt.Sprintf("option '%s', failed to stat file '%s'", "TLSKeyFiles", item))
-					}
-					if err == nil && fi.IsDir() {
-						report = append(report, fmt.Sprintf("option '%s', '%s' is a directory", "TLSKeyFiles", item))
-					}
-				}
-			}
-		}
-	}
-	if c.Timeout == nil {
-		defaultValue := restConfigDefaultTimeout
-		c.Timeout = &defaultValue
-	}
-	if *c.Timeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "Timeout", *c.Timeout))
-	}
-	if c.MaxConnsPerHost == nil {
-		defaultValue := restConfigDefaultMaxConnsPerHost
-		c.MaxConnsPerHost = &defaultValue
-	}
-	if *c.MaxConnsPerHost < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "MaxConnsPerHost", *c.MaxConnsPerHost))
-	}
-	if c.MaxIdleConns == nil {
-		defaultValue := restConfigDefaultMaxIdleConns
-		c.MaxIdleConns = &defaultValue
-	}
-	if *c.MaxIdleConns < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "MaxIdleConns", *c.MaxIdleConns))
-	}
-	if c.MaxIdleConnsPerHost == nil {
-		defaultValue := restConfigDefaultMaxIdleConnsPerHost
-		c.MaxIdleConnsPerHost = &defaultValue
-	}
-	if *c.MaxIdleConnsPerHost < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "MaxIdleConnsPerHost",
-			*c.MaxIdleConnsPerHost))
-	}
-	if c.IdleConnTimeout == nil {
-		defaultValue := restConfigDefaultIdleConnTimeout
-		c.IdleConnTimeout = &defaultValue
-	}
-	if *c.IdleConnTimeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "IdleConnTimeout", *c.IdleConnTimeout))
-	}
-	if c.Retry == nil {
-		defaultValue := restConfigDefaultRetry
-		c.Retry = &defaultValue
-	}
-	if *c.Retry < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "Retry", *c.Retry))
-	}
-	if c.RetryDelay == nil {
-		defaultValue := restConfigDefaultRetryDelay
-		c.RetryDelay = &defaultValue
-	}
-	if *c.RetryDelay < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "RetryDelay", *c.RetryDelay))
-	}
-	for k := range c.Headers {
-		if k == "" {
-			report = append(report, fmt.Sprintf("option '%s', invalid key '%s'", "Headers", k))
-		}
-	}
-	for k := range c.Params {
-		if k == "" {
-			report = append(report, fmt.Sprintf("option '%s', invalid key '%s'", "Params", k))
-		}
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the provider.
-func (p *restProvider) Load(config map[string]interface{}) error {
-	var c restProviderConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &p.config); err != nil {
+		p.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	p.config = &c
-	p.logger = log.New(os.Stderr, restLogger+": ", log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
+	if p.config.TLSCAFiles != nil {
+		for _, item := range *p.config.TLSCAFiles {
+			if item == "" {
+				p.logger.Printf("option '%s', invalid value '%s'", "TLSCAFiles", item)
+				errInit = true
+				continue
+			}
+			file, err := p.osOpenFile(item, os.O_RDONLY, 0)
+			if err != nil {
+				p.logger.Printf("option '%s', failed to open file '%s'", "TLSCAFiles", item)
+				errInit = true
+				continue
+			}
+			p.osClose(file)
+			fi, err := p.osStat(item)
+			if err != nil {
+				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSCAFiles", item)
+				errInit = true
+				continue
+			}
+			if err == nil && fi.IsDir() {
+				p.logger.Printf("option '%s', '%s' is a directory", "TLSCAFiles", item)
+				errInit = true
+				continue
+			}
+		}
+	}
+	if p.config.TLSCertFiles != nil {
+		for _, item := range *p.config.TLSCertFiles {
+			if item == "" {
+				p.logger.Printf("option '%s', invalid value '%s'", "TLSCertFiles", item)
+				errInit = true
+				continue
+			}
+			file, err := p.osOpenFile(item, os.O_RDONLY, 0)
+			if err != nil {
+				p.logger.Printf("option '%s', failed to open file '%s'", "TLSCertFiles", item)
+				errInit = true
+				continue
+			}
+			p.osClose(file)
+			fi, err := p.osStat(item)
+			if err != nil {
+				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSCertFiles", item)
+				errInit = true
+				continue
+			}
+			if err == nil && fi.IsDir() {
+				p.logger.Printf("option '%s', '%s' is a directory", "TLSCertFiles", item)
+				errInit = true
+				continue
+			}
+		}
+	}
+	if p.config.TLSKeyFiles != nil {
+		if p.config.TLSCertFiles == nil || len(*p.config.TLSKeyFiles) != len(*p.config.TLSCertFiles) {
+			p.logger.Printf("option '%s', missing value(s)", "TLSKeyFiles")
+			errInit = true
+		}
+		for _, item := range *p.config.TLSKeyFiles {
+			if item == "" {
+				p.logger.Printf("option '%s', invalid value '%s'", "TLSKeyFiles", item)
+				errInit = true
+				continue
+			}
+			file, err := p.osOpenFile(item, os.O_RDONLY, 0)
+			if err != nil {
+				p.logger.Printf("option '%s', failed to open file '%s'", "TLSKeyFiles", item)
+				errInit = true
+				continue
+			}
+			p.osClose(file)
+			fi, err := p.osStat(item)
+			if err != nil {
+				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSKeyFiles", item)
+				errInit = true
+				continue
+			}
+			if err == nil && fi.IsDir() {
+				p.logger.Printf("option '%s', '%s' is a directory", "TLSKeyFiles", item)
+				errInit = true
+				continue
+			}
+		}
+	}
 	if p.config.Timeout == nil {
 		defaultValue := restConfigDefaultTimeout
 		p.config.Timeout = &defaultValue
+	}
+	if *p.config.Timeout < 0 {
+		p.logger.Printf("option '%s', invalid value '%d'", "Timeout", *p.config.Timeout)
+		errInit = true
 	}
 	if p.config.MaxConnsPerHost == nil {
 		defaultValue := restConfigDefaultMaxConnsPerHost
 		p.config.MaxConnsPerHost = &defaultValue
 	}
+	if *p.config.MaxConnsPerHost < 0 {
+		p.logger.Printf("option '%s', invalid value '%d'", "MaxConnsPerHost", *p.config.MaxConnsPerHost)
+		errInit = true
+	}
 	if p.config.MaxIdleConns == nil {
 		defaultValue := restConfigDefaultMaxIdleConns
 		p.config.MaxIdleConns = &defaultValue
+	}
+	if *p.config.MaxIdleConns < 0 {
+		p.logger.Printf("option '%s', invalid value '%d'", "MaxIdleConns", *p.config.MaxIdleConns)
+		errInit = true
 	}
 	if p.config.MaxIdleConnsPerHost == nil {
 		defaultValue := restConfigDefaultMaxIdleConnsPerHost
 		p.config.MaxIdleConnsPerHost = &defaultValue
 	}
+	if *p.config.MaxIdleConnsPerHost < 0 {
+		p.logger.Printf("option '%s', invalid value '%d'", "MaxIdleConnsPerHost", *p.config.MaxIdleConnsPerHost)
+		errInit = true
+	}
 	if p.config.IdleConnTimeout == nil {
 		defaultValue := restConfigDefaultIdleConnTimeout
 		p.config.IdleConnTimeout = &defaultValue
+	}
+	if *p.config.IdleConnTimeout < 0 {
+		p.logger.Printf("option '%s', invalid value '%d'", "IdleConnTimeout", *p.config.IdleConnTimeout)
+		errInit = true
 	}
 	if p.config.Retry == nil {
 		defaultValue := restConfigDefaultRetry
 		p.config.Retry = &defaultValue
 	}
+	if *p.config.Retry < 0 {
+		p.logger.Printf("option '%s', invalid value '%d'", "Retry", *p.config.Retry)
+		errInit = true
+	}
 	if p.config.RetryDelay == nil {
 		defaultValue := restConfigDefaultRetryDelay
 		p.config.RetryDelay = &defaultValue
+	}
+	if *p.config.RetryDelay < 0 {
+		p.logger.Printf("option '%s', invalid value '%d'", "RetryDelay", *p.config.RetryDelay)
+		errInit = true
+	}
+	for k := range p.config.Headers {
+		if k == "" {
+			p.logger.Printf("option '%s', invalid key '%s'", "Headers", k)
+			errInit = true
+		}
+	}
+	for k := range p.config.Params {
+		if k == "" {
+			p.logger.Printf("option '%s', invalid key '%s'", "Params", k)
+			errInit = true
+		}
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	tlsConfig := &tls.Config{}
 
 	if p.config.TLSCAFiles != nil {
 		caCertPool := x509.NewCertPool()
-
 		for _, tlsCAFile := range *p.config.TLSCAFiles {
 			ca, err := p.osReadFile(tlsCAFile)
 			if err != nil {
@@ -360,10 +342,9 @@ func (p *restProvider) Load(config map[string]interface{}) error {
 	}
 
 	if p.config.TLSCertFiles != nil {
-		var err error
 		tlsConfig.Certificates = make([]tls.Certificate, len(*p.config.TLSCertFiles))
-
 		for i := range *p.config.TLSCertFiles {
+			var err error
 			tlsConfig.Certificates[i], err = p.tlsLoadX509KeyPair((*p.config.TLSCertFiles)[i], (*p.config.TLSKeyFiles)[i])
 			if err != nil {
 				return err
@@ -371,25 +352,23 @@ func (p *restProvider) Load(config map[string]interface{}) error {
 		}
 	}
 
-	transport := http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout: time.Duration(*p.config.Timeout) * time.Second,
-		}).Dial,
-		TLSClientConfig:       tlsConfig,
-		TLSHandshakeTimeout:   time.Duration(*p.config.Timeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(*p.config.Timeout) * time.Second,
-		ExpectContinueTimeout: time.Duration(*p.config.Timeout) * time.Second,
-		ForceAttemptHTTP2:     true,
-		MaxConnsPerHost:       *p.config.MaxConnsPerHost,
-		MaxIdleConns:          *p.config.MaxIdleConns,
-		MaxIdleConnsPerHost:   *p.config.MaxIdleConnsPerHost,
-		IdleConnTimeout:       time.Duration(*p.config.IdleConnTimeout) * time.Second,
-	}
-
 	p.client = http.Client{
-		Transport: &transport,
-		Timeout:   time.Duration(*p.config.Timeout) * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout: time.Duration(*p.config.Timeout) * time.Second,
+			}).Dial,
+			TLSClientConfig:       tlsConfig,
+			TLSHandshakeTimeout:   time.Duration(*p.config.Timeout) * time.Second,
+			ResponseHeaderTimeout: time.Duration(*p.config.Timeout) * time.Second,
+			ExpectContinueTimeout: time.Duration(*p.config.Timeout) * time.Second,
+			ForceAttemptHTTP2:     true,
+			MaxConnsPerHost:       *p.config.MaxConnsPerHost,
+			MaxIdleConns:          *p.config.MaxIdleConns,
+			MaxIdleConnsPerHost:   *p.config.MaxIdleConnsPerHost,
+			IdleConnTimeout:       time.Duration(*p.config.IdleConnTimeout) * time.Second,
+		},
+		Timeout: time.Duration(*p.config.Timeout) * time.Second,
 	}
 
 	return nil
@@ -526,7 +505,7 @@ func (p *restProvider) fetchResource(ctx context.Context, config *restResourceCo
 		}
 
 		if core.DEBUG {
-			p.logger.Printf("Fetch request: method=%s, url=%s, code=%d\n", req.Method, req.URL.String(), response.StatusCode)
+			p.logger.Printf("Fetch request: method=%s, url=%s, code=%d)", req.Method, req.URL.String(), response.StatusCode)
 		}
 
 		switch response.StatusCode {

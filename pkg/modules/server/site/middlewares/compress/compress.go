@@ -8,12 +8,10 @@ import (
 	"bufio"
 	"compress/gzip"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -36,7 +34,6 @@ type compressMiddlewareConfig struct {
 
 const (
 	compressModuleID module.ModuleID = "server.site.middleware.compress"
-	compressLogger   string          = "middleware[compress]"
 
 	compressConfigDefaultLevel int = 0
 
@@ -62,46 +59,28 @@ func (m compressMiddleware) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the middleware configuration.
-func (m *compressMiddleware) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the middleware.
+func (m *compressMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+	m.logger = logger
 
-	var c compressMiddlewareConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.Level == nil {
-		defaultValue := compressConfigDefaultLevel
-		c.Level = &defaultValue
-	}
-	if *c.Level < -2 || *c.Level > 9 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "Level", *c.Level))
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the middleware.
-func (m *compressMiddleware) Load(config map[string]interface{}) error {
-	var c compressMiddlewareConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &m.config); err != nil {
+		m.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	m.config = &c
-	m.logger = log.New(os.Stderr, fmt.Sprint(compressLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
 	if m.config.Level == nil {
 		defaultValue := compressConfigDefaultLevel
 		m.config.Level = &defaultValue
+	}
+	if *m.config.Level < -2 || *m.config.Level > 9 {
+		m.logger.Printf("option '%s', invalid value '%d'", "Level", *m.config.Level)
+		errInit = true
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	m.pool = newGzipPool(&GzipPoolConfig{

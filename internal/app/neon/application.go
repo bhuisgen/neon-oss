@@ -56,32 +56,22 @@ func (a *application) Check() error {
 	a.loader = newLoader(a.store, a.fetcher)
 	a.server = newServer(a.store, a.fetcher, a.loader)
 
-	var report []string
+	var errCheck bool
 
-	r, err := a.checkStore(a.store, a.config.Store.Config)
-	if err != nil {
-		report = append(report, r...)
+	if err := a.checkStore(a.store, a.config.Store.Config); err != nil {
+		errCheck = true
+	}
+	if err := a.checkFetcher(a.fetcher, a.config.Fetcher.Config); err != nil {
+		errCheck = true
+	}
+	if err := a.checkLoader(a.loader, a.config.Loader.Config); err != nil {
+		errCheck = true
+	}
+	if err := a.checkServer(a.server, a.config.Server.Config); err != nil {
+		errCheck = true
 	}
 
-	r, err = a.checkFetcher(a.fetcher, a.config.Fetcher.Config)
-	if err != nil {
-		report = append(report, r...)
-	}
-
-	r, err = a.checkLoader(a.loader, a.config.Loader.Config)
-	if err != nil {
-		report = append(report, r...)
-	}
-
-	r, err = a.checkServer(a.server, a.config.Server.Config)
-	if err != nil {
-		report = append(report, r...)
-	}
-
-	if len(report) > 0 {
-		for _, l := range report {
-			a.logger.Print(l)
-		}
+	if errCheck {
 		return errors.New("check failure")
 	}
 
@@ -184,9 +174,7 @@ func (a *application) stop() error {
 // shutdown stops the application gracefully.
 func (a *application) shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
 
 	if err := a.shutdownServer(ctx, a.server); err != nil {
 		return err
@@ -238,7 +226,7 @@ func (a *application) reload() error {
 					files = append(files, descriptor.Files()...)
 				}
 
-				if _, err = os.StartProcess(exe, os.Args, &os.ProcAttr{
+				if _, err := os.StartProcess(exe, os.Args, &os.ProcAttr{
 					Dir:   filepath.Dir(exe),
 					Env:   env,
 					Files: files,
@@ -262,21 +250,17 @@ func (a *application) reload() error {
 }
 
 // checkStore checks the store configuration.
-func (a *application) checkStore(store Store, config map[string]interface{}) ([]string, error) {
-	if r, err := store.Check(config); err != nil {
-		return r, err
+func (a *application) checkStore(store Store, config map[string]interface{}) error {
+	if err := store.Init(config); err != nil {
+		return err
 	}
 
-	return nil, nil
+	return nil
 }
 
 // startStore starts the store.
 func (a *application) startStore(store Store, config map[string]interface{}) error {
-	if _, err := store.Check(config); err != nil {
-		return err
-	}
-
-	if err := store.Load(config); err != nil {
+	if err := store.Init(config); err != nil {
 		return err
 	}
 
@@ -289,22 +273,17 @@ func (a *application) stopStore(store Store) error {
 }
 
 // checkFetcher checks the fetcher configuration.
-func (a *application) checkFetcher(fetcher Fetcher, config map[string]interface{}) ([]string, error) {
-	r, err := fetcher.Check(config)
-	if err != nil {
-		return r, err
+func (a *application) checkFetcher(fetcher Fetcher, config map[string]interface{}) error {
+	if err := fetcher.Init(config); err != nil {
+		return err
 	}
 
-	return nil, nil
+	return nil
 }
 
 // startFetcher starts the fetcher.
 func (a *application) startFetcher(fetcher Fetcher, config map[string]interface{}) error {
-	_, err := fetcher.Check(config)
-	if err != nil {
-		return err
-	}
-	if err := fetcher.Load(config); err != nil {
+	if err := fetcher.Init(config); err != nil {
 		return err
 	}
 
@@ -317,20 +296,17 @@ func (a *application) stopFetcher(fetcher Fetcher) error {
 }
 
 // checkLoader checks the loader configuration.
-func (a *application) checkLoader(loader Loader, config map[string]interface{}) ([]string, error) {
-	if r, err := loader.Check(config); err != nil {
-		return r, err
+func (a *application) checkLoader(loader Loader, config map[string]interface{}) error {
+	if err := loader.Init(config); err != nil {
+		return err
 	}
 
-	return nil, nil
+	return nil
 }
 
 // startLoader starts the loader.
 func (a *application) startLoader(loader Loader, config map[string]interface{}) error {
-	if _, err := loader.Check(config); err != nil {
-		return err
-	}
-	if err := loader.Load(config); err != nil {
+	if err := loader.Init(config); err != nil {
 		return err
 	}
 	if err := loader.Start(); err != nil {
@@ -350,21 +326,17 @@ func (a *application) stopLoader(loader Loader) error {
 }
 
 // checkServer checks the server configuration.
-func (a *application) checkServer(server Server, config map[string]interface{}) ([]string, error) {
-	r, err := server.Check(config)
-	if err != nil {
-		return r, err
+func (a *application) checkServer(server Server, config map[string]interface{}) error {
+	if err := server.Init(config); err != nil {
+		return err
 	}
 
-	return nil, nil
+	return nil
 }
 
 // startServer starts the server.
 func (a *application) startServer(server Server, config map[string]interface{}) error {
-	if _, err := server.Check(config); err != nil {
-		return err
-	}
-	if err := server.Load(config); err != nil {
+	if err := server.Init(config); err != nil {
 		return err
 	}
 	if err := server.Register(a.state.serverListenersDescriptors); err != nil {
@@ -473,21 +445,18 @@ func (a *application) listenChild(ch chan<- string, errorCh chan<- error) {
 				return
 			}
 
-			_, err = c.Write(data)
-			if err != nil {
+			if _, err := c.Write(data); err != nil {
 				errorCh <- err
 				return
 			}
 
 		case childMessageReady:
-			err = a.shutdown()
-			if err != nil {
+			if err := a.shutdown(); err != nil {
 				errorCh <- err
 				return
 			}
 
-			_, err = c.Write([]byte("ok"))
-			if err != nil {
+			if _, err := c.Write([]byte("ok")); err != nil {
 				errorCh <- err
 				return
 			}
@@ -506,7 +475,6 @@ func (a *application) listenChild(ch chan<- string, errorCh chan<- error) {
 func (a *application) acceptChild(l net.Listener) (net.Conn, error) {
 	var c net.Conn
 	var err error
-
 	ch := make(chan error, 1)
 
 	go func() {
@@ -517,7 +485,7 @@ func (a *application) acceptChild(l net.Listener) (net.Conn, error) {
 	}()
 
 	select {
-	case err = <-ch:
+	case err := <-ch:
 		if err != nil {
 			return nil, err
 		}
@@ -535,9 +503,7 @@ func (a *application) child() error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		c.Close()
-	}()
+	defer c.Close()
 
 	var data []byte
 	wg := sync.WaitGroup{}
@@ -555,8 +521,7 @@ func (a *application) child() error {
 	wg.Add(1)
 	go readResponse()
 
-	_, err = c.Write([]byte(childMessageHello))
-	if err != nil {
+	if _, err := c.Write([]byte(childMessageHello)); err != nil {
 		return err
 	}
 
@@ -567,8 +532,7 @@ func (a *application) child() error {
 	}
 
 	var response childHelloResponse
-	err = json.Unmarshal(data, &response)
-	if err != nil {
+	if err := json.Unmarshal(data, &response); err != nil {
 		return err
 	}
 
@@ -586,8 +550,7 @@ func (a *application) child() error {
 	wg.Add(1)
 	go readResponse()
 
-	_, err = c.Write([]byte(childMessageReady))
-	if err != nil {
+	if _, err := c.Write([]byte(childMessageReady)); err != nil {
 		return err
 	}
 
@@ -595,3 +558,5 @@ func (a *application) child() error {
 
 	return nil
 }
+
+var _ (Application) = (*application)(nil)

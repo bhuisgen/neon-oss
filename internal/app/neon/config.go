@@ -96,8 +96,7 @@ func newConfigParserYAML() *configParserYAML {
 // parse parses the YAML data.
 func (p *configParserYAML) parse(data []byte, c *config) error {
 	var y yamlConfig
-	err := p.yamlUnmarshal(data, &y)
-	if err != nil {
+	if err := p.yamlUnmarshal(data, &y); err != nil {
 		return err
 	}
 
@@ -144,8 +143,7 @@ func newConfigParserTOML() *configParserTOML {
 // parse parses the TOML data.
 func (p *configParserTOML) parse(data []byte, c *config) error {
 	var t tomlConfig
-	err := p.tomlUnmarshal(data, &t)
-	if err != nil {
+	if err := p.tomlUnmarshal(data, &t); err != nil {
 		return err
 	}
 
@@ -192,8 +190,7 @@ func newConfigParserJSON() *configParserJSON {
 // parse parses the JSON data.
 func (p *configParserJSON) parse(data []byte, c *config) error {
 	var j jsonConfig
-	err := p.jsonUnmarshal(data, &j)
-	if err != nil {
+	if err := p.jsonUnmarshal(data, &j); err != nil {
 		return err
 	}
 
@@ -237,8 +234,8 @@ func LoadConfig() (*config, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = c.parser.parse(data, c)
-	if err != nil {
+
+	if err := c.parser.parse(data, c); err != nil {
 		return nil, err
 	}
 
@@ -279,20 +276,17 @@ func GenerateConfig(template string) error {
 			return nil
 		}
 
-		err = os.MkdirAll(filepath.Dir(dst), 0755)
-		if err != nil {
+		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 			return err
 		}
-
-		err = os.WriteFile(dst, data, 0644)
-		if err != nil {
+		if err := os.WriteFile(dst, data, 0644); err != nil {
 			return err
 		}
 
 		return nil
 	})
 	if err != nil {
-		return errors.New("failed to copy templates files")
+		return errors.New("failed to process template")
 	}
 
 	return nil

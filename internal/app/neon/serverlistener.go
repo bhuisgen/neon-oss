@@ -21,7 +21,6 @@ import (
 // serverListener implements a server listener.
 type serverListener struct {
 	name    string
-	config  *serverListenerConfig
 	logger  *log.Logger
 	state   *serverListenerState
 	mu      sync.RWMutex
@@ -30,23 +29,13 @@ type serverListener struct {
 	osClose func(f *os.File) error
 }
 
-// serverListenerConfig implements the server listener configuration.
-type serverListenerConfig struct {
-	Listener map[string]interface{}
-}
-
 // serverListenerState implements the server listener state.
 type serverListenerState struct {
-	sites          map[string]ServerSite
-	listener       string
-	listenerModule core.ServerListenerModule
-	mediator       *serverListenerMediator
-	handler        *serverListenerHandler
+	listener core.ServerListenerModule
+	sites    map[string]ServerSite
+	mediator *serverListenerMediator
+	handler  *serverListenerHandler
 }
-
-const (
-	serverListenerLogger string = "listener"
-)
 
 // serverListenerOsClose redirects to os.Close.
 func serverListenerOsClose(f *os.File) error {
@@ -56,78 +45,62 @@ func serverListenerOsClose(f *os.File) error {
 // newServerListener creates a new server listener.
 func newServerListener(name string) *serverListener {
 	return &serverListener{
-		name:    name,
+		name: name,
+		state: &serverListenerState{
+			sites: make(map[string]ServerSite),
+		},
 		quit:    make(chan struct{}),
 		update:  make(chan struct{}),
 		osClose: serverListenerOsClose,
 	}
 }
 
-// Check checks the listener configuration.
-func (l *serverListener) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the listener.
+func (l *serverListener) Init(config map[string]interface{}, logger *log.Logger) error {
+	l.logger = logger
 
+	if config == nil {
+		l.logger.Print("missing configuration")
+		return errors.New("missing configuration")
+	}
+
+	var errInit bool
+
+	if len(config) == 0 {
+		l.logger.Print("missing listener configuration")
+		errInit = true
+	}
 	for listener, listenerConfig := range config {
 		moduleInfo, err := module.Lookup(module.ModuleID("server.listener." + listener))
 		if err != nil {
-			report = append(report, fmt.Sprintf("unregistered listener module '%s'", listener))
-			continue
+			l.logger.Printf("unregistered module '%s'", listener)
+			errInit = true
+			break
 		}
 		module, ok := moduleInfo.NewInstance().(core.ServerListenerModule)
 		if !ok {
-			report = append(report, fmt.Sprintf("invalid listener module '%s'", listener))
-			continue
+			l.logger.Printf("invalid module '%s'", listener)
+			errInit = true
+			break
 		}
-		var moduleConfig map[string]interface{}
-		moduleConfig, _ = listenerConfig.(map[string]interface{})
-		r, err := module.Check(moduleConfig)
-		if err != nil {
-			for _, line := range r {
-				report = append(report, fmt.Sprintf("failed to check configuration: %s", line))
-			}
-			continue
+
+		moduleConfig, ok := listenerConfig.(map[string]interface{})
+		if !ok {
+			moduleConfig = map[string]interface{}{}
 		}
+		if err := module.Init(moduleConfig, l.logger); err != nil {
+			l.logger.Printf("failed to init module '%s'", listener)
+			errInit = true
+			break
+		}
+
+		l.state.listener = module
 
 		break
 	}
 
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the listener.
-func (l *serverListener) Load(config map[string]interface{}) error {
-	l.config = &serverListenerConfig{
-		Listener: config,
-	}
-	l.logger = log.New(os.Stderr, fmt.Sprintf("%s[%s]: ", serverListenerLogger, l.name), log.LstdFlags|log.Lmsgprefix)
-	l.state = &serverListenerState{
-		sites: make(map[string]ServerSite),
-	}
-
-	for listener, listenerConfig := range l.config.Listener {
-		moduleInfo, err := module.Lookup(module.ModuleID("server.listener." + listener))
-		if err != nil {
-			return err
-		}
-		module, ok := moduleInfo.NewInstance().(core.ServerListenerModule)
-		if !ok {
-			return fmt.Errorf("invalid listener module '%s'", listener)
-		}
-		var moduleConfig map[string]interface{}
-		moduleConfig, _ = listenerConfig.(map[string]interface{})
-		err = module.Load(moduleConfig)
-		if err != nil {
-			return err
-		}
-
-		l.state.listener = listener
-		l.state.listenerModule = module
-
-		break
+	if errInit {
+		return errors.New("init error")
 	}
 
 	return nil
@@ -148,8 +121,7 @@ func (l *serverListener) Register(descriptor ServerListenerDescriptor) error {
 		}
 	}
 
-	err := l.state.listenerModule.Register(mediator)
-	if err != nil {
+	if err := l.state.listener.Register(mediator); err != nil {
 		return err
 	}
 
@@ -163,8 +135,7 @@ func (l *serverListener) Register(descriptor ServerListenerDescriptor) error {
 
 // Serve starts the listener serving.
 func (l *serverListener) Serve() error {
-	err := l.state.listenerModule.Serve(l.state.handler)
-	if err != nil {
+	if err := l.state.listener.Serve(l.state.handler); err != nil {
 		return err
 	}
 
@@ -173,8 +144,7 @@ func (l *serverListener) Serve() error {
 
 // Shutdown shutdowns the listener gracefully.
 func (l *serverListener) Shutdown(ctx context.Context) error {
-	err := l.state.listenerModule.Shutdown(ctx)
-	if err != nil {
+	if err := l.state.listener.Shutdown(ctx); err != nil {
 		return err
 	}
 
@@ -183,8 +153,7 @@ func (l *serverListener) Shutdown(ctx context.Context) error {
 
 // Close stops the listener listening.
 func (l *serverListener) Close() error {
-	err := l.state.listenerModule.Close()
-	if err != nil {
+	if err := l.state.listener.Close(); err != nil {
 		return err
 	}
 
@@ -238,8 +207,7 @@ func (l *serverListener) waitForEvents() error {
 			return nil
 
 		case <-l.update:
-			err := l.updateRouter()
-			if err != nil {
+			if err := l.updateRouter(); err != nil {
 				l.logger.Print("failed to update router")
 			}
 		}
@@ -273,7 +241,7 @@ func (l *serverListener) Descriptor() (ServerListenerDescriptor, error) {
 
 	descriptor, err := l.buildDescriptor()
 	if err != nil {
-		return nil, errors.New("invalid descriptor")
+		return nil, err
 	}
 
 	return descriptor, nil
@@ -379,9 +347,8 @@ var _ ServerListenerDescriptor = (*serverListenerDescriptor)(nil)
 
 // serverListenerRouter implements the server listener router.
 type serverListenerRouter struct {
-	listener *serverListener
-	logger   *log.Logger
-	mux      *http.ServeMux
+	logger *log.Logger
+	mux    *http.ServeMux
 }
 
 // newServerListenerRouter creates a new listener router.
@@ -395,9 +362,8 @@ func newServerListenerRouter(l *serverListener, routers ...ServerSiteRouter) *se
 	}
 
 	return &serverListenerRouter{
-		listener: l,
-		logger:   log.New(os.Stderr, fmt.Sprintf("%s[%s]: ", serverListenerLogger, l.name), log.LstdFlags|log.Lmsgprefix),
-		mux:      mux,
+		logger: log.New(os.Stderr, fmt.Sprintf("%srouter: ", l.logger.Prefix()), log.LstdFlags|log.Lmsgprefix),
+		mux:    mux,
 	}
 }
 
@@ -408,16 +374,14 @@ func (r *serverListenerRouter) ServeHTTP(w http.ResponseWriter, req *http.Reques
 
 // serverListenerHandler implements the server listener handler.
 type serverListenerHandler struct {
-	listener *serverListener
-	logger   *log.Logger
-	router   ServerListenerRouter
+	logger *log.Logger
+	router ServerListenerRouter
 }
 
 // newServerListenerHandler creates a new server listener handler.
 func newServerListenerHandler(l *serverListener) *serverListenerHandler {
 	return &serverListenerHandler{
-		listener: l,
-		logger:   log.New(os.Stderr, fmt.Sprintf("%s[%s]: ", serverListenerLogger, l.name), log.LstdFlags|log.Lmsgprefix),
+		logger: log.New(os.Stderr, fmt.Sprintf("%shandler: ", l.logger.Prefix()), log.LstdFlags|log.Lmsgprefix),
 	}
 }
 

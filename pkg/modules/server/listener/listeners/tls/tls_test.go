@@ -14,7 +14,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -144,7 +143,7 @@ func TestTLSListenerModuleInfo(t *testing.T) {
 	}
 }
 
-func TestTLSListenerCheck(t *testing.T) {
+func TestTLSListenerInit(t *testing.T) {
 	type fields struct {
 		config                         *tlsListenerConfig
 		logger                         *log.Logger
@@ -163,12 +162,12 @@ func TestTLSListenerCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -189,6 +188,7 @@ func TestTLSListenerCheck(t *testing.T) {
 					"CertFiles": []string{"cert.pem"},
 					"KeyFiles":  []string{"key.pem"},
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -217,6 +217,7 @@ func TestTLSListenerCheck(t *testing.T) {
 					"WriteTimeout":      30,
 					"IdleTimeout":       60,
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -245,17 +246,7 @@ func TestTLSListenerCheck(t *testing.T) {
 					"WriteTimeout":      -1,
 					"IdleTimeout":       -1,
 				},
-			},
-			want: []string{
-				"option 'ListenPort', invalid value '-1'",
-				"option 'CAFiles', invalid value ''",
-				"option 'CertFiles', invalid value ''",
-				"option 'KeyFiles', invalid value ''",
-				"option 'ClientAuth', invalid value ''",
-				"option 'ReadTimeout', invalid value '-1'",
-				"option 'ReadHeaderTimeout', invalid value '-1'",
-				"option 'WriteTimeout', invalid value '-1'",
-				"option 'IdleTimeout', invalid value '-1'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -278,11 +269,7 @@ func TestTLSListenerCheck(t *testing.T) {
 					"CertFiles": []string{"cert.pem"},
 					"KeyFiles":  []string{"key.pem"},
 				},
-			},
-			want: []string{
-				"option 'CAFiles', failed to open file 'ca.pem'",
-				"option 'CertFiles', failed to open file 'cert.pem'",
-				"option 'KeyFiles', failed to open file 'key.pem'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -305,11 +292,7 @@ func TestTLSListenerCheck(t *testing.T) {
 					"CertFiles": []string{"cert.pem"},
 					"KeyFiles":  []string{"key.pem"},
 				},
-			},
-			want: []string{
-				"option 'CAFiles', failed to stat file 'ca.pem'",
-				"option 'CertFiles', failed to stat file 'cert.pem'",
-				"option 'KeyFiles', failed to stat file 'key.pem'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -334,11 +317,7 @@ func TestTLSListenerCheck(t *testing.T) {
 					"CertFiles": []string{"cert.pem"},
 					"KeyFiles":  []string{"key.pem"},
 				},
-			},
-			want: []string{
-				"option 'CAFiles', 'ca.pem' is a directory",
-				"option 'CertFiles', 'cert.pem' is a directory",
-				"option 'KeyFiles', 'key.pem' is a directory",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -361,68 +340,8 @@ func TestTLSListenerCheck(t *testing.T) {
 				httpServerShutdown:             tt.fields.httpServerShutdown,
 				httpServerClose:                tt.fields.httpServerClose,
 			}
-			got, err := l.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("tlsListener.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("tlsListener.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestTLSListenerLoad(t *testing.T) {
-	type fields struct {
-		config                         *tlsListenerConfig
-		logger                         *log.Logger
-		listener                       net.Listener
-		server                         *http.Server
-		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
-		osReadFile                     func(name string) ([]byte, error)
-		osClose                        func(f *os.File) error
-		osStat                         func(name string) (fs.FileInfo, error)
-		x509CertPoolAppendCertsFromPEM func(pool *x509.CertPool, pemCerts []byte) bool
-		tlsLoadX509KeyPair             func(certFile string, keyFile string) (tls.Certificate, error)
-		netListen                      func(network string, addr string) (net.Listener, error)
-		httpServerServeTLS             func(server *http.Server, listener net.Listener, certFile string, keyFile string) error
-		httpServerShutdown             func(server *http.Server, context context.Context) error
-		httpServerClose                func(server *http.Server) error
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			l := &tlsListener{
-				config:                         tt.fields.config,
-				logger:                         tt.fields.logger,
-				listener:                       tt.fields.listener,
-				server:                         tt.fields.server,
-				osOpenFile:                     tt.fields.osOpenFile,
-				osReadFile:                     tt.fields.osReadFile,
-				osClose:                        tt.fields.osClose,
-				osStat:                         tt.fields.osStat,
-				x509CertPoolAppendCertsFromPEM: tt.fields.x509CertPoolAppendCertsFromPEM,
-				tlsLoadX509KeyPair:             tt.fields.tlsLoadX509KeyPair,
-				netListen:                      tt.fields.netListen,
-				httpServerServeTLS:             tt.fields.httpServerServeTLS,
-				httpServerShutdown:             tt.fields.httpServerShutdown,
-				httpServerClose:                tt.fields.httpServerClose,
-			}
-			if err := l.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("tlsListener.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := l.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("tlsListener.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

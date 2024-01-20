@@ -6,7 +6,6 @@ package logger
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -74,53 +73,44 @@ func (m loggerMiddleware) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the middleware configuration.
-func (m *loggerMiddleware) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the middleware.
+func (m *loggerMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+	m.logger = logger
 
-	var c loggerMiddlewareConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
+	if err := mapstructure.Decode(config, &m.config); err != nil {
+		m.logger.Print("failed to parse configuration")
+		return err
 	}
 
-	if c.File != nil {
-		if *c.File == "" {
-			report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "File", *c.File))
+	var errInit bool
+
+	if m.config.File != nil {
+		if *m.config.File == "" {
+			m.logger.Printf("option '%s', invalid value '%s'", "File", *m.config.File)
+			errInit = true
 		} else {
-			f, err := m.osOpenFile(*c.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+			f, err := m.osOpenFile(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 			if err != nil {
-				report = append(report, fmt.Sprintf("option '%s', failed to open file '%s'", "File", *c.File))
+				m.logger.Printf("option '%s', failed to open file '%s'", "File", *m.config.File)
+				errInit = true
 			} else {
 				m.osClose(f)
-				fi, err := m.osStat(*c.File)
+				fi, err := m.osStat(*m.config.File)
 				if err != nil {
-					report = append(report, fmt.Sprintf("option '%s', failed to stat file '%s'", "File", *c.File))
+					m.logger.Printf("option '%s', failed to stat file '%s'", "File", *m.config.File)
+					errInit = true
 				}
 				if err == nil && fi.IsDir() {
-					report = append(report, fmt.Sprintf("option '%s', '%s' is a directory", "File", *c.File))
+					m.logger.Printf("option '%s', '%s' is a directory", "File", *m.config.File)
+					errInit = true
 				}
 			}
 		}
 	}
 
-	if len(report) > 0 {
-		return report, errors.New("check failure")
+	if errInit {
+		return errors.New("init error")
 	}
-
-	return nil, nil
-}
-
-// Load loads the middleware.
-func (m *loggerMiddleware) Load(config map[string]interface{}) error {
-	var c loggerMiddlewareConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		return err
-	}
-
-	m.config = &c
 
 	return nil
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/bhuisgen/neon/pkg/core"
 )
 
-func TestStoreCheck(t *testing.T) {
+func TestStoreInit(t *testing.T) {
 	type fields struct {
 		config *storeConfig
 		logger *log.Logger
@@ -25,11 +25,35 @@ func TestStoreCheck(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
+			name: "no configuration",
+			fields: fields{
+				logger: log.Default(),
+				state:  &storeState{},
+			},
+		},
+		{
+			name: "empty configuration",
+			fields: fields{
+				logger: log.Default(),
+				state:  &storeState{},
+			},
+			args: args{
+				config: map[string]interface{}{
+					"storage": map[string]interface{}{
+						"test": map[string]interface{}{},
+					},
+				},
+			},
+		},
+		{
 			name: "default",
+			fields: fields{
+				logger: log.Default(),
+				state:  &storeState{},
+			},
 			args: args{
 				config: map[string]interface{}{
 					"storage": map[string]interface{}{
@@ -40,75 +64,21 @@ func TestStoreCheck(t *testing.T) {
 		},
 		{
 			name: "error no storage",
+			fields: fields{
+				logger: log.Default(),
+				state:  &storeState{},
+			},
 			args: args{
 				config: map[string]interface{}{},
 			},
-			want: []string{
-				"store: no storage defined",
-			},
 			wantErr: true,
 		},
 		{
-			name: "error unregistered module",
-			args: args{
-				config: map[string]interface{}{
-					"storage": map[string]interface{}{
-						"unknown": map[string]interface{}{},
-					},
-				},
+			name: "error unregistered storage module",
+			fields: fields{
+				logger: log.Default(),
+				state:  &storeState{},
 			},
-			want: []string{
-				"store: unregistered storage module 'unknown'",
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &store{
-				config: tt.fields.config,
-				logger: tt.fields.logger,
-				state:  tt.fields.state,
-			}
-			got, err := s.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("store.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("store.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStoreLoad(t *testing.T) {
-	type fields struct {
-		config *storeConfig
-		logger *log.Logger
-		state  *storeState
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-			args: args{
-				config: map[string]interface{}{
-					"storage": map[string]interface{}{
-						"test": map[string]interface{}{},
-					},
-				},
-			},
-		},
-		{
-			name: "error unregistered module",
 			args: args{
 				config: map[string]interface{}{
 					"storage": map[string]interface{}{
@@ -126,8 +96,8 @@ func TestStoreLoad(t *testing.T) {
 				logger: tt.fields.logger,
 				state:  tt.fields.state,
 			}
-			if err := s.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("store.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := s.Init(tt.args.config); (err != nil) != tt.wantErr {
+				t.Errorf("store.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -153,7 +123,7 @@ func TestStoreLoadResource(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &storeState{
-					storageModule: &testStoreStorageModule{},
+					storage: &testStoreStorageModule{},
 				},
 			},
 			args: args{
@@ -168,7 +138,7 @@ func TestStoreLoadResource(t *testing.T) {
 			name: "error module",
 			fields: fields{
 				state: &storeState{
-					storageModule: &testStoreStorageModule{
+					storage: &testStoreStorageModule{
 						errLoadResource: true,
 					},
 				},
@@ -218,7 +188,7 @@ func TestStoreStoreResource(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &storeState{
-					storageModule: &testStoreStorageModule{},
+					storage: &testStoreStorageModule{},
 				},
 			},
 			args: args{
@@ -233,7 +203,7 @@ func TestStoreStoreResource(t *testing.T) {
 			name: "error module",
 			fields: fields{
 				state: &storeState{
-					storageModule: &testStoreStorageModule{
+					storage: &testStoreStorageModule{
 						errStoreResource: true,
 					},
 				},

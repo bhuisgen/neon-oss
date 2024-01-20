@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -143,7 +142,7 @@ func TestLoggerMiddlewareModuleInfo(t *testing.T) {
 	}
 }
 
-func TestLoggerMiddlewareCheck(t *testing.T) {
+func TestLoggerMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config     *loggerMiddlewareConfig
 		logger     *log.Logger
@@ -154,12 +153,12 @@ func TestLoggerMiddlewareCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -175,7 +174,10 @@ func TestLoggerMiddlewareCheck(t *testing.T) {
 					return testLoggerMiddlewareFileInfo{}, nil
 				},
 			},
-			args: args{},
+			args: args{
+				config: map[string]interface{}{},
+				logger: log.Default(),
+			},
 		},
 		{
 			name: "full",
@@ -194,6 +196,7 @@ func TestLoggerMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "access.log",
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -213,9 +216,7 @@ func TestLoggerMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "",
 				},
-			},
-			want: []string{
-				"option 'File', invalid value ''",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -236,9 +237,7 @@ func TestLoggerMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "access.log",
 				},
-			},
-			want: []string{
-				"option 'File', failed to open file 'access.log'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -259,9 +258,7 @@ func TestLoggerMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "access.log",
 				},
-			},
-			want: []string{
-				"option 'File', failed to stat file 'access.log'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -284,9 +281,7 @@ func TestLoggerMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "dir",
 				},
-			},
-			want: []string{
-				"option 'File', 'dir' is a directory",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -301,52 +296,8 @@ func TestLoggerMiddlewareCheck(t *testing.T) {
 				osClose:    tt.fields.osClose,
 				osStat:     tt.fields.osStat,
 			}
-			got, err := m.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("loggerMiddleware.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("loggerMiddleware.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoggerMiddlewareLoad(t *testing.T) {
-	type fields struct {
-		config     *loggerMiddlewareConfig
-		logger     *log.Logger
-		reopen     chan os.Signal
-		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
-		osClose    func(f *os.File) error
-		osStat     func(name string) (fs.FileInfo, error)
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &loggerMiddleware{
-				config:     tt.fields.config,
-				logger:     tt.fields.logger,
-				reopen:     tt.fields.reopen,
-				osOpenFile: tt.fields.osOpenFile,
-				osClose:    tt.fields.osClose,
-				osStat:     tt.fields.osStat,
-			}
-			if err := m.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("loggerMiddleware.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := m.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("loggerMiddleware.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

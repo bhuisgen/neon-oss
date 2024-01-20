@@ -4,11 +4,14 @@
 
 package core
 
-import "github.com/bhuisgen/neon/pkg/module"
+import (
+	"log"
+
+	"github.com/bhuisgen/neon/pkg/module"
+)
 
 // Module
 type Module interface {
 	module.Module
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
+	Init(config map[string]interface{}, logger *log.Logger) error
 }

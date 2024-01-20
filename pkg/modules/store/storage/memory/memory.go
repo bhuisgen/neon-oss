@@ -6,9 +6,7 @@ package memory
 
 import (
 	"errors"
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/mitchellh/mapstructure"
 
@@ -31,7 +29,6 @@ type memoryStorageConfig struct {
 
 const (
 	memoryModuleID module.ModuleID = "store.storage.memory"
-	memoryLogger   string          = "store.storage.memory"
 )
 
 // init initializes the module.
@@ -49,34 +46,14 @@ func (s memoryStorage) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the storage configuration.
-func (s *memoryStorage) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initialize the storage.
+func (s *memoryStorage) Init(config map[string]interface{}, logger *log.Logger) error {
+	s.logger = logger
 
-	var c memoryStorageConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
+	if err := mapstructure.Decode(config, &s.config); err != nil {
+		s.logger.Print("failed to parse configuration")
 	}
 
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the provider.
-func (s *memoryStorage) Load(config map[string]interface{}) error {
-	var c memoryStorageConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		return err
-	}
-
-	s.config = &c
-	s.logger = log.New(os.Stderr, fmt.Sprint(memoryLogger, ": "), log.LstdFlags|log.Lmsgprefix)
 	s.storage = memory.New(0, 0)
 
 	return nil

@@ -48,10 +48,9 @@ func (w testServerListenerHandlerResponseWriter) WriteHeader(statusCode int) {
 
 var _ http.ResponseWriter = (*testServerListenerHandlerResponseWriter)(nil)
 
-func TestServerListenerCheck(t *testing.T) {
+func TestServerListenerInit(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -60,76 +59,7 @@ func TestServerListenerCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []string
-		wantErr bool
-	}{
-		{
-			name: "minimal",
-			fields: fields{
-				name: "test",
-			},
-			args: args{
-				config: map[string]interface{}{
-					"test": map[string]interface{}{},
-				},
-			},
-		},
-		{
-			name: "error unregistered module",
-			fields: fields{
-				name: "test",
-			},
-			args: args{
-				config: map[string]interface{}{
-					"unknown": map[string]interface{}{},
-				},
-			},
-			want: []string{
-				"unregistered listener module 'unknown'",
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			l := &serverListener{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				quit:    tt.fields.quit,
-				update:  tt.fields.update,
-				osClose: tt.fields.osClose,
-			}
-			got, err := l.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("listener.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("listener.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestServerListenerLoad(t *testing.T) {
-	type fields struct {
-		name    string
-		config  *serverListenerConfig
-		logger  *log.Logger
-		state   *serverListenerState
-		quit    chan struct{}
-		update  chan struct{}
-		osClose func(f *os.File) error
-	}
-	type args struct {
-		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
@@ -139,15 +69,26 @@ func TestServerListenerLoad(t *testing.T) {
 	}{
 		{
 			name: "minimal",
+			fields: fields{
+				name:  "default",
+				state: &serverListenerState{},
+			},
 			args: args{
+				logger: log.Default(),
 				config: map[string]interface{}{
-					"test": map[string]interface{}{},
+					"test": map[string]interface{}{
+						"test": "abc",
+					},
 				},
 			},
 		},
 		{
 			name: "error unregistered module",
+			fields: fields{
+				name: "default",
+			},
 			args: args{
+				logger: log.Default(),
 				config: map[string]interface{}{
 					"unknown": map[string]interface{}{},
 				},
@@ -159,24 +100,33 @@ func TestServerListenerLoad(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
 			}
-			if err := l.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := l.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("listener.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
 func TestServerListenerRegister(t *testing.T) {
+	listener, err := net.Listen("tcp", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	file, err := listener.(*net.TCPListener).File()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -193,10 +143,11 @@ func TestServerListenerRegister(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "default",
+			name: "without descriptors",
 			fields: fields{
+				logger: log.Default(),
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{},
+					listener: &testServerListenerModule{},
 				},
 				osClose: func(f *os.File) error {
 					return nil
@@ -207,10 +158,30 @@ func TestServerListenerRegister(t *testing.T) {
 			},
 		},
 		{
+			name: "with descriptors",
+			fields: fields{
+				logger: log.Default(),
+				state: &serverListenerState{
+					listener: &testServerListenerModule{},
+				},
+				osClose: func(f *os.File) error {
+					return nil
+				},
+			},
+			args: args{
+				descriptor: &serverListenerDescriptor{
+					files: []*os.File{
+						file,
+					},
+				},
+			},
+		},
+		{
 			name: "error register",
 			fields: fields{
+				logger: log.Default(),
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{
+					listener: &testServerListenerModule{
 						errRegister: true,
 					},
 				},
@@ -225,7 +196,6 @@ func TestServerListenerRegister(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -242,7 +212,6 @@ func TestServerListenerRegister(t *testing.T) {
 func TestServerListenerServe(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -258,7 +227,7 @@ func TestServerListenerServe(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{},
+					listener: &testServerListenerModule{},
 				},
 			},
 		},
@@ -266,7 +235,7 @@ func TestServerListenerServe(t *testing.T) {
 			name: "error serve",
 			fields: fields{
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{
+					listener: &testServerListenerModule{
 						errServe: true,
 					},
 				},
@@ -278,7 +247,6 @@ func TestServerListenerServe(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -295,7 +263,6 @@ func TestServerListenerServe(t *testing.T) {
 func TestServerListenerShutdown(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -315,7 +282,7 @@ func TestServerListenerShutdown(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{},
+					listener: &testServerListenerModule{},
 				},
 			},
 		},
@@ -323,7 +290,7 @@ func TestServerListenerShutdown(t *testing.T) {
 			name: "error shutdown",
 			fields: fields{
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{
+					listener: &testServerListenerModule{
 						errShutdown: true,
 					},
 				},
@@ -335,7 +302,6 @@ func TestServerListenerShutdown(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -352,7 +318,6 @@ func TestServerListenerShutdown(t *testing.T) {
 func TestServerListenerClose(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -368,7 +333,7 @@ func TestServerListenerClose(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{},
+					listener: &testServerListenerModule{},
 				},
 			},
 		},
@@ -376,7 +341,7 @@ func TestServerListenerClose(t *testing.T) {
 			name: "error close",
 			fields: fields{
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{
+					listener: &testServerListenerModule{
 						errClose: true,
 					},
 				},
@@ -388,7 +353,6 @@ func TestServerListenerClose(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -405,7 +369,6 @@ func TestServerListenerClose(t *testing.T) {
 func TestServerListenerRemove(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -421,7 +384,7 @@ func TestServerListenerRemove(t *testing.T) {
 			name: "default",
 			fields: fields{
 				state: &serverListenerState{
-					listenerModule: &testServerListenerModule{},
+					listener: &testServerListenerModule{},
 				},
 				quit:   make(chan struct{}, 1),
 				update: make(chan struct{}, 1),
@@ -432,7 +395,6 @@ func TestServerListenerRemove(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -449,7 +411,6 @@ func TestServerListenerRemove(t *testing.T) {
 func TestServerListenerName(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -473,7 +434,6 @@ func TestServerListenerName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -490,7 +450,6 @@ func TestServerListenerName(t *testing.T) {
 func TestServerListenerLink(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -525,7 +484,6 @@ func TestServerListenerLink(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -542,7 +500,6 @@ func TestServerListenerLink(t *testing.T) {
 func TestServerListenerUnlink(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -577,7 +534,6 @@ func TestServerListenerUnlink(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -594,7 +550,6 @@ func TestServerListenerUnlink(t *testing.T) {
 func TestServerListenerDescriptor(t *testing.T) {
 	type fields struct {
 		name    string
-		config  *serverListenerConfig
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
@@ -615,12 +570,19 @@ func TestServerListenerDescriptor(t *testing.T) {
 				update: make(chan struct{}, 1),
 			},
 		},
+		{
+			name: "listener not ready",
+			fields: fields{
+				state:  &serverListenerState{},
+				update: make(chan struct{}, 1),
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListener{
 				name:    tt.fields.name,
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
 				quit:    tt.fields.quit,
@@ -725,9 +687,8 @@ func TestServerListenerRouterServeHTTP(t *testing.T) {
 	}
 
 	type fields struct {
-		listener *serverListener
-		logger   *log.Logger
-		mux      *http.ServeMux
+		logger *log.Logger
+		mux    *http.ServeMux
 	}
 	type args struct {
 		w http.ResponseWriter
@@ -741,13 +702,12 @@ func TestServerListenerRouterServeHTTP(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				listener: &serverListener{},
-				logger:   log.Default(),
-				mux:      http.NewServeMux(),
+				logger: log.Default(),
+				mux:    http.NewServeMux(),
 			},
 			args: args{
 				w: testServerListenerRouterResponseWriter{
-					header: make(http.Header),
+					header: http.Header{},
 				},
 				r: req,
 			},
@@ -756,9 +716,8 @@ func TestServerListenerRouterServeHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &serverListenerRouter{
-				listener: tt.fields.listener,
-				logger:   tt.fields.logger,
-				mux:      tt.fields.mux,
+				logger: tt.fields.logger,
+				mux:    tt.fields.mux,
 			}
 			l.ServeHTTP(tt.args.w, tt.args.r)
 		})
@@ -775,9 +734,8 @@ func TestServerListenerHandlerServeHTTP(t *testing.T) {
 	}
 
 	type fields struct {
-		listener *serverListener
-		logger   *log.Logger
-		router   ServerListenerRouter
+		logger *log.Logger
+		router ServerListenerRouter
 	}
 	type args struct {
 		w http.ResponseWriter
@@ -791,12 +749,11 @@ func TestServerListenerHandlerServeHTTP(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				listener: &serverListener{},
-				logger:   log.Default(),
+				logger: log.Default(),
 			},
 			args: args{
 				w: testServerListenerHandlerResponseWriter{
-					header: make(http.Header),
+					header: http.Header{},
 				},
 				r: req,
 			},
@@ -804,15 +761,14 @@ func TestServerListenerHandlerServeHTTP(t *testing.T) {
 		{
 			name: "default with router",
 			fields: fields{
-				listener: &serverListener{},
-				logger:   log.Default(),
+				logger: log.Default(),
 				router: &serverListenerRouter{
 					mux: mux,
 				},
 			},
 			args: args{
 				w: testServerListenerHandlerResponseWriter{
-					header: make(http.Header),
+					header: http.Header{},
 				},
 				r: req,
 			},
@@ -821,9 +777,8 @@ func TestServerListenerHandlerServeHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &serverListenerHandler{
-				listener: tt.fields.listener,
-				logger:   tt.fields.logger,
-				router:   tt.fields.router,
+				logger: tt.fields.logger,
+				router: tt.fields.router,
 			}
 			h.ServeHTTP(tt.args.w, tt.args.r)
 		})

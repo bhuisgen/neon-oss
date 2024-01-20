@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -149,7 +148,7 @@ func TestStaticMiddlewareModuleInfo(t *testing.T) {
 	}
 }
 
-func TestStaticMiddlewareCheck(t *testing.T) {
+func TestStaticMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config        *staticMiddlewareConfig
 		logger        *log.Logger
@@ -161,12 +160,12 @@ func TestStaticMiddlewareCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -175,6 +174,7 @@ func TestStaticMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "/static",
 				},
+				logger: log.Default(),
 			},
 			fields: fields{
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
@@ -196,9 +196,7 @@ func TestStaticMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "",
 				},
-			},
-			want: []string{
-				"option 'Path', missing option or value",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -208,14 +206,12 @@ func TestStaticMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "/test",
 				},
+				logger: log.Default(),
 			},
 			fields: fields{
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
 					return nil, errors.New("test error")
 				},
-			},
-			want: []string{
-				"option 'Path', failed to open file '/test'",
 			},
 			wantErr: true,
 		},
@@ -225,6 +221,7 @@ func TestStaticMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "/test",
 				},
+				logger: log.Default(),
 			},
 			fields: fields{
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
@@ -236,9 +233,6 @@ func TestStaticMiddlewareCheck(t *testing.T) {
 				osStat: func(name string) (fs.FileInfo, error) {
 					return nil, errors.New("test error")
 				},
-			},
-			want: []string{
-				"option 'Path', failed to stat file '/test'",
 			},
 			wantErr: true,
 		},
@@ -261,9 +255,7 @@ func TestStaticMiddlewareCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "dir",
 				},
-			},
-			want: []string{
-				"option 'Path', 'dir' is not a directory",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -279,54 +271,8 @@ func TestStaticMiddlewareCheck(t *testing.T) {
 				osClose:       tt.fields.osClose,
 				osStat:        tt.fields.osStat,
 			}
-			got, err := m.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("staticMiddleware.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("staticMiddleware.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStaticMiddlewareLoad(t *testing.T) {
-	type fields struct {
-		config        *staticMiddlewareConfig
-		logger        *log.Logger
-		staticFS      StaticFileSystem
-		staticHandler http.Handler
-		osOpenFile    func(name string, flag int, perm fs.FileMode) (*os.File, error)
-		osClose       func(*os.File) error
-		osStat        func(name string) (fs.FileInfo, error)
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &staticMiddleware{
-				config:        tt.fields.config,
-				logger:        tt.fields.logger,
-				staticFS:      tt.fields.staticFS,
-				staticHandler: tt.fields.staticHandler,
-				osOpenFile:    tt.fields.osOpenFile,
-				osClose:       tt.fields.osClose,
-				osStat:        tt.fields.osStat,
-			}
-			if err := m.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("staticMiddleware.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := m.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("staticMiddleware.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

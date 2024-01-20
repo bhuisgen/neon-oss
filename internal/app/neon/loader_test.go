@@ -6,7 +6,6 @@ package neon
 
 import (
 	"log"
-	"reflect"
 	"testing"
 )
 
@@ -14,7 +13,7 @@ func intPtr(i int) *int {
 	return &i
 }
 
-func TestLoaderCheck(t *testing.T) {
+func TestLoaderInit(t *testing.T) {
 	type fields struct {
 		config  *loaderConfig
 		logger  *log.Logger
@@ -29,14 +28,28 @@ func TestLoaderCheck(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
-			name: "minimal",
+			name: "no configuration",
+			fields: fields{
+				logger: log.Default(),
+			},
+		},
+		{
+			name: "empty configuration",
+			fields: fields{
+				logger: log.Default(),
+			},
+			args: args{
+				config: map[string]interface{}{},
+			},
 		},
 		{
 			name: "full",
+			fields: fields{
+				logger: log.Default(),
+			},
 			args: args{
 				config: map[string]interface{}{
 					"execStartup":          15,
@@ -53,6 +66,9 @@ func TestLoaderCheck(t *testing.T) {
 		},
 		{
 			name: "invalid values",
+			fields: fields{
+				logger: log.Default(),
+			},
 			args: args{
 				config: map[string]interface{}{
 					"execStartup":          -1,
@@ -63,76 +79,13 @@ func TestLoaderCheck(t *testing.T) {
 					"execMaxDelay":         -1,
 				},
 			},
-			want: []string{
-				"loader: option 'ExecStartup', invalid value '-1'",
-				"loader: option 'ExecInterval', invalid value '-1'",
-				"loader: option 'ExecFailsafeInterval', invalid value '-1'",
-				"loader: option 'ExecWorkers', invalid value '-1'",
-				"loader: option 'ExecMaxOps', invalid value '-1'",
-				"loader: option 'ExecMaxDelay', invalid value '-1'",
-			},
 			wantErr: true,
 		},
 		{
 			name: "error unregistered parser module",
-			args: args{
-				config: map[string]interface{}{
-					"rules": map[string]interface{}{
-						"name": map[string]interface{}{
-							"unknown": map[string]interface{}{},
-						},
-					},
-				},
+			fields: fields{
+				logger: log.Default(),
 			},
-			want: []string{
-				"loader: rule 'name', unregistered parser module 'unknown'",
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			l := &loader{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
-				stop:    tt.fields.stop,
-			}
-			got, err := l.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("loader.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("loader.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLoaderLoad(t *testing.T) {
-	type fields struct {
-		config  *loaderConfig
-		logger  *log.Logger
-		state   *loaderState
-		fetcher Fetcher
-		stop    chan struct{}
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "minimal",
-		},
-		{
-			name: "error unregistered parser module",
 			args: args{
 				config: map[string]interface{}{
 					"rules": map[string]interface{}{
@@ -154,8 +107,8 @@ func TestLoaderLoad(t *testing.T) {
 				fetcher: tt.fields.fetcher,
 				stop:    tt.fields.stop,
 			}
-			if err := l.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("loader.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := l.Init(tt.args.config); (err != nil) != tt.wantErr {
+				t.Errorf("loader.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -175,10 +128,23 @@ func TestLoaderStart(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "default",
+			name: "execution",
+			fields: fields{
+				config: &loaderConfig{
+					ExecInterval: intPtr(loaderConfigDefaultExecInterval),
+					ExecStartup:  intPtr(loaderConfigDefaultExecStartup),
+				},
+				logger: log.Default(),
+				state:  &loaderState{},
+				stop:   make(chan struct{}, 1),
+			},
+		},
+		{
+			name: "no execution",
 			fields: fields{
 				config: &loaderConfig{
 					ExecInterval: intPtr(0),
+					ExecStartup:  intPtr(loaderConfigDefaultExecStartup),
 				},
 				logger: log.Default(),
 				state:  &loaderState{},
@@ -216,7 +182,18 @@ func TestLoaderStop(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "default",
+			name: "execution",
+			fields: fields{
+				config: &loaderConfig{
+					ExecInterval: intPtr(loaderConfigDefaultExecInterval),
+				},
+				logger: log.Default(),
+				state:  &loaderState{},
+				stop:   make(chan struct{}, 1),
+			},
+		},
+		{
+			name: "no execution",
 			fields: fields{
 				config: &loaderConfig{
 					ExecInterval: intPtr(0),

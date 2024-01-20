@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
@@ -38,7 +37,6 @@ type jsonParserConfig struct {
 
 const (
 	jsonModuleID module.ModuleID = "loader.parser.json"
-	jsonLogger   string          = "loader.parser.json"
 )
 
 // loaderJsonUnmarshal redirects to json.Unmarshal.
@@ -63,44 +61,33 @@ func (p jsonParser) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the parser configuration.
-func (p *jsonParser) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the parser.
+func (p *jsonParser) Init(config map[string]interface{}, logger *log.Logger) error {
+	p.logger = logger
 
-	var c jsonParserConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.Resource == nil {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "Resource", c.Resource))
-	}
-	if c.Filter == "" {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "Filter", c.Filter))
-	}
-	if c.ItemResource == nil {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "ItemResource", c.ItemResource))
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the parser.
-func (p *jsonParser) Load(config map[string]interface{}) error {
-	var c jsonParserConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &p.config); err != nil {
+		p.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	p.config = &c
-	p.logger = log.New(os.Stderr, fmt.Sprint(jsonLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
+
+	if p.config.Resource == nil {
+		p.logger.Printf("option '%s', invalid value '%s'", "Resource", p.config.Resource)
+		errInit = true
+	}
+	if p.config.Filter == "" {
+		p.logger.Printf("option '%s', invalid value '%s'", "Filter", p.config.Filter)
+		errInit = true
+	}
+	if p.config.ItemResource == nil {
+		p.logger.Printf("option '%s', invalid value '%s'", "ItemResource", p.config.ItemResource)
+		errInit = true
+	}
+
+	if errInit {
+		return errors.New("init error")
+	}
 
 	return nil
 }

@@ -7,7 +7,6 @@ package memory
 import (
 	"errors"
 	"log"
-	"reflect"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/cache"
@@ -15,13 +14,12 @@ import (
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
-type testMemoryStore struct {
+type testMemoryStorageStore struct {
 	errLoadResource  bool
 	errStoreResource bool
 }
 
-// LoadResource implements core.Store.
-func (s testMemoryStore) LoadResource(name string) (*core.Resource, error) {
+func (s testMemoryStorageStore) LoadResource(name string) (*core.Resource, error) {
 	if s.errLoadResource {
 		return nil, errors.New("test error")
 	}
@@ -31,21 +29,20 @@ func (s testMemoryStore) LoadResource(name string) (*core.Resource, error) {
 	}, nil
 }
 
-// StoreResource implements core.Store.
-func (s testMemoryStore) StoreResource(name string, resource *core.Resource) error {
+func (s testMemoryStorageStore) StoreResource(name string, resource *core.Resource) error {
 	if s.errStoreResource {
 		return errors.New("test error")
 	}
 	return nil
 }
 
-var _ core.Store = (*testMemoryStore)(nil)
+var _ core.Store = (*testMemoryStorageStore)(nil)
 
-type testMemoryCache struct {
+type testMemoryStorageCache struct {
 	errGet bool
 }
 
-func (c testMemoryCache) Get(key string) any {
+func (c testMemoryStorageCache) Get(key string) any {
 	if c.errGet {
 		return nil
 	}
@@ -56,16 +53,16 @@ func (c testMemoryCache) Get(key string) any {
 	}
 }
 
-func (c testMemoryCache) Set(key string, value any) {
+func (c testMemoryStorageCache) Set(key string, value any) {
 }
 
-func (c testMemoryCache) Remove(key string) {
+func (c testMemoryStorageCache) Remove(key string) {
 }
 
-func (c testMemoryCache) Clear() {
+func (c testMemoryStorageCache) Clear() {
 }
 
-var _ cache.Cache = (*testMemoryCache)(nil)
+var _ cache.Cache = (*testMemoryStorageCache)(nil)
 
 func TestMemoryStorageModuleInfo(t *testing.T) {
 	type fields struct {
@@ -104,7 +101,7 @@ func TestMemoryStorageModuleInfo(t *testing.T) {
 	}
 }
 
-func TestMemoryStorageCheck(t *testing.T) {
+func TestMemoryStorageInit(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
 		logger  *log.Logger
@@ -112,12 +109,12 @@ func TestMemoryStorageCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -132,46 +129,9 @@ func TestMemoryStorageCheck(t *testing.T) {
 				logger:  tt.fields.logger,
 				storage: tt.fields.storage,
 			}
-			got, err := s.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("memoryStorage.Check() error = %v, wantErr %v", err, tt.wantErr)
+			if err := s.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("memoryStorage.Init() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("memoryStorage.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestMemoryStorageLoad(t *testing.T) {
-	type fields struct {
-		config  *memoryStorageConfig
-		logger  *log.Logger
-		storage cache.Cache
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &memoryStorage{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				storage: tt.fields.storage,
-			}
-			if err := s.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("memoryStorage.Load() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -197,7 +157,7 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 			name: "default",
 			fields: fields{
 				config:  &memoryStorageConfig{},
-				storage: testMemoryCache{},
+				storage: testMemoryStorageCache{},
 			},
 			args: args{
 				name: "test",
@@ -207,7 +167,7 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 			name: "invalid resource name",
 			fields: fields{
 				config: &memoryStorageConfig{},
-				storage: testMemoryCache{
+				storage: testMemoryStorageCache{
 					errGet: true,
 				},
 			},
@@ -253,7 +213,7 @@ func TestMemoryStorageStoreResource(t *testing.T) {
 			name: "default",
 			fields: fields{
 				config:  &memoryStorageConfig{},
-				storage: testMemoryCache{},
+				storage: testMemoryStorageCache{},
 			},
 			args: args{
 				name: "test",

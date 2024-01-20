@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -180,7 +179,7 @@ func TestFileHandlerModuleInfo(t *testing.T) {
 	}
 }
 
-func TestFileHandlerCheck(t *testing.T) {
+func TestFileHandlerInit(t *testing.T) {
 	type fields struct {
 		config     *fileHandlerConfig
 		logger     *log.Logger
@@ -195,12 +194,12 @@ func TestFileHandlerCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
@@ -220,6 +219,7 @@ func TestFileHandlerCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "file",
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -242,6 +242,7 @@ func TestFileHandlerCheck(t *testing.T) {
 					"Cache":      true,
 					"CacheTTL":   60,
 				},
+				logger: log.Default(),
 			},
 		},
 		{
@@ -263,11 +264,7 @@ func TestFileHandlerCheck(t *testing.T) {
 					"StatusCode": -1,
 					"CacheTTL":   -1,
 				},
-			},
-			want: []string{
-				"option 'Path', missing option or value",
-				"option 'StatusCode', invalid value '-1'",
-				"option 'CacheTTL', invalid value '-1'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -288,9 +285,7 @@ func TestFileHandlerCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "file",
 				},
-			},
-			want: []string{
-				"option 'Path', failed to open file 'file'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -311,9 +306,7 @@ func TestFileHandlerCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "file",
 				},
-			},
-			want: []string{
-				"option 'Path', failed to stat file 'file'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -336,9 +329,7 @@ func TestFileHandlerCheck(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "dir",
 				},
-			},
-			want: []string{
-				"option 'Path', 'dir' is a directory",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -357,60 +348,8 @@ func TestFileHandlerCheck(t *testing.T) {
 				osClose:    tt.fields.osClose,
 				osStat:     tt.fields.osStat,
 			}
-			got, err := h.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("fileHandler.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("fileHandler.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFileHandlerLoad(t *testing.T) {
-	type fields struct {
-		config     *fileHandlerConfig
-		logger     *log.Logger
-		file       []byte
-		fileInfo   *time.Time
-		rwPool     render.RenderWriterPool
-		cache      cache.Cache
-		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
-		osReadFile func(name string) ([]byte, error)
-		osClose    func(*os.File) error
-		osStat     func(name string) (fs.FileInfo, error)
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &fileHandler{
-				config:     tt.fields.config,
-				logger:     tt.fields.logger,
-				file:       tt.fields.file,
-				fileInfo:   tt.fields.fileInfo,
-				rwPool:     tt.fields.rwPool,
-				cache:      tt.fields.cache,
-				osOpenFile: tt.fields.osOpenFile,
-				osReadFile: tt.fields.osReadFile,
-				osClose:    tt.fields.osClose,
-				osStat:     tt.fields.osStat,
-			}
-			if err := h.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("fileHandler.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := h.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("fileHandler.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

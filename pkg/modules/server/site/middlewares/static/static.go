@@ -6,7 +6,6 @@ package static
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -39,9 +38,9 @@ type staticMiddlewareConfig struct {
 }
 
 const (
-	staticModuleID           module.ModuleID = "server.site.middleware.static"
-	staticLogger             string          = "middleware[static]"
-	staticConfigDefaultIndex bool            = false
+	staticModuleID module.ModuleID = "server.site.middleware.static"
+
+	staticConfigDefaultIndex bool = false
 )
 
 // staticOsOpenFile redirects to os.OpenFile.
@@ -78,56 +77,45 @@ func (m staticMiddleware) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the middleware configuration.
-func (m *staticMiddleware) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the middleware.
+func (m *staticMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+	m.logger = logger
 
-	var c staticMiddlewareConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.Path == "" {
-		report = append(report, fmt.Sprintf("option '%s', missing option or value", "Path"))
-	} else {
-		f, err := m.osOpenFile(c.Path, os.O_RDONLY, 0)
-		if err != nil {
-			report = append(report, fmt.Sprintf("option '%s', failed to open file '%s'", "Path", c.Path))
-		} else {
-			m.osClose(f)
-			fi, err := m.osStat(c.Path)
-			if err != nil {
-				report = append(report, fmt.Sprintf("option '%s', failed to stat file '%s'", "Path", c.Path))
-			}
-			if err == nil && !fi.IsDir() {
-				report = append(report, fmt.Sprintf("option '%s', '%s' is not a directory", "Path", c.Path))
-			}
-		}
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the middleware.
-func (m *staticMiddleware) Load(config map[string]interface{}) error {
-	var c staticMiddlewareConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &m.config); err != nil {
+		m.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	m.config = &c
-	m.logger = log.New(os.Stderr, fmt.Sprint(staticLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
+	if m.config.Path == "" {
+		m.logger.Printf("option '%s', missing option or value", "Path")
+		errInit = true
+	} else {
+		f, err := m.osOpenFile(m.config.Path, os.O_RDONLY, 0)
+		if err != nil {
+			m.logger.Printf("option '%s', failed to open file '%s'", "Path", m.config.Path)
+			errInit = true
+		} else {
+			m.osClose(f)
+			fi, err := m.osStat(m.config.Path)
+			if err != nil {
+				m.logger.Printf("option '%s', failed to stat file '%s'", "Path", m.config.Path)
+				errInit = true
+			}
+			if err == nil && !fi.IsDir() {
+				m.logger.Printf("option '%s', '%s' is not a directory", "Path", m.config.Path)
+				errInit = true
+			}
+		}
+	}
 	if m.config.Index == nil {
 		defaultValue := staticConfigDefaultIndex
 		m.config.Index = &defaultValue
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	return nil

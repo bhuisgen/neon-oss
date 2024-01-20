@@ -7,9 +7,7 @@ package raw
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/mitchellh/mapstructure"
 
@@ -30,7 +28,6 @@ type rawParserConfig struct {
 
 const (
 	rawModuleID module.ModuleID = "loader.parser.raw"
-	rawLogger   string          = "loader.parser.raw"
 )
 
 // init initializes the module.
@@ -48,38 +45,25 @@ func (p rawParser) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the parser configuration.
-func (p *rawParser) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the parser configuration.
+func (p *rawParser) Init(config map[string]interface{}, logger *log.Logger) error {
+	p.logger = logger
 
-	var c rawParserConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.Resource == nil {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "Resource", c.Resource))
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the parser.
-func (p *rawParser) Load(config map[string]interface{}) error {
-	var c rawParserConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &p.config); err != nil {
+		p.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	p.config = &c
-	p.logger = log.New(os.Stderr, fmt.Sprint(rawLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
+
+	if p.config.Resource == nil {
+		p.logger.Printf("option '%s', invalid value '%s'", "Resource", p.config.Resource)
+		errInit = true
+	}
+
+	if errInit {
+		return errors.New("init error")
+	}
 
 	return nil
 }

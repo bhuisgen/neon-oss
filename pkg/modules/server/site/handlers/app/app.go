@@ -85,7 +85,6 @@ type appResource struct {
 
 const (
 	appModuleID module.ModuleID = "server.site.handler.app"
-	appLogger   string          = "handler[app]"
 
 	appResourceUnknown string = "unknown resource"
 
@@ -98,7 +97,6 @@ const (
 	appConfigDefaultMaxSpareVMs     int    = 0
 	appConfigDefaultCache           bool   = false
 	appConfigDefaultCacheTTL        int    = 60
-	appConfigDefaultRuleLast        bool   = false
 )
 
 // appOsOpen redirects to os.Open.
@@ -153,144 +151,98 @@ func (h appHandler) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-// Check checks the handler configuration.
-func (h *appHandler) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
+// Init initializes the handler.
+func (h *appHandler) Init(config map[string]interface{}, logger *log.Logger) error {
+	h.logger = logger
 
-	var c appHandlerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "failed to parse configuration")
-		return report, err
-	}
-
-	if c.Index == "" {
-		report = append(report, fmt.Sprintf("option '%s', missing option or value", "Index"))
-	} else {
-		f, err := h.osOpenFile(c.Index, os.O_RDONLY, 0)
-		if err != nil {
-			report = append(report, fmt.Sprintf("option '%s', failed to open file '%s'", "Index", c.Index))
-		} else {
-			h.osClose(f)
-			fi, err := h.osStat(c.Index)
-			if err != nil {
-				report = append(report, fmt.Sprintf("option '%s', failed to stat file '%s'", "Index", c.Index))
-			}
-			if err == nil && fi.IsDir() {
-				report = append(report, fmt.Sprintf("option '%s', '%s' is a directory", "Index", c.Index))
-			}
-		}
-	}
-	if c.Bundle == "" {
-		report = append(report, fmt.Sprintf("option '%s', missing option or value", "Bundle"))
-	} else {
-		f, err := h.osOpenFile(c.Bundle, os.O_RDONLY, 0)
-		if err != nil {
-			report = append(report, fmt.Sprintf("option '%s', failed to open file '%s'", "Bundle", c.Bundle))
-		} else {
-			h.osClose(f)
-			fi, err := h.osStat(c.Bundle)
-			if err != nil {
-				report = append(report, fmt.Sprintf("option '%s', failed to stat file '%s'", "Bundle", c.Bundle))
-			}
-			if err == nil && fi.IsDir() {
-				report = append(report, fmt.Sprintf("option '%s', '%s' is a directory", "Bundle", c.Bundle))
-			}
-		}
-	}
-	if c.Env == nil {
-		defaultValue := appConfigDefaultEnv
-		c.Env = &defaultValue
-	}
-	if *c.Env == "" {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "Env", *c.Env))
-	}
-	if c.Container == nil {
-		defaultValue := appConfigDefaultContainer
-		c.Container = &defaultValue
-	}
-	if *c.Container == "" {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "Container", *c.Container))
-	}
-	if c.State == nil {
-		defaultValue := appConfigDefaultState
-		c.State = &defaultValue
-	}
-	if *c.State == "" {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%s'", "State", *c.State))
-	}
-	if c.Timeout == nil {
-		defaultValue := appConfigDefaultTimeout
-		c.Timeout = &defaultValue
-	}
-	if *c.Timeout < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "Timeout", *c.Timeout))
-	}
-	if c.MaxVMs == nil {
-		defaultValue := runtime.NumCPU() * 2
-		c.MaxVMs = &defaultValue
-	}
-	if *c.MaxVMs < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "MaxVMs", *c.MaxVMs))
-	}
-	if c.CacheTTL == nil {
-		defaultValue := appConfigDefaultCacheTTL
-		c.CacheTTL = &defaultValue
-	}
-	if *c.CacheTTL < 0 {
-		report = append(report, fmt.Sprintf("option '%s', invalid value '%d'", "CacheTTL", *c.CacheTTL))
-	}
-	for _, rule := range c.Rules {
-		if rule.Path == "" {
-			report = append(report, fmt.Sprintf("rule option '%s', missing option or value", "Path"))
-		}
-		for _, state := range rule.State {
-			if state.Key == "" {
-				report = append(report, fmt.Sprintf("rule state option '%s', missing option or value", "Key"))
-			}
-			if state.Resource == "" {
-				report = append(report, fmt.Sprintf("rule state option '%s', missing option or value", "Resource"))
-			}
-		}
-	}
-
-	if len(report) > 0 {
-		return report, errors.New("check failure")
-	}
-
-	return nil, nil
-}
-
-// Load loads the handler.
-func (h *appHandler) Load(config map[string]interface{}) error {
-	var c appHandlerConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
+	if err := mapstructure.Decode(config, &h.config); err != nil {
+		h.logger.Print("failed to parse configuration")
 		return err
 	}
 
-	h.config = &c
-	h.logger = log.New(os.Stderr, fmt.Sprint(appLogger, ": "), log.LstdFlags|log.Lmsgprefix)
+	var errInit bool
 
+	if h.config.Index == "" {
+		h.logger.Printf("option '%s', missing option or value", "Index")
+		errInit = true
+	} else {
+		f, err := h.osOpenFile(h.config.Index, os.O_RDONLY, 0)
+		if err != nil {
+			h.logger.Printf("option '%s', failed to open file '%s'", "Index", h.config.Index)
+			errInit = true
+		} else {
+			h.osClose(f)
+			fi, err := h.osStat(h.config.Index)
+			if err != nil {
+				h.logger.Printf("option '%s', failed to stat file '%s'", "Index", h.config.Index)
+				errInit = true
+			}
+			if err == nil && fi.IsDir() {
+				h.logger.Printf("option '%s', '%s' is a directory", "Index", h.config.Index)
+				errInit = true
+			}
+		}
+	}
+	if h.config.Bundle == "" {
+		h.logger.Printf("option '%s', missing option or value", "Bundle")
+		errInit = true
+	} else {
+		f, err := h.osOpenFile(h.config.Bundle, os.O_RDONLY, 0)
+		if err != nil {
+			h.logger.Printf("option '%s', failed to open file '%s'", "Bundle", h.config.Bundle)
+			errInit = true
+		} else {
+			h.osClose(f)
+			fi, err := h.osStat(h.config.Bundle)
+			if err != nil {
+				h.logger.Printf("option '%s', failed to stat file '%s'", "Bundle", h.config.Bundle)
+				errInit = true
+			}
+			if err == nil && fi.IsDir() {
+				h.logger.Printf("option '%s', '%s' is a directory", "Bundle", h.config.Bundle)
+				errInit = true
+			}
+		}
+	}
 	if h.config.Env == nil {
 		defaultValue := appConfigDefaultEnv
 		h.config.Env = &defaultValue
+	}
+	if *h.config.Env == "" {
+		h.logger.Printf("option '%s', invalid value '%s'", "Env", *h.config.Env)
+		errInit = true
 	}
 	if h.config.Container == nil {
 		defaultValue := appConfigDefaultContainer
 		h.config.Container = &defaultValue
 	}
+	if *h.config.Container == "" {
+		h.logger.Printf("option '%s', invalid value '%s'", "Container", *h.config.Container)
+		errInit = true
+	}
 	if h.config.State == nil {
 		defaultValue := appConfigDefaultState
 		h.config.State = &defaultValue
+	}
+	if *h.config.State == "" {
+		h.logger.Printf("option '%s', invalid value '%s'", "State", *h.config.State)
+		errInit = true
 	}
 	if h.config.Timeout == nil {
 		defaultValue := appConfigDefaultTimeout
 		h.config.Timeout = &defaultValue
 	}
+	if *h.config.Timeout < 0 {
+		h.logger.Printf("option '%s', invalid value '%d'", "Timeout", *h.config.Timeout)
+		errInit = true
+	}
 	if h.config.MaxVMs == nil {
 		defaultValue := runtime.NumCPU() * 2
 		h.config.MaxVMs = &defaultValue
+	}
+	if *h.config.MaxVMs < 0 {
+		h.logger.Printf("option '%s', invalid value '%d'", "MaxVMs", *h.config.MaxVMs)
+		errInit = true
 	}
 	if h.config.Cache == nil {
 		defaultValue := appConfigDefaultCache
@@ -299,6 +251,30 @@ func (h *appHandler) Load(config map[string]interface{}) error {
 	if h.config.CacheTTL == nil {
 		defaultValue := appConfigDefaultCacheTTL
 		h.config.CacheTTL = &defaultValue
+	}
+	if *h.config.CacheTTL < 0 {
+		h.logger.Printf("option '%s', invalid value '%d'", "CacheTTL", *h.config.CacheTTL)
+		errInit = true
+	}
+	for _, rule := range h.config.Rules {
+		if rule.Path == "" {
+			h.logger.Printf("rule option '%s', missing option or value", "Path")
+			errInit = true
+		}
+		for _, state := range rule.State {
+			if state.Key == "" {
+				h.logger.Printf("rule state option '%s', missing option or value", "Key")
+				errInit = true
+			}
+			if state.Resource == "" {
+				h.logger.Printf("rule state option '%s', missing option or value", "Resource")
+				errInit = true
+			}
+		}
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
@@ -336,15 +312,6 @@ func (h *appHandler) Start() error {
 	}
 
 	return nil
-}
-
-// Mount mounts the handler.
-func (h *appHandler) Mount() error {
-	return nil
-}
-
-// Unmount unmounts the handler.
-func (h *appHandler) Unmount() {
 }
 
 // Stop stops the handler.

@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/core"
@@ -95,7 +94,7 @@ func TestLocalListenerModuleInfo(t *testing.T) {
 	}
 }
 
-func TestLocalListenerCheck(t *testing.T) {
+func TestLocalListenerInit(t *testing.T) {
 	type fields struct {
 		config             *localListenerConfig
 		logger             *log.Logger
@@ -109,17 +108,20 @@ func TestLocalListenerCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
 			name: "minimal",
-			args: args{},
+			args: args{
+				config: map[string]interface{}{},
+				logger: log.Default(),
+			},
 		},
 		{
 			name: "full",
@@ -144,13 +146,7 @@ func TestLocalListenerCheck(t *testing.T) {
 					"WriteTimeout":      -1,
 					"IdleTimeout":       -1,
 				},
-			},
-			want: []string{
-				"option 'ListenPort', invalid value '-1'",
-				"option 'ReadTimeout', invalid value '-1'",
-				"option 'ReadHeaderTimeout', invalid value '-1'",
-				"option 'WriteTimeout', invalid value '-1'",
-				"option 'IdleTimeout', invalid value '-1'",
+				logger: log.Default(),
 			},
 			wantErr: true,
 		},
@@ -168,58 +164,8 @@ func TestLocalListenerCheck(t *testing.T) {
 				httpServerShutdown: tt.fields.httpServerShutdown,
 				httpServerClose:    tt.fields.httpServerClose,
 			}
-			got, err := l.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("localListener.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("localListener.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLocalListenerLoad(t *testing.T) {
-	type fields struct {
-		config             *localListenerConfig
-		logger             *log.Logger
-		listener           net.Listener
-		server             *http.Server
-		osReadFile         func(name string) ([]byte, error)
-		netListen          func(network string, addr string) (net.Listener, error)
-		httpServerServe    func(server *http.Server, listener net.Listener) error
-		httpServerShutdown func(server *http.Server, context context.Context) error
-		httpServerClose    func(server *http.Server) error
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			l := &localListener{
-				config:             tt.fields.config,
-				logger:             tt.fields.logger,
-				listener:           tt.fields.listener,
-				server:             tt.fields.server,
-				osReadFile:         tt.fields.osReadFile,
-				netListen:          tt.fields.netListen,
-				httpServerServe:    tt.fields.httpServerServe,
-				httpServerShutdown: tt.fields.httpServerShutdown,
-				httpServerClose:    tt.fields.httpServerClose,
-			}
-			if err := l.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("localListener.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := l.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("localListener.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

@@ -7,8 +7,11 @@ package neon
 import (
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/bhuisgen/neon/pkg/core"
 )
 
 type testServerSiteResponseWriter struct {
@@ -28,7 +31,7 @@ func (w testServerSiteResponseWriter) WriteHeader(statusCode int) {
 
 var _ http.ResponseWriter = (*testServerSiteResponseWriter)(nil)
 
-func TestServerSiteCheck(t *testing.T) {
+func TestServerSiteInit(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
@@ -38,17 +41,23 @@ func TestServerSiteCheck(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
+		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    []string
 		wantErr bool
 	}{
 		{
 			name: "default",
+			fields: fields{
+				state: &serverSiteState{
+					routesMap: map[string]serverSiteRouteState{},
+				},
+			},
 			args: args{
+				logger: log.Default(),
 				config: map[string]interface{}{
 					"listeners": []string{"test"},
 					"routes": map[string]interface{}{
@@ -66,97 +75,26 @@ func TestServerSiteCheck(t *testing.T) {
 		},
 		{
 			name: "error no listener",
+			fields: fields{
+				state: &serverSiteState{
+					routesMap: map[string]serverSiteRouteState{},
+				},
+			},
 			args: args{
+				logger: log.Default(),
 				config: map[string]interface{}{},
 			},
-			want: []string{
-				"site: no listener defined",
-			},
 			wantErr: true,
 		},
 		{
 			name: "error unregistered modules",
-			args: args{
-				config: map[string]interface{}{
-					"listeners": []string{"test"},
-					"routes": map[string]interface{}{
-						"default": map[string]interface{}{
-							"middlewares": map[string]interface{}{
-								"unknown": map[string]interface{}{},
-							},
-							"handler": map[string]interface{}{
-								"unknown": map[string]interface{}{},
-							},
-						},
-					},
+			fields: fields{
+				state: &serverSiteState{
+					routesMap: map[string]serverSiteRouteState{},
 				},
 			},
-			want: []string{
-				"site: unregistered middleware module 'unknown'",
-				"site: unregistered handler module 'unknown'",
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
-			}
-			got, err := s.Check(tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("server.Check() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("server.Check() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestServerSiteLoad(t *testing.T) {
-	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *log.Logger
-		state   *serverSiteState
-		fetcher Fetcher
-	}
-	type args struct {
-		config map[string]interface{}
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "default",
 			args: args{
-				config: map[string]interface{}{
-					"listeners": []string{"test"},
-					"routes": map[string]interface{}{
-						"default": map[string]interface{}{
-							"middlewares": map[string]interface{}{
-								"test": map[string]interface{}{},
-							},
-							"handler": map[string]interface{}{
-								"test": map[string]interface{}{},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "error unregistered modules",
-			args: args{
+				logger: log.Default(),
 				config: map[string]interface{}{
 					"listeners": []string{"test"},
 					"routes": map[string]interface{}{
@@ -183,8 +121,8 @@ func TestServerSiteLoad(t *testing.T) {
 				state:   tt.fields.state,
 				fetcher: tt.fields.fetcher,
 			}
-			if err := s.Load(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("server.Load() error = %v, wantErr %v", err, tt.wantErr)
+			if err := s.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+				t.Errorf("server.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -204,10 +142,63 @@ func TestServerSiteRegister(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "default",
+			name: "without routes",
 			fields: fields{
-				state: &serverSiteState{},
+				logger: log.Default(),
+				state:  &serverSiteState{},
 			},
+		},
+		{
+			name: "with routes",
+			fields: fields{
+				logger: log.Default(),
+				state: &serverSiteState{
+					routes: []string{"/"},
+					routesMap: map[string]serverSiteRouteState{
+						"/": {
+							middlewares: map[string]core.ServerSiteMiddlewareModule{
+								"test": testServerSiteMiddlewareModule{},
+							},
+							handler: testServerSiteHandlerModule{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "error register middleware",
+			fields: fields{
+				logger: log.Default(),
+				state: &serverSiteState{
+					routes: []string{"/"},
+					routesMap: map[string]serverSiteRouteState{
+						"/": {
+							middlewares: map[string]core.ServerSiteMiddlewareModule{
+								"test": testServerSiteMiddlewareModule{
+									errRegister: true,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "error register handler",
+			fields: fields{
+				logger: log.Default(),
+				state: &serverSiteState{
+					routes: []string{"/"},
+					routesMap: map[string]serverSiteRouteState{
+						"/": {
+							handler: testServerSiteHandlerModule{
+								errRegister: true},
+						},
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -240,10 +231,61 @@ func TestServerSiteStart(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "default",
+			name: "without routes",
 			fields: fields{
 				state: &serverSiteState{},
 			},
+		},
+		{
+			name: "with routes",
+			fields: fields{
+				state: &serverSiteState{
+					routes: []string{"/"},
+					routesMap: map[string]serverSiteRouteState{
+						"/": {
+							middlewares: map[string]core.ServerSiteMiddlewareModule{
+								"test": testServerSiteMiddlewareModule{},
+							},
+							handler: testServerSiteHandlerModule{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "error start middleware",
+			fields: fields{
+				state: &serverSiteState{
+					routes: []string{"/"},
+					routesMap: map[string]serverSiteRouteState{
+						"/": {
+							middlewares: map[string]core.ServerSiteMiddlewareModule{
+								"test": testServerSiteMiddlewareModule{
+									errStart: true,
+								},
+							},
+							handler: testServerSiteHandlerModule{},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "error start handler",
+			fields: fields{
+				state: &serverSiteState{
+					routes: []string{"/"},
+					routesMap: map[string]serverSiteRouteState{
+						"/": {
+							handler: testServerSiteHandlerModule{
+								errStart: true,
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -276,9 +318,25 @@ func TestServerSiteStop(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "default",
+			name: "without routes",
 			fields: fields{
 				state: &serverSiteState{},
+			},
+		},
+		{
+			name: "with routes",
+			fields: fields{
+				state: &serverSiteState{
+					routes: []string{"/"},
+					routesMap: map[string]serverSiteRouteState{
+						"/": {
+							middlewares: map[string]core.ServerSiteMiddlewareModule{
+								"test": testServerSiteMiddlewareModule{},
+							},
+							handler: testServerSiteHandlerModule{},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -461,6 +519,54 @@ func TestServerSiteDefault(t *testing.T) {
 	}
 }
 
+func TestServerSiteRouter(t *testing.T) {
+	type fields struct {
+		name    string
+		config  *serverSiteConfig
+		logger  *log.Logger
+		state   *serverSiteState
+		fetcher Fetcher
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    ServerSiteRouter
+		wantErr bool
+	}{
+		{
+			name: "default",
+			fields: fields{
+				state: &serverSiteState{
+					router: &serverSiteRouter{},
+				},
+			},
+		},
+		{
+			name: "error server not ready",
+			fields: fields{
+				state: &serverSiteState{},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &serverSite{
+				name:    tt.fields.name,
+				config:  tt.fields.config,
+				logger:  tt.fields.logger,
+				state:   tt.fields.state,
+				fetcher: tt.fields.fetcher,
+			}
+			_, err := s.Router()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("server.Router() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+}
+
 func TestServerSiteMediatorRegisterMiddleware(t *testing.T) {
 	type fields struct {
 		site               *serverSite
@@ -579,49 +685,74 @@ func TestServerSiteMediatorRegisterHandler(t *testing.T) {
 	}
 }
 
-func TestServerSiteRouter(t *testing.T) {
+func TestServerSiteRouterRoutes(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *log.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		logger *log.Logger
+		routes map[string]http.Handler
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		want    ServerSiteRouter
-		wantErr bool
+		name   string
+		fields fields
+		want   map[string]http.Handler
 	}{
 		{
 			name: "default",
 			fields: fields{
-				state: &serverSiteState{
-					router: &serverSiteRouter{},
-				},
+				routes: map[string]http.Handler{},
 			},
-		},
-		{
-			name: "error server not ready",
-			fields: fields{
-				state: &serverSiteState{},
-			},
-			wantErr: true,
+			want: map[string]http.Handler{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+			r := &serverSiteRouter{
+				logger: tt.fields.logger,
+				routes: tt.fields.routes,
 			}
-			_, err := s.Router()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("server.Router() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if got := r.Routes(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("serverSiteRouter.Routes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestServerSiteMiddlewareHandler(t *testing.T) {
+	type fields struct {
+		logger *log.Logger
+	}
+	type args struct {
+		next http.Handler
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   http.Handler
+	}{
+		{
+			name: "default",
+			fields: fields{
+				logger: log.Default(),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &serverSiteMiddleware{
+				logger: tt.fields.logger,
+			}
+			h := m.Handler(tt.args.next)
+			w := httptest.NewRecorder()
+			r, err := http.NewRequest("GET", "/", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h.ServeHTTP(w, r)
+			if v := w.Header().Get(serverSiteMiddlewareHeaderServer); v != serverSiteMiddlewareHeaderServerValue {
+				t.Errorf("missing header")
+			}
+			if v := w.Header().Get(serverSiteMiddlewareHeaderRequestId); v == "" {
+				t.Errorf("missing header")
 			}
 		})
 	}
@@ -637,7 +768,6 @@ func TestServerSiteHandlerServeHTTP(t *testing.T) {
 	}
 
 	type fields struct {
-		site   *serverSite
 		logger *log.Logger
 	}
 	type args struct {
@@ -652,12 +782,11 @@ func TestServerSiteHandlerServeHTTP(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				site:   &serverSite{},
 				logger: log.Default(),
 			},
 			args: args{
 				w: testServerListenerHandlerResponseWriter{
-					header: make(http.Header),
+					header: http.Header{},
 				},
 				r: req,
 			},
@@ -666,7 +795,6 @@ func TestServerSiteHandlerServeHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &serverSiteHandler{
-				site:   tt.fields.site,
 				logger: tt.fields.logger,
 			}
 			h.ServeHTTP(tt.args.w, tt.args.r)

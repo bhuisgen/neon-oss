@@ -25,26 +25,76 @@ func TestApplicationCheck(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "minimal",
+			fields: fields{
+				config: &config{
+					Store: &configStore{
+						Config: nil,
+					},
+					Fetcher: &configFetcher{
+						Config: nil,
+					},
+					Loader: &configLoader{
+						Config: nil,
+					},
+					Server: &configServer{
+						Config: map[string]interface{}{
+							"listeners": map[string]interface{}{
+								"default": map[string]interface{}{
+									"test": map[string]interface{}{
+										"option": "value",
+									},
+								},
+							},
+							"sites": map[string]interface{}{
+								"main": map[string]interface{}{
+									"listeners": []string{"default"},
+									"routes":    map[string]interface{}{},
+								},
+							},
+						},
+					},
+				},
+				logger:  log.Default(),
+				store:   &store{},
+				fetcher: &fetcher{},
+				loader:  &loader{},
+				server:  &server{},
+			},
+		},
+		{
 			name: "default",
 			fields: fields{
 				config: &config{
 					Store: &configStore{
 						Config: map[string]interface{}{
-							"storage": map[string]map[string]interface{}{
-								"test": {},
+							"storage": map[string]interface{}{
+								"test": map[string]interface{}{},
 							},
 						},
 					},
-					Fetcher: &configFetcher{},
-					Loader:  &configLoader{},
+					Fetcher: &configFetcher{
+						Config: map[string]interface{}{
+							"providers": map[string]interface{}{
+								"test": map[string]interface{}{},
+							},
+						},
+					},
+					Loader: &configLoader{
+						Config: map[string]interface{}{},
+					},
 					Server: &configServer{
 						Config: map[string]interface{}{
-							"listeners": map[string]map[string]interface{}{
-								"test": {},
+							"listeners": map[string]interface{}{
+								"default": map[string]interface{}{
+									"test": map[string]interface{}{
+										"option": "value",
+									},
+								},
 							},
-							"sites": map[string]map[string]interface{}{
-								"default": {
-									"listeners": []string{"test"},
+							"sites": map[string]interface{}{
+								"main": map[string]interface{}{
+									"listeners": []string{"default"},
 									"routes":    map[string]interface{}{},
 								},
 							},

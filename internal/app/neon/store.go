@@ -30,8 +30,7 @@ type storeConfig struct {
 
 // storeState implements the datastore state
 type storeState struct {
-	storage       string
-	storageModule core.StoreStorageModule
+	storage core.StoreStorageModule
 }
 
 const (
@@ -40,82 +39,66 @@ const (
 
 // newStore creates a new store.
 func newStore() *store {
-	return &store{}
+	return &store{
+		logger: log.New(os.Stderr, fmt.Sprint(storeLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		state:  &storeState{},
+	}
 }
 
-// Check checks the store configuration.
-func (s *store) Check(config map[string]interface{}) ([]string, error) {
-	var report []string
-
-	var c storeConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		report = append(report, "store: failed to parse configuration")
-		return report, err
-	}
-
-	if len(c.Storage) == 0 {
-		report = append(report, "store: no storage defined")
-	}
-
-	for storage, storageConfig := range c.Storage {
-		moduleInfo, err := module.Lookup(module.ModuleID("store.storage." + storage))
-		if err != nil {
-			report = append(report, fmt.Sprintf("store: unregistered storage module '%s'", storage))
-			continue
+// Init initializes the store.
+func (s *store) Init(config map[string]interface{}) error {
+	if config == nil {
+		s.config = &storeConfig{
+			Storage: map[string]map[string]interface{}{
+				"memory": {},
+			},
 		}
-		module, ok := moduleInfo.NewInstance().(core.StoreStorageModule)
-		if !ok {
-			report = append(report, fmt.Sprintf("store: invalid storage module '%s'", storage))
-			continue
+	} else {
+		if err := mapstructure.Decode(config, &s.config); err != nil {
+			s.logger.Print("failed to parse configuration")
+			return err
 		}
-		r, err := module.Check(storageConfig)
-		if err != nil {
-			for _, line := range r {
-				report = append(report, fmt.Sprintf("store: failed to check configuration: %s", line))
-			}
-			continue
-		}
-
-		break
 	}
 
-	if len(report) > 0 {
-		return report, errors.New("check failure")
+	var errInit bool
+
+	if len(s.config.Storage) == 0 {
+		s.logger.Print("no storage defined")
+		errInit = true
 	}
-	return nil, nil
-}
-
-// Load loads the store.
-func (s *store) Load(config map[string]interface{}) error {
-	var c storeConfig
-	err := mapstructure.Decode(config, &c)
-	if err != nil {
-		return err
-	}
-
-	s.config = &c
-	s.logger = log.New(os.Stderr, fmt.Sprint(storeLogger, ": "), log.LstdFlags|log.Lmsgprefix)
-	s.state = &storeState{}
-
 	for storage, storageConfig := range s.config.Storage {
 		moduleInfo, err := module.Lookup(module.ModuleID("store.storage." + storage))
 		if err != nil {
-			return err
+			s.logger.Printf("unregistered storage module '%s'", storage)
+			errInit = true
+			break
 		}
 		module, ok := moduleInfo.NewInstance().(core.StoreStorageModule)
 		if !ok {
-			return fmt.Errorf("invalid storage module '%s'", storage)
-		}
-		err = module.Load(storageConfig)
-		if err != nil {
-			return err
+			s.logger.Printf("invalid storage module '%s'", storage)
+			errInit = true
+			break
 		}
 
-		s.state.storage = storage
-		s.state.storageModule = module
+		if storageConfig == nil {
+			storageConfig = map[string]interface{}{}
+		}
+		if err := module.Init(
+			storageConfig,
+			log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "storage[", storage, "]: "), log.LstdFlags|log.Lmsgprefix),
+		); err != nil {
+			s.logger.Printf("failed to init storage module '%s'", storage)
+			errInit = true
+			break
+		}
+
+		s.state.storage = module
 
 		break
+	}
+
+	if errInit {
+		return errors.New("init error")
 	}
 
 	return nil
@@ -123,7 +106,7 @@ func (s *store) Load(config map[string]interface{}) error {
 
 // LoadResource loads a resource.
 func (s *store) LoadResource(name string) (*core.Resource, error) {
-	resource, err := s.state.storageModule.LoadResource(name)
+	resource, err := s.state.storage.LoadResource(name)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +116,7 @@ func (s *store) LoadResource(name string) (*core.Resource, error) {
 
 // StoreResource stores a resource.
 func (s *store) StoreResource(name string, resource *core.Resource) error {
-	err := s.state.storageModule.StoreResource(name, resource)
-	if err != nil {
+	if err := s.state.storage.StoreResource(name, resource); err != nil {
 		return err
 	}
 

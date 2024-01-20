@@ -6,39 +6,42 @@ package neon
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 
 	"github.com/bhuisgen/neon/pkg/core"
 )
 
+// Application
+type Application interface {
+	Check() error
+	Serve() error
+}
+
 // Store
 type Store interface {
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
+	Init(config map[string]interface{}) error
 	LoadResource(name string) (*core.Resource, error)
 	StoreResource(name string, resource *core.Resource) error
 }
 
 // Fetcher
 type Fetcher interface {
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
+	Init(config map[string]interface{}) error
 	Fetch(ctx context.Context, name string, provider string, config map[string]interface{}) (*core.Resource, error)
 }
 
 // Loader
 type Loader interface {
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
+	Init(config map[string]interface{}) error
 	Start() error
 	Stop() error
 }
 
 // Server
 type Server interface {
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
+	Init(config map[string]interface{}) error
 	Register(descriptors map[string]ServerListenerDescriptor) error
 	Start() error
 	Stop() error
@@ -47,8 +50,7 @@ type Server interface {
 
 // ServerListener
 type ServerListener interface {
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
+	Init(config map[string]interface{}, logger *log.Logger) error
 	Register(descriptor ServerListenerDescriptor) error
 	Serve() error
 	Shutdown(ctx context.Context) error
@@ -72,8 +74,7 @@ type ServerListenerDescriptor interface {
 
 // ServerSite
 type ServerSite interface {
-	Check(config map[string]interface{}) ([]string, error)
-	Load(config map[string]interface{}) error
+	Init(config map[string]interface{}, logger *log.Logger) error
 	Register() error
 	Start() error
 	Stop() error
