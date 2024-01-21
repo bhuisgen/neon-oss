@@ -153,7 +153,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 			}
 			if err := module.Init(
 				moduleConfig,
-				log.New(os.Stderr, fmt.Sprint(l.logger.Prefix(), "rule[", ruleName, "] parser[", moduleName, "]: "),
+				log.New(os.Stderr, fmt.Sprint(l.logger.Prefix(), "parser[", moduleName, "]: "),
 					log.LstdFlags|log.Lmsgprefix),
 			); err != nil {
 				l.logger.Printf("rule '%s', failed to init parser module '%s'", ruleName, moduleName)
@@ -283,16 +283,16 @@ func (l *loader) execute(stop <-chan struct{}) {
 					}
 				}
 
-				l.logger.Printf("Results: success=%d, failure=%d, total=%d", success, failure, rulesCount)
+				l.logger.Printf("Execution finished (success=%d, failure=%d, total=%d)", success, failure, rulesCount)
 
 				if failure > 0 && !l.state.failsafe && *l.config.ExecFailsafeInterval > 0 {
-					l.logger.Print("Last execution failed, failsafe mode enabled")
+					l.logger.Print("Last execution failed, enabling failsafe mode")
 
 					ticker.Stop()
 					ticker = time.NewTicker(time.Duration(*l.config.ExecFailsafeInterval) * time.Second)
 				}
 				if failure == 0 && l.state.failsafe {
-					l.logger.Print("Last execution recovered, failsafe mode disabled")
+					l.logger.Print("Last execution succeeded, disabling failsafe mode")
 
 					ticker.Stop()
 					ticker = time.NewTicker(time.Duration(*l.config.ExecInterval) * time.Second)

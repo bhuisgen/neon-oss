@@ -362,7 +362,7 @@ func newServerListenerRouter(l *serverListener, routers ...ServerSiteRouter) *se
 	}
 
 	return &serverListenerRouter{
-		logger: log.New(os.Stderr, fmt.Sprintf("%srouter: ", l.logger.Prefix()), log.LstdFlags|log.Lmsgprefix),
+		logger: log.New(os.Stderr, fmt.Sprintf(l.logger.Prefix(), "router: "), log.LstdFlags|log.Lmsgprefix),
 		mux:    mux,
 	}
 }
@@ -381,7 +381,7 @@ type serverListenerHandler struct {
 // newServerListenerHandler creates a new server listener handler.
 func newServerListenerHandler(l *serverListener) *serverListenerHandler {
 	return &serverListenerHandler{
-		logger: log.New(os.Stderr, fmt.Sprintf("%shandler: ", l.logger.Prefix()), log.LstdFlags|log.Lmsgprefix),
+		logger: log.New(os.Stderr, fmt.Sprint(l.logger.Prefix(), "handler: "), log.LstdFlags|log.Lmsgprefix),
 	}
 }
 

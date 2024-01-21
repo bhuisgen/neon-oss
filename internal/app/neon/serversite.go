@@ -132,7 +132,7 @@ func (s *serverSite) Init(config map[string]interface{}, logger *log.Logger) err
 			}
 			if err := module.Init(
 				middlewareConfig,
-				log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "route[", route, "] middleware[", middleware, "]: "),
+				log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "middleware[", middleware, "]: "),
 					log.LstdFlags|log.Lmsgprefix),
 			); err != nil {
 				s.logger.Printf("failed to init middleware module '%s'", middleware)
@@ -161,7 +161,7 @@ func (s *serverSite) Init(config map[string]interface{}, logger *log.Logger) err
 			}
 			if err := module.Init(
 				handlerConfig,
-				log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "route[", route, "] handler[", handler, "]: "),
+				log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "handler[", handler, "]: "),
 					log.LstdFlags|log.Lmsgprefix),
 			); err != nil {
 				s.logger.Printf("failed to init handler module '%s'", handler)
@@ -205,7 +205,7 @@ func (s *serverSite) Register() error {
 			return err
 		}
 	}
-	
+
 	s.state.mediator = mediator
 
 	router, err := s.buildRouter()
@@ -472,7 +472,7 @@ type serverSiteRouter struct {
 // newServerSiteRouter creates a new server site router.
 func newServerSiteRouter(s *serverSite) *serverSiteRouter {
 	return &serverSiteRouter{
-		logger: log.New(os.Stderr, fmt.Sprintf("%s router: ", s.logger.Prefix()), log.LstdFlags|log.Lmsgprefix),
+		logger: log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "router: "), log.LstdFlags|log.Lmsgprefix),
 		routes: make(map[string]http.Handler),
 	}
 }
@@ -510,7 +510,7 @@ const (
 // newServerSiteMiddleware creates the server site middleware.
 func newServerSiteMiddleware(s *serverSite) *serverSiteMiddleware {
 	return &serverSiteMiddleware{
-		logger: log.New(os.Stderr, fmt.Sprintf("%s middleware: ", s.logger.Prefix()), log.LstdFlags|log.Lmsgprefix),
+		logger: log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "middleware[server]: "), log.LstdFlags|log.Lmsgprefix),
 	}
 }
 
@@ -543,7 +543,7 @@ type serverSiteHandler struct {
 // newServerSiteHandler creates the site handler.
 func newServerSiteHandler(s *serverSite) *serverSiteHandler {
 	return &serverSiteHandler{
-		logger: log.New(os.Stderr, fmt.Sprintf("%s handler: ", s.logger.Prefix()), log.LstdFlags|log.Lmsgprefix),
+		logger: log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "handler[server]: "), log.LstdFlags|log.Lmsgprefix),
 	}
 }
 

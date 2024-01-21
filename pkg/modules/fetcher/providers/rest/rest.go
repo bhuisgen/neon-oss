@@ -505,7 +505,7 @@ func (p *restProvider) fetchResource(ctx context.Context, config *restResourceCo
 		}
 
 		if core.DEBUG {
-			p.logger.Printf("Fetch request: method=%s, url=%s, code=%d)", req.Method, req.URL.String(), response.StatusCode)
+			p.logger.Printf("Fetch completed (method=%s, url=%s, code=%d)", req.Method, req.URL.String(), response.StatusCode)
 		}
 
 		switch response.StatusCode {
