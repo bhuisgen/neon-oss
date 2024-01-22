@@ -71,11 +71,13 @@ func (m *headerMiddleware) Init(config map[string]interface{}, logger *log.Logge
 			errInit = true
 			continue
 		}
-		_, err := regexp.Compile(rule.Path)
+		re, err := regexp.Compile(rule.Path)
 		if err != nil {
 			m.logger.Printf("rule option '%s', invalid regular expression '%s'", "Path", rule.Path)
 			errInit = true
 			continue
+		} else {
+			m.regexps = append(m.regexps, re)
 		}
 		for key := range rule.Set {
 			if key == "" {
@@ -105,20 +107,11 @@ func (m *headerMiddleware) Register(site core.ServerSite) error {
 
 // Start starts the middleware.
 func (m *headerMiddleware) Start() error {
-	for _, rule := range m.config.Rules {
-		re, err := regexp.Compile(rule.Path)
-		if err != nil {
-			return err
-		}
-		m.regexps = append(m.regexps, re)
-	}
-
 	return nil
 }
 
 // Stop stops the middleware.
 func (m *headerMiddleware) Stop() {
-	m.regexps = []*regexp.Regexp{}
 }
 
 // Handler implements the middleware handler.

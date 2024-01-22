@@ -75,10 +75,12 @@ func (m *rewriteMiddleware) Init(config map[string]interface{}, logger *log.Logg
 			m.logger.Printf("rule option '%s', missing option or value", "Path")
 			errInit = true
 		} else {
-			_, err := regexp.Compile(rule.Path)
+			re, err := regexp.Compile(rule.Path)
 			if err != nil {
 				m.logger.Printf("rule option '%s', invalid regular expression '%s'", "Path", rule.Path)
 				errInit = true
+			} else {
+				m.regexps = append(m.regexps, re)
 			}
 		}
 		if rule.Replacement == "" {
@@ -115,20 +117,11 @@ func (m *rewriteMiddleware) Register(site core.ServerSite) error {
 
 // Start starts the middleware.
 func (m *rewriteMiddleware) Start() error {
-	for _, rule := range m.config.Rules {
-		re, err := regexp.Compile(rule.Path)
-		if err != nil {
-			return err
-		}
-		m.regexps = append(m.regexps, re)
-	}
-
 	return nil
 }
 
 // Stop stops the middleware.
 func (m *rewriteMiddleware) Stop() {
-	m.regexps = []*regexp.Regexp{}
 }
 
 // Handler implements the middleware handler.

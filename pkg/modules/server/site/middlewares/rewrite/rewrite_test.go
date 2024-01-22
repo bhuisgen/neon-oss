@@ -242,28 +242,6 @@ func TestRewriteMiddlewareStart(t *testing.T) {
 	}{
 		{
 			name: "default",
-			fields: fields{
-				config: &rewriteMiddlewareConfig{
-					Rules: []RewriteRule{
-						{
-							Path: "/test",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "error regular expression",
-			fields: fields{
-				config: &rewriteMiddlewareConfig{
-					Rules: []RewriteRule{
-						{
-							Path: "(",
-						},
-					},
-				},
-			},
-			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

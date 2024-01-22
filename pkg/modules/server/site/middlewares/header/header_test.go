@@ -247,28 +247,6 @@ func TestHeaderMiddlewareStart(t *testing.T) {
 	}{
 		{
 			name: "default",
-			fields: fields{
-				config: &headerMiddlewareConfig{
-					Rules: []HeaderRule{
-						{
-							Path: "/test",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "error regular expression",
-			fields: fields{
-				config: &headerMiddlewareConfig{
-					Rules: []HeaderRule{
-						{
-							Path: "(",
-						},
-					},
-				},
-			},
-			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
