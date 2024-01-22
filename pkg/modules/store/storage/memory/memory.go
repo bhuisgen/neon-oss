@@ -8,10 +8,6 @@ import (
 	"errors"
 	"log"
 
-	"github.com/mitchellh/mapstructure"
-
-	"github.com/bhuisgen/neon/pkg/cache"
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 )
@@ -20,7 +16,7 @@ import (
 type memoryStorage struct {
 	config  *memoryStorageConfig
 	logger  *log.Logger
-	storage cache.Cache
+	storage Cache
 }
 
 // memoryStorageConfig implements the memory storage configuration.
@@ -49,12 +45,7 @@ func (s memoryStorage) ModuleInfo() module.ModuleInfo {
 // Init initialize the storage.
 func (s *memoryStorage) Init(config map[string]interface{}, logger *log.Logger) error {
 	s.logger = logger
-
-	if err := mapstructure.Decode(config, &s.config); err != nil {
-		s.logger.Print("failed to parse configuration")
-	}
-
-	s.storage = memory.New(0, 0)
+	s.storage = newCache()
 
 	return nil
 }

@@ -9,7 +9,6 @@ import (
 	"log"
 	"testing"
 
-	"github.com/bhuisgen/neon/pkg/cache"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 )
@@ -62,13 +61,13 @@ func (c testMemoryStorageCache) Remove(key string) {
 func (c testMemoryStorageCache) Clear() {
 }
 
-var _ cache.Cache = (*testMemoryStorageCache)(nil)
+var _ Cache = (*testMemoryStorageCache)(nil)
 
 func TestMemoryStorageModuleInfo(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
 		logger  *log.Logger
-		storage cache.Cache
+		storage Cache
 	}
 	tests := []struct {
 		name   string
@@ -105,7 +104,7 @@ func TestMemoryStorageInit(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
 		logger  *log.Logger
-		storage cache.Cache
+		storage Cache
 	}
 	type args struct {
 		config map[string]interface{}
@@ -141,7 +140,7 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
 		logger  *log.Logger
-		storage cache.Cache
+		storage Cache
 	}
 	type args struct {
 		name string
@@ -197,7 +196,7 @@ func TestMemoryStorageStoreResource(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
 		logger  *log.Logger
-		storage cache.Cache
+		storage Cache
 	}
 	type args struct {
 		name     string
