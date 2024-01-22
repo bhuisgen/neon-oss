@@ -14,8 +14,6 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/bhuisgen/neon/pkg/cache"
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -27,7 +25,7 @@ type robotsHandler struct {
 	logger   *log.Logger
 	template *template.Template
 	rwPool   render.RenderWriterPool
-	cache    cache.Cache
+	cache    *robotsHandlerCache
 }
 
 // robotsHandlerConfig implements the robots handler configuration.
@@ -42,6 +40,12 @@ type robotsHandlerConfig struct {
 type robotsTemplateData struct {
 	Check    bool
 	Sitemaps []string
+}
+
+// robotsHandlerCache implements the robots handler cache.
+type robotsHandlerCache struct {
+	render render.Render
+	expire time.Time
 }
 
 const (
@@ -118,7 +122,6 @@ func (h *robotsHandler) Init(config map[string]interface{}, logger *log.Logger) 
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
-	h.cache = memory.New(time.Duration(*h.config.CacheTTL)*time.Second, 0)
 
 	return nil
 }
@@ -140,15 +143,14 @@ func (h *robotsHandler) Start() error {
 
 // Stop stops the handler.
 func (h *robotsHandler) Stop() {
-	h.cache.Clear()
+	h.cache = nil
 }
 
 // ServeHTTP implements the http handler.
 func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if *h.config.Cache {
-		obj := h.cache.Get(r.URL.Path)
-		if obj != nil {
-			render := obj.(render.Render)
+		if h.cache != nil && h.cache.expire.After(time.Now()) {
+			render := h.cache.render
 
 			w.WriteHeader(render.StatusCode())
 			w.Write(render.Body())
@@ -174,7 +176,10 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	render := rw.Render()
 
 	if *h.config.Cache {
-		h.cache.Set(r.URL.Path, render)
+		h.cache = &robotsHandlerCache{
+			render: render,
+			expire: time.Now().Add(time.Duration(*h.config.CacheTTL) * time.Second),
+		}
 	}
 
 	w.WriteHeader(render.StatusCode())

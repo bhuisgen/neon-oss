@@ -14,33 +14,37 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/bhuisgen/neon/pkg/cache"
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
 )
 
-// fileHandler implements the html handler.
+// fileHandler implements the file handler.
 type fileHandler struct {
 	config     *fileHandlerConfig
 	logger     *log.Logger
 	file       []byte
 	fileInfo   *time.Time
 	rwPool     render.RenderWriterPool
-	cache      cache.Cache
+	cache      *fileHandlerCache
 	osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 	osReadFile func(name string) ([]byte, error)
 	osClose    func(*os.File) error
 	osStat     func(name string) (fs.FileInfo, error)
 }
 
-// fileHandlerConfig implements the default html configuration.
+// fileHandlerConfig implements the file handler configuration.
 type fileHandlerConfig struct {
 	Path       string
 	StatusCode *int
 	Cache      *bool
 	CacheTTL   *int
+}
+
+// fileHandlerCache implments the file handler cache.
+type fileHandlerCache struct {
+	render render.Render
+	expire time.Time
 }
 
 const (
@@ -148,7 +152,6 @@ func (h *fileHandler) Init(config map[string]interface{}, logger *log.Logger) er
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
-	h.cache = memory.New(time.Duration(*h.config.CacheTTL)*time.Second, 0)
 
 	return nil
 }
@@ -175,15 +178,14 @@ func (h *fileHandler) Start() error {
 
 // Stop stops the handler.
 func (h *fileHandler) Stop() {
-	h.cache.Clear()
+	h.cache = nil
 }
 
 // ServeHTTP implements the http handler.
 func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if *h.config.Cache {
-		obj := h.cache.Get(r.URL.Path)
-		if obj != nil {
-			render := obj.(render.Render)
+		if h.cache != nil && h.cache.expire.After(time.Now()) {
+			render := h.cache.render
 
 			w.WriteHeader(render.StatusCode())
 			w.Write(render.Body())
@@ -218,7 +220,10 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	render := rw.Render()
 
 	if *h.config.Cache {
-		h.cache.Set(r.URL.Path, render)
+		h.cache = &fileHandlerCache{
+			render: render,
+			expire: time.Now().Add(time.Duration(*h.config.CacheTTL) * time.Second),
+		}
 	}
 
 	w.WriteHeader(render.StatusCode())

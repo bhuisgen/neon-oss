@@ -449,95 +449,7 @@ func TestVMExecute(t *testing.T) {
 	}
 }
 
-func TestNewVMResult(t *testing.T) {
-	render := []byte("test")
-	status := http.StatusOK
-	redirect := true
-	redirectURL := "http://redirect"
-	redirectStatus := http.StatusFound
-	headers := map[string][]string{
-		"key": {"value"},
-	}
-	title := "test"
-	meta := newDOMElement("test")
-	meta.SetAttribute("key", "value")
-	metas := newDOMElementList()
-	metas.Set(meta)
-	link := newDOMElement("test")
-	link.SetAttribute("key", "value")
-	links := newDOMElementList()
-	links.Set(link)
-	script := newDOMElement("test")
-	script.SetAttribute("key", "value")
-	scripts := newDOMElementList()
-	scripts.Set(script)
-
-	type args struct {
-		d *vmData
-	}
-	tests := []struct {
-		name string
-		args args
-		want *vmResult
-	}{
-		{
-			name: "empty",
-			args: args{
-				d: &vmData{
-					render:         nil,
-					status:         nil,
-					redirect:       nil,
-					redirectURL:    nil,
-					redirectStatus: nil,
-					title:          nil,
-					headers:        nil,
-					metas:          nil,
-					links:          nil,
-					scripts:        nil,
-				},
-			},
-			want: &vmResult{},
-		},
-		{
-			name: "default",
-			args: args{
-				d: &vmData{
-					render:         &render,
-					status:         &status,
-					redirect:       &redirect,
-					redirectURL:    &redirectURL,
-					redirectStatus: &redirectStatus,
-					headers:        headers,
-					title:          &title,
-					metas:          metas,
-					links:          links,
-					scripts:        scripts,
-				},
-			},
-			want: &vmResult{
-				Render:         &render,
-				Status:         &status,
-				Redirect:       &redirect,
-				RedirectURL:    &redirectURL,
-				RedirectStatus: &redirectStatus,
-				Headers:        headers,
-				Title:          &title,
-				Metas:          metas,
-				Links:          links,
-				Scripts:        scripts,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := newVMResult(tt.args.d); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("newVMResult() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestVM_APIServerHandler(t *testing.T) {
+func TestVMExecute_APIServerHandler(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -598,7 +510,7 @@ func TestVM_APIServerHandler(t *testing.T) {
 	}
 }
 
-func TestVM_APIServerRequest(t *testing.T) {
+func TestVMExecute_APIServerRequest(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -771,7 +683,7 @@ func TestVM_APIServerRequest(t *testing.T) {
 	}
 }
 
-func TestVM_APIServerResponse(t *testing.T) {
+func TestVMExecute_APIServerResponse(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}

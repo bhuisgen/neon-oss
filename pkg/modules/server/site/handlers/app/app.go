@@ -21,8 +21,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/net/html"
 
-	"github.com/bhuisgen/neon/pkg/cache"
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -30,16 +28,17 @@ import (
 
 // appHandler implements the app handler.
 type appHandler struct {
-	config      *appHandlerConfig
-	logger      *log.Logger
-	regexps     []*regexp.Regexp
-	index       []byte
-	indexInfo   *time.Time
-	bundle      string
-	bundleInfo  *time.Time
-	rwPool      render.RenderWriterPool
-	vmPool      VMPool
-	cache       cache.Cache
+	config     *appHandlerConfig
+	logger     *log.Logger
+	regexps    []*regexp.Regexp
+	index      []byte
+	indexInfo  *time.Time
+	bundle     string
+	bundleInfo *time.Time
+	rwPool     render.RenderWriterPool
+	vmPool     VMPool
+
+	cache       Cache
 	site        core.ServerSite
 	osOpen      func(name string) (*os.File, error)
 	osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -51,16 +50,17 @@ type appHandler struct {
 
 // appHandlerConfig implements the app handler configuration.
 type appHandlerConfig struct {
-	Index     string
-	Bundle    string
-	Env       *string
-	Container *string
-	State     *string
-	Timeout   *int
-	MaxVMs    *int
-	Cache     *bool
-	CacheTTL  *int
-	Rules     []AppRule
+	Index         string
+	Bundle        string
+	Env           *string
+	Container     *string
+	State         *string
+	Timeout       *int
+	MaxVMs        *int
+	Cache         *bool
+	CacheTTL      *int
+	CacheMaxItems *int
+	Rules         []AppRule
 }
 
 // AppRule implements a rule.
@@ -75,6 +75,12 @@ type AppRuleStateEntry struct {
 	Key      string
 	Resource string
 	Export   *bool
+}
+
+// appCacheItem implements a app handler cache item.
+type appCacheItem struct {
+	render render.Render
+	expire time.Time
 }
 
 // appResource implements a resource.
@@ -93,10 +99,9 @@ const (
 	appConfigDefaultContainer       string = "root"
 	appConfigDefaultState           string = "state"
 	appConfigDefaultTimeout         int    = 4
-	appConfigDefaultMinSpareVMs     int    = 0
-	appConfigDefaultMaxSpareVMs     int    = 0
 	appConfigDefaultCache           bool   = false
 	appConfigDefaultCacheTTL        int    = 60
+	appConfigDefaultCacheMaxItems   int    = 100
 )
 
 // appOsOpen redirects to os.Open.
@@ -256,10 +261,26 @@ func (h *appHandler) Init(config map[string]interface{}, logger *log.Logger) err
 		h.logger.Printf("option '%s', invalid value '%d'", "CacheTTL", *h.config.CacheTTL)
 		errInit = true
 	}
+	if h.config.CacheMaxItems == nil {
+		defaultValue := appConfigDefaultCacheMaxItems
+		h.config.CacheMaxItems = &defaultValue
+	}
+	if *h.config.CacheMaxItems < 0 {
+		h.logger.Printf("option '%s', invalid value '%d'", "CacheMaxCapacity", *h.config.CacheMaxItems)
+		errInit = true
+	}
 	for _, rule := range h.config.Rules {
 		if rule.Path == "" {
 			h.logger.Printf("rule option '%s', missing option or value", "Path")
 			errInit = true
+		} else {
+			re, err := regexp.Compile(rule.Path)
+			if err != nil {
+				h.logger.Printf("rule option '%s', invalid regular expression '%s'", "Path", rule.Path)
+				errInit = true
+			} else {
+				h.regexps = append(h.regexps, re)
+			}
 		}
 		for _, state := range rule.State {
 			if state.Key == "" {
@@ -278,7 +299,8 @@ func (h *appHandler) Init(config map[string]interface{}, logger *log.Logger) err
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
-	h.cache = memory.New(time.Duration(*h.config.CacheTTL)*time.Second, 0)
+	h.vmPool = newVMPool(*h.config.MaxVMs)
+	h.cache = newCache(*h.config.CacheMaxItems)
 
 	return nil
 }
@@ -297,15 +319,6 @@ func (h *appHandler) Register(site core.ServerSite) error {
 
 // Start starts the handler.
 func (h *appHandler) Start() error {
-	for _, rule := range h.config.Rules {
-		re, err := regexp.Compile(rule.Path)
-		if err != nil {
-			return err
-		}
-		h.regexps = append(h.regexps, re)
-	}
-	h.vmPool = newVMPool(*h.config.MaxVMs)
-
 	err := h.read()
 	if err != nil {
 		return err
@@ -316,11 +329,9 @@ func (h *appHandler) Start() error {
 
 // Stop stops the handler.
 func (h *appHandler) Stop() {
-	h.regexps = []*regexp.Regexp{}
-	h.indexInfo = nil
-	h.bundleInfo = nil
-	h.vmPool = nil
 	h.cache.Clear()
+	h.bundleInfo = nil
+	h.indexInfo = nil
 }
 
 // ServeHTTP implements the http handler.
@@ -328,9 +339,8 @@ func (h *appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Path
 
 	if *h.config.Cache {
-		obj := h.cache.Get(key)
-		if obj != nil {
-			render := obj.(render.Render)
+		if item, ok := h.cache.Get(key).(appCacheItem); ok && item.expire.After(time.Now()) {
+			render := item.render
 
 			if render.Redirect() {
 				http.Redirect(w, r, render.RedirectURL(), render.StatusCode())
@@ -379,7 +389,10 @@ func (h *appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	render := rw.Render()
 
 	if *h.config.Cache {
-		h.cache.Set(key, render)
+		h.cache.Set(key, &appCacheItem{
+			render: render,
+			expire: time.Now().Add(time.Duration(*h.config.CacheTTL) * time.Second),
+		})
 	}
 
 	if render.Redirect() {

@@ -13,8 +13,6 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/bhuisgen/neon/pkg/cache"
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -100,7 +98,7 @@ func TestSitemapHandlerModuleInfo(t *testing.T) {
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
-		cache                cache.Cache
+		cache                *sitemapHandlerCache
 		site                 core.ServerSite
 	}
 	tests := []struct {
@@ -145,7 +143,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
-		cache                cache.Cache
+		cache                *sitemapHandlerCache
 		site                 core.ServerSite
 	}
 	type args struct {
@@ -384,7 +382,7 @@ func TestSitemapHandlerRegister(t *testing.T) {
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
-		cache                cache.Cache
+		cache                *sitemapHandlerCache
 		site                 core.ServerSite
 	}
 	type args struct {
@@ -437,7 +435,7 @@ func TestSitemapHandlerStart(t *testing.T) {
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
-		cache                cache.Cache
+		cache                *sitemapHandlerCache
 		site                 core.ServerSite
 	}
 	tests := []struct {
@@ -474,7 +472,7 @@ func TestSitemapHandlerStop(t *testing.T) {
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
-		cache                cache.Cache
+		cache                *sitemapHandlerCache
 		site                 core.ServerSite
 	}
 	tests := []struct {
@@ -483,9 +481,6 @@ func TestSitemapHandlerStop(t *testing.T) {
 	}{
 		{
 			name: "default",
-			fields: fields{
-				cache: memory.New(0, 0),
-			},
 		},
 	}
 	for _, tt := range tests {
@@ -521,7 +516,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
-		cache                cache.Cache
+		cache                *sitemapHandlerCache
 		site                 core.ServerSite
 	}
 	type args struct {
@@ -544,7 +539,6 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 				templateSitemapIndex: tmplSitemapIndex,
 				templateSitemap:      tmplSitemap,
 				rwPool:               render.NewRenderWriterPool(),
-				cache:                memory.New(0, 0),
 			},
 			args: args{
 				w: testSitemapHandlerResponseWriter{},

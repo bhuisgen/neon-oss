@@ -15,8 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bhuisgen/neon/pkg/cache"
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -148,7 +146,7 @@ func TestAppHandlerModuleInfo(t *testing.T) {
 		bundleInfo  *time.Time
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
-		cache       cache.Cache
+		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -213,7 +211,7 @@ func TestAppHandlerInit(t *testing.T) {
 		bundleInfo  *time.Time
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
-		cache       cache.Cache
+		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -268,15 +266,16 @@ func TestAppHandlerInit(t *testing.T) {
 			},
 			args: args{
 				config: map[string]interface{}{
-					"Index":     "index.html",
-					"Bundle":    "bundle.js",
-					"Env":       "test",
-					"Container": "root",
-					"State":     "state",
-					"Timeout":   4,
-					"MaxVMs":    2,
-					"Cache":     true,
-					"CacheTTL":  60,
+					"Index":         "index.html",
+					"Bundle":        "bundle.js",
+					"Env":           "test",
+					"Container":     "root",
+					"State":         "state",
+					"Timeout":       4,
+					"MaxVMs":        2,
+					"Cache":         true,
+					"CacheTTL":      60,
+					"CacheMaxItems": 100,
 					"Rules": []map[string]interface{}{
 						{
 							"Path": "/",
@@ -327,14 +326,15 @@ func TestAppHandlerInit(t *testing.T) {
 			},
 			args: args{
 				config: map[string]interface{}{
-					"Index":     "",
-					"Bundle":    "",
-					"Env":       "",
-					"Container": "",
-					"State":     "",
-					"Timeout":   -1,
-					"MaxVMs":    -1,
-					"CacheTTL":  -1,
+					"Index":         "",
+					"Bundle":        "",
+					"Env":           "",
+					"Container":     "",
+					"State":         "",
+					"Timeout":       -1,
+					"MaxVMs":        -1,
+					"CacheTTL":      -1,
+					"CacheMaxItems": -1,
 					"Rules": []map[string]interface{}{
 						{
 							"Path": "",
@@ -459,7 +459,7 @@ func TestAppHandlerRegister(t *testing.T) {
 		bundleInfo  *time.Time
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
-		cache       cache.Cache
+		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -532,7 +532,7 @@ func TestAppHandlerStart(t *testing.T) {
 		bundleInfo  *time.Time
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
-		cache       cache.Cache
+		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -604,7 +604,7 @@ func TestAppHandlerStop(t *testing.T) {
 		bundleInfo  *time.Time
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
-		cache       cache.Cache
+		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -620,7 +620,7 @@ func TestAppHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: memory.New(0, 0),
+				cache: newCache(1),
 			},
 		},
 	}
@@ -661,7 +661,7 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 		bundleInfo  *time.Time
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
-		cache       cache.Cache
+		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
 		osOpenFile  func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -683,20 +683,21 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 			name: "default",
 			fields: fields{
 				config: &appHandlerConfig{
-					Index:     "test/default/index.html",
-					Bundle:    "test/default/bundle.js",
-					Env:       stringPtr("test"),
-					Container: stringPtr("root"),
-					State:     stringPtr("state"),
-					Timeout:   intPtr(4),
-					MaxVMs:    intPtr(1),
-					Cache:     boolPtr(true),
-					CacheTTL:  intPtr(60),
+					Index:         "test/default/index.html",
+					Bundle:        "test/default/bundle.js",
+					Env:           stringPtr("test"),
+					Container:     stringPtr("root"),
+					State:         stringPtr("state"),
+					Timeout:       intPtr(4),
+					MaxVMs:        intPtr(1),
+					Cache:         boolPtr(true),
+					CacheTTL:      intPtr(60),
+					CacheMaxItems: intPtr(100),
 				},
 				logger: log.Default(),
 				rwPool: render.NewRenderWriterPool(),
 				vmPool: newVMPool(1),
-				cache:  memory.New(0, 0),
+				cache:  newCache(1),
 				osReadFile: func(name string) ([]byte, error) {
 					return os.ReadFile(name)
 				},

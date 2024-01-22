@@ -14,8 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bhuisgen/neon/pkg/cache"
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -135,7 +133,7 @@ func TestFileHandlerModuleInfo(t *testing.T) {
 		file       []byte
 		fileInfo   *time.Time
 		rwPool     render.RenderWriterPool
-		cache      cache.Cache
+		cache      *fileHandlerCache
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -186,7 +184,7 @@ func TestFileHandlerInit(t *testing.T) {
 		file       []byte
 		fileInfo   *time.Time
 		rwPool     render.RenderWriterPool
-		cache      cache.Cache
+		cache      *fileHandlerCache
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -362,7 +360,7 @@ func TestFileHandlerRegister(t *testing.T) {
 		file       []byte
 		fileInfo   *time.Time
 		rwPool     render.RenderWriterPool
-		cache      cache.Cache
+		cache      *fileHandlerCache
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -421,7 +419,7 @@ func TestFileHandlerStart(t *testing.T) {
 		file       []byte
 		fileInfo   *time.Time
 		rwPool     render.RenderWriterPool
-		cache      cache.Cache
+		cache      *fileHandlerCache
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -489,7 +487,7 @@ func TestFileHandlerStop(t *testing.T) {
 		file       []byte
 		fileInfo   *time.Time
 		rwPool     render.RenderWriterPool
-		cache      cache.Cache
+		cache      *fileHandlerCache
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -501,9 +499,6 @@ func TestFileHandlerStop(t *testing.T) {
 	}{
 		{
 			name: "default",
-			fields: fields{
-				cache: memory.New(0, 0),
-			},
 		},
 	}
 	for _, tt := range tests {
@@ -532,7 +527,7 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 		file       []byte
 		fileInfo   *time.Time
 		rwPool     render.RenderWriterPool
-		cache      cache.Cache
+		cache      *fileHandlerCache
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -558,7 +553,6 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 				},
 				logger: log.Default(),
 				rwPool: render.NewRenderWriterPool(),
-				cache:  memory.New(0, 0),
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
 					return nil, nil
 				},

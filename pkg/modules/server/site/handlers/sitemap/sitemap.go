@@ -20,8 +20,6 @@ import (
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/bhuisgen/neon/pkg/cache"
-	"github.com/bhuisgen/neon/pkg/cache/memory"
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
 	"github.com/bhuisgen/neon/pkg/render"
@@ -34,7 +32,7 @@ type sitemapHandler struct {
 	templateSitemapIndex *template.Template
 	templateSitemap      *template.Template
 	rwPool               render.RenderWriterPool
-	cache                cache.Cache
+	cache                *sitemapHandlerCache
 	site                 core.ServerSite
 }
 
@@ -108,6 +106,12 @@ type sitemapTemplateSitemapItem struct {
 	Lastmod    string
 	Changefreq string
 	Priority   string
+}
+
+// sitemapHandlerCache implements the sitemap handler cache.
+type sitemapHandlerCache struct {
+	render render.Render
+	expire time.Time
 }
 
 const (
@@ -328,7 +332,6 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *log.Logger)
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
-	h.cache = memory.New(time.Duration(*h.config.CacheTTL)*time.Second, 0)
 
 	return nil
 }
@@ -352,15 +355,14 @@ func (h *sitemapHandler) Start() error {
 
 // Stop stops the handler.
 func (h *sitemapHandler) Stop() {
-	h.cache.Clear()
+	h.cache = nil
 }
 
 // ServeHTTP implements the http handler.
 func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if *h.config.Cache {
-		obj := h.cache.Get(r.URL.Path)
-		if obj != nil {
-			render := obj.(render.Render)
+		if h.cache != nil && h.cache.expire.After(time.Now()) {
+			render := h.cache.render
 
 			w.WriteHeader(render.StatusCode())
 			w.Write(render.Body())
@@ -386,7 +388,10 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	render := rw.Render()
 
 	if *h.config.Cache {
-		h.cache.Set(r.URL.Path, render)
+		h.cache = &sitemapHandlerCache{
+			render: render,
+			expire: time.Now().Add(time.Duration(*h.config.CacheTTL) * time.Second),
+		}
 	}
 
 	w.WriteHeader(render.StatusCode())
