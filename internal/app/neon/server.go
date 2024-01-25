@@ -152,7 +152,9 @@ func (s *server) Start() error {
 		}
 
 		for listenerName, listener := range s.state.listenersMap {
-			listener.Link(site)
+			if err := listener.Link(site); err != nil {
+				return err
+			}
 			s.state.sitesListeners[site.Name()] = append(s.state.sitesListeners[site.Name()],
 				s.state.listenersMap[listenerName])
 		}
@@ -163,14 +165,14 @@ func (s *server) Start() error {
 
 // Stop stops the server.
 func (s *server) Stop() error {
-	for _, site := range s.state.sitesMap {
-		if err := site.Stop(); err != nil {
+	for _, listener := range s.state.listenersMap {
+		if err := listener.Close(); err != nil {
 			return err
 		}
 	}
 
-	for _, listener := range s.state.listenersMap {
-		if err := listener.Close(); err != nil {
+	for _, site := range s.state.sitesMap {
+		if err := site.Stop(); err != nil {
 			return err
 		}
 	}
@@ -187,19 +189,15 @@ func (s *server) Shutdown(ctx context.Context) error {
 	}
 
 	for _, site := range s.state.sitesMap {
-		if err := site.Stop(); err != nil {
-			return err
-		}
-	}
-
-	for _, site := range s.state.sitesMap {
 		listeners, ok := s.state.sitesListeners[site.Name()]
 		if !ok {
 			s.logger.Print("site is not linked")
 			continue
 		}
 		for _, listener := range listeners {
-			listener.Unlink(site)
+			if err := listener.Unlink(site); err != nil {
+				return err
+			}
 		}
 		delete(s.state.sitesListeners, site.Name())
 	}
@@ -209,6 +207,12 @@ func (s *server) Shutdown(ctx context.Context) error {
 			return err
 		}
 		if err := listener.Remove(); err != nil {
+			return err
+		}
+	}
+
+	for _, site := range s.state.sitesMap {
+		if err := site.Stop(); err != nil {
 			return err
 		}
 	}
