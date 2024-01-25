@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -28,16 +30,17 @@ import (
 
 // appHandler implements the app handler.
 type appHandler struct {
-	config     *appHandlerConfig
-	logger     *log.Logger
-	regexps    []*regexp.Regexp
-	index      []byte
-	indexInfo  *time.Time
-	bundle     string
-	bundleInfo *time.Time
-	rwPool     render.RenderWriterPool
-	vmPool     VMPool
-
+	config      *appHandlerConfig
+	logger      *log.Logger
+	regexps     []*regexp.Regexp
+	index       []byte
+	indexInfo   *time.Time
+	muIndex     *sync.RWMutex
+	bundle      string
+	bundleInfo  *time.Time
+	muBundle    *sync.RWMutex
+	rwPool      render.RenderWriterPool
+	vmPool      VMPool
 	cache       Cache
 	site        core.ServerSite
 	osOpen      func(name string) (*os.File, error)
@@ -145,6 +148,8 @@ func (h appHandler) ModuleInfo() module.ModuleInfo {
 		ID: appModuleID,
 		NewInstance: func() module.Module {
 			return &appHandler{
+				muIndex:     new(sync.RWMutex),
+				muBundle:    new(sync.RWMutex),
 				osOpen:      appOsOpen,
 				osOpenFile:  appOsOpenFile,
 				osReadFile:  appOsReadFile,
@@ -329,9 +334,15 @@ func (h *appHandler) Start() error {
 
 // Stop stops the handler.
 func (h *appHandler) Stop() {
-	h.cache.Clear()
-	h.bundleInfo = nil
+	h.muIndex.Lock()
 	h.indexInfo = nil
+	h.muIndex.Unlock()
+
+	h.muBundle.Lock()
+	h.bundleInfo = nil
+	h.muBundle.Unlock()
+
+	h.cache.Clear()
 }
 
 // ServeHTTP implements the http handler.
@@ -423,7 +434,11 @@ func (h *appHandler) read() error {
 
 		return err
 	}
+
+	h.muIndex.RLock()
 	if h.indexInfo == nil || htmlInfo.ModTime().After(*h.indexInfo) {
+		h.muIndex.RUnlock()
+
 		buf, err := h.osReadFile(h.config.Index)
 		if err != nil {
 			h.logger.Printf("Failed to read index file '%s': %s", h.config.Index, err)
@@ -431,9 +446,13 @@ func (h *appHandler) read() error {
 			return err
 		}
 
+		h.muIndex.Lock()
 		h.index = buf
 		i := htmlInfo.ModTime()
 		h.indexInfo = &i
+		h.muIndex.Unlock()
+	} else {
+		h.muIndex.RUnlock()
 	}
 
 	bundleInfo, err := h.osStat(h.config.Bundle)
@@ -442,16 +461,25 @@ func (h *appHandler) read() error {
 
 		return err
 	}
+
+	h.muBundle.RLock()
 	if h.bundleInfo == nil || bundleInfo.ModTime().After(*h.bundleInfo) {
+		h.muBundle.RUnlock()
+
 		buf, err := h.osReadFile(h.config.Bundle)
 		if err != nil {
 			h.logger.Printf("Failed to read bundle file '%s': %s", h.config.Bundle, err)
 
 			return err
 		}
+
+		h.muBundle.Lock()
 		h.bundle = string(buf)
 		i := bundleInfo.ModTime()
 		h.bundleInfo = &i
+		h.muBundle.Unlock()
+	} else {
+		h.muBundle.RUnlock()
 	}
 
 	return nil
@@ -591,18 +619,20 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 	var vm = h.vmPool.Get()
 	defer h.vmPool.Put(vm)
 
-	err := vm.Configure(&vmConfig{
+	if err := vm.Configure(&vmConfig{
 		Env:     *h.config.Env,
 		Request: r,
 		State:   serverState,
-	})
-	if err != nil {
+	}); err != nil {
 		h.logger.Printf("Failed to configure VM: %s", err)
 
 		return err
 	}
 
+	var err error
+	h.muBundle.RLock()
 	result, err := vm.Execute(h.config.Bundle, h.bundle, time.Duration(*h.config.Timeout)*time.Second)
+	h.muBundle.RUnlock()
 	if err != nil {
 		h.logger.Printf("Failed to execute VM: %s", err)
 
@@ -628,7 +658,13 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 
-	err = h.app(w, r, clientState, vmResult)
+	h.muIndex.RLock()
+	if h.index != nil {
+		err = h.app(w, r, bytes.NewReader(h.index), clientState, vmResult)
+	} else {
+		err = errors.New("index not loaded")
+	}
+	h.muIndex.RUnlock()
 	if err != nil {
 		h.logger.Printf("Failed to render: %s", err)
 
@@ -638,10 +674,9 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 	return nil
 }
 
-// app generates the final index response body.
-func (h *appHandler) app(w render.RenderWriter, r *http.Request, state *string,
-	result *vmResult) error {
-	doc, err := html.Parse(bytes.NewReader(h.index))
+// app writes the final index.
+func (h *appHandler) app(w render.RenderWriter, r *http.Request, b io.Reader, state *string, result *vmResult) error {
+	doc, err := html.Parse(b)
 	if err != nil {
 		return err
 	}

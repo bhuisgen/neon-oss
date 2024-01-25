@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sync"
 	"text/template"
 	"time"
 
@@ -26,6 +27,7 @@ type robotsHandler struct {
 	template *template.Template
 	rwPool   render.RenderWriterPool
 	cache    *robotsHandlerCache
+	muCache  *sync.RWMutex
 }
 
 // robotsHandlerConfig implements the robots handler configuration.
@@ -70,7 +72,9 @@ func (h robotsHandler) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
 		ID: robotsModuleID,
 		NewInstance: func() module.Module {
-			return &robotsHandler{}
+			return &robotsHandler{
+				muCache: new(sync.RWMutex),
+			}
 		},
 	}
 }
@@ -143,14 +147,18 @@ func (h *robotsHandler) Start() error {
 
 // Stop stops the handler.
 func (h *robotsHandler) Stop() {
+	h.muCache.Lock()
 	h.cache = nil
+	h.muCache.Unlock()
 }
 
 // ServeHTTP implements the http handler.
 func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if *h.config.Cache {
+		h.muCache.RLock()
 		if h.cache != nil && h.cache.expire.After(time.Now()) {
 			render := h.cache.render
+			h.muCache.RUnlock()
 
 			w.WriteHeader(render.StatusCode())
 			w.Write(render.Body())
@@ -158,6 +166,8 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), true)
 
 			return
+		} else {
+			h.muCache.RUnlock()
 		}
 	}
 
@@ -176,10 +186,12 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	render := rw.Render()
 
 	if *h.config.Cache {
+		h.muCache.Lock()
 		h.cache = &robotsHandlerCache{
 			render: render,
 			expire: time.Now().Add(time.Duration(*h.config.CacheTTL) * time.Second),
 		}
+		h.muCache.Unlock()
 	}
 
 	w.WriteHeader(render.StatusCode())

@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -142,8 +143,10 @@ func TestAppHandlerModuleInfo(t *testing.T) {
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
+		muIndex     *sync.RWMutex
 		bundle      string
 		bundleInfo  *time.Time
+		muBundle    *sync.RWMutex
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       Cache
@@ -176,8 +179,10 @@ func TestAppHandlerModuleInfo(t *testing.T) {
 				regexps:     tt.fields.regexps,
 				index:       tt.fields.index,
 				indexInfo:   tt.fields.indexInfo,
+				muIndex:     tt.fields.muIndex,
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
+				muBundle:    tt.fields.muBundle,
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
@@ -207,8 +212,10 @@ func TestAppHandlerInit(t *testing.T) {
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
+		muIndex     *sync.RWMutex
 		bundle      string
 		bundleInfo  *time.Time
+		muBundle    *sync.RWMutex
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       Cache
@@ -428,8 +435,10 @@ func TestAppHandlerInit(t *testing.T) {
 				regexps:     tt.fields.regexps,
 				index:       tt.fields.index,
 				indexInfo:   tt.fields.indexInfo,
+				muIndex:     tt.fields.muIndex,
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
+				muBundle:    tt.fields.muBundle,
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
@@ -455,8 +464,10 @@ func TestAppHandlerRegister(t *testing.T) {
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
+		muIndex     *sync.RWMutex
 		bundle      string
 		bundleInfo  *time.Time
+		muBundle    *sync.RWMutex
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       Cache
@@ -501,8 +512,10 @@ func TestAppHandlerRegister(t *testing.T) {
 				regexps:     tt.fields.regexps,
 				index:       tt.fields.index,
 				indexInfo:   tt.fields.indexInfo,
+				muIndex:     tt.fields.muIndex,
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
+				muBundle:    tt.fields.muBundle,
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
@@ -528,8 +541,10 @@ func TestAppHandlerStart(t *testing.T) {
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
+		muIndex     *sync.RWMutex
 		bundle      string
 		bundleInfo  *time.Time
+		muBundle    *sync.RWMutex
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       Cache
@@ -554,8 +569,10 @@ func TestAppHandlerStart(t *testing.T) {
 					Bundle: "test/default/bundle.js",
 					MaxVMs: intPtr(1),
 				},
-				logger: log.Default(),
-				vmPool: newVMPool(1),
+				logger:   log.Default(),
+				muIndex:  &sync.RWMutex{},
+				muBundle: &sync.RWMutex{},
+				vmPool:   newVMPool(1),
 				osReadFile: func(name string) ([]byte, error) {
 					return os.ReadFile(name)
 				},
@@ -573,8 +590,10 @@ func TestAppHandlerStart(t *testing.T) {
 				regexps:     tt.fields.regexps,
 				index:       tt.fields.index,
 				indexInfo:   tt.fields.indexInfo,
+				muIndex:     tt.fields.muIndex,
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
+				muBundle:    tt.fields.muBundle,
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
@@ -600,8 +619,10 @@ func TestAppHandlerStop(t *testing.T) {
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
+		muIndex     *sync.RWMutex
 		bundle      string
 		bundleInfo  *time.Time
+		muBundle    *sync.RWMutex
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       Cache
@@ -620,7 +641,9 @@ func TestAppHandlerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				cache: newCache(1),
+				muIndex:  &sync.RWMutex{},
+				muBundle: &sync.RWMutex{},
+				cache:    newCache(1),
 			},
 		},
 	}
@@ -632,8 +655,10 @@ func TestAppHandlerStop(t *testing.T) {
 				regexps:     tt.fields.regexps,
 				index:       tt.fields.index,
 				indexInfo:   tt.fields.indexInfo,
+				muIndex:     tt.fields.muIndex,
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
+				muBundle:    tt.fields.muBundle,
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
@@ -657,8 +682,10 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
+		muIndex     *sync.RWMutex
 		bundle      string
 		bundleInfo  *time.Time
+		muBundle    *sync.RWMutex
 		rwPool      render.RenderWriterPool
 		vmPool      VMPool
 		cache       Cache
@@ -694,10 +721,12 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 					CacheTTL:      intPtr(60),
 					CacheMaxItems: intPtr(100),
 				},
-				logger: log.Default(),
-				rwPool: render.NewRenderWriterPool(),
-				vmPool: newVMPool(1),
-				cache:  newCache(1),
+				logger:   log.Default(),
+				muIndex:  &sync.RWMutex{},
+				muBundle: &sync.RWMutex{},
+				rwPool:   render.NewRenderWriterPool(),
+				vmPool:   newVMPool(1),
+				cache:    newCache(1),
 				osReadFile: func(name string) ([]byte, error) {
 					return os.ReadFile(name)
 				},
@@ -723,8 +752,10 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 				regexps:     tt.fields.regexps,
 				index:       tt.fields.index,
 				indexInfo:   tt.fields.indexInfo,
+				muIndex:     tt.fields.muIndex,
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
+				muBundle:    tt.fields.muBundle,
 				rwPool:      tt.fields.rwPool,
 				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,

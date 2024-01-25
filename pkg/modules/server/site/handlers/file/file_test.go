@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -132,8 +133,10 @@ func TestFileHandlerModuleInfo(t *testing.T) {
 		logger     *log.Logger
 		file       []byte
 		fileInfo   *time.Time
+		muFile     *sync.RWMutex
 		rwPool     render.RenderWriterPool
 		cache      *fileHandlerCache
+		muCache    *sync.RWMutex
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -159,8 +162,10 @@ func TestFileHandlerModuleInfo(t *testing.T) {
 				logger:     tt.fields.logger,
 				file:       tt.fields.file,
 				fileInfo:   tt.fields.fileInfo,
+				muFile:     tt.fields.muFile,
 				rwPool:     tt.fields.rwPool,
 				cache:      tt.fields.cache,
+				muCache:    tt.fields.muCache,
 				osOpenFile: tt.fields.osOpenFile,
 				osReadFile: tt.fields.osReadFile,
 				osClose:    tt.fields.osClose,
@@ -183,8 +188,10 @@ func TestFileHandlerInit(t *testing.T) {
 		logger     *log.Logger
 		file       []byte
 		fileInfo   *time.Time
+		muFile     *sync.RWMutex
 		rwPool     render.RenderWriterPool
 		cache      *fileHandlerCache
+		muCache    *sync.RWMutex
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -339,8 +346,10 @@ func TestFileHandlerInit(t *testing.T) {
 				logger:     tt.fields.logger,
 				file:       tt.fields.file,
 				fileInfo:   tt.fields.fileInfo,
+				muFile:     tt.fields.muFile,
 				rwPool:     tt.fields.rwPool,
 				cache:      tt.fields.cache,
+				muCache:    tt.fields.muCache,
 				osOpenFile: tt.fields.osOpenFile,
 				osReadFile: tt.fields.osReadFile,
 				osClose:    tt.fields.osClose,
@@ -359,8 +368,10 @@ func TestFileHandlerRegister(t *testing.T) {
 		logger     *log.Logger
 		file       []byte
 		fileInfo   *time.Time
+		muFile     *sync.RWMutex
 		rwPool     render.RenderWriterPool
 		cache      *fileHandlerCache
+		muCache    *sync.RWMutex
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -398,8 +409,10 @@ func TestFileHandlerRegister(t *testing.T) {
 				logger:     tt.fields.logger,
 				file:       tt.fields.file,
 				fileInfo:   tt.fields.fileInfo,
+				muFile:     tt.fields.muFile,
 				rwPool:     tt.fields.rwPool,
 				cache:      tt.fields.cache,
+				muCache:    tt.fields.muCache,
 				osOpenFile: tt.fields.osOpenFile,
 				osReadFile: tt.fields.osReadFile,
 				osClose:    tt.fields.osClose,
@@ -418,8 +431,10 @@ func TestFileHandlerStart(t *testing.T) {
 		logger     *log.Logger
 		file       []byte
 		fileInfo   *time.Time
+		muFile     *sync.RWMutex
 		rwPool     render.RenderWriterPool
 		cache      *fileHandlerCache
+		muCache    *sync.RWMutex
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -437,6 +452,7 @@ func TestFileHandlerStart(t *testing.T) {
 					Path: "test",
 				},
 				logger: log.Default(),
+				muFile: &sync.RWMutex{},
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testFileHandlerFileInfo{}, nil
 				},
@@ -452,6 +468,7 @@ func TestFileHandlerStart(t *testing.T) {
 					Path: "test",
 				},
 				logger: log.Default(),
+				muFile: &sync.RWMutex{},
 				osStat: func(name string) (fs.FileInfo, error) {
 					return nil, errors.New("test error")
 				},
@@ -466,8 +483,10 @@ func TestFileHandlerStart(t *testing.T) {
 				logger:     tt.fields.logger,
 				file:       tt.fields.file,
 				fileInfo:   tt.fields.fileInfo,
+				muFile:     tt.fields.muFile,
 				rwPool:     tt.fields.rwPool,
 				cache:      tt.fields.cache,
+				muCache:    tt.fields.muCache,
 				osOpenFile: tt.fields.osOpenFile,
 				osReadFile: tt.fields.osReadFile,
 				osClose:    tt.fields.osClose,
@@ -486,8 +505,10 @@ func TestFileHandlerStop(t *testing.T) {
 		logger     *log.Logger
 		file       []byte
 		fileInfo   *time.Time
+		muFile     *sync.RWMutex
 		rwPool     render.RenderWriterPool
 		cache      *fileHandlerCache
+		muCache    *sync.RWMutex
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -499,6 +520,10 @@ func TestFileHandlerStop(t *testing.T) {
 	}{
 		{
 			name: "default",
+			fields: fields{
+				muFile:  &sync.RWMutex{},
+				muCache: &sync.RWMutex{},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -508,8 +533,10 @@ func TestFileHandlerStop(t *testing.T) {
 				logger:     tt.fields.logger,
 				file:       tt.fields.file,
 				fileInfo:   tt.fields.fileInfo,
+				muFile:     tt.fields.muFile,
 				rwPool:     tt.fields.rwPool,
 				cache:      tt.fields.cache,
+				muCache:    tt.fields.muCache,
 				osOpenFile: tt.fields.osOpenFile,
 				osReadFile: tt.fields.osReadFile,
 				osClose:    tt.fields.osClose,
@@ -526,8 +553,10 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 		logger     *log.Logger
 		file       []byte
 		fileInfo   *time.Time
+		muFile     *sync.RWMutex
 		rwPool     render.RenderWriterPool
 		cache      *fileHandlerCache
+		muCache    *sync.RWMutex
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile func(name string) ([]byte, error)
 		osClose    func(*os.File) error
@@ -551,8 +580,10 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 					Cache:      boolPtr(true),
 					CacheTTL:   intPtr(60),
 				},
-				logger: log.Default(),
-				rwPool: render.NewRenderWriterPool(),
+				logger:  log.Default(),
+				muFile:  &sync.RWMutex{},
+				rwPool:  render.NewRenderWriterPool(),
+				muCache: &sync.RWMutex{},
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
 					return nil, nil
 				},
@@ -583,8 +614,10 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 				logger:     tt.fields.logger,
 				file:       tt.fields.file,
 				fileInfo:   tt.fields.fileInfo,
+				muFile:     tt.fields.muFile,
 				rwPool:     tt.fields.rwPool,
 				cache:      tt.fields.cache,
+				muCache:    tt.fields.muCache,
 				osOpenFile: tt.fields.osOpenFile,
 				osClose:    tt.fields.osClose,
 				osReadFile: tt.fields.osReadFile,

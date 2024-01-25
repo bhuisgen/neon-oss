@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"testing"
 	"text/template"
 
@@ -98,6 +99,7 @@ func TestRobotsHandlerModuleInfo(t *testing.T) {
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
+		muCache  *sync.RWMutex
 	}
 	tests := []struct {
 		name   string
@@ -120,6 +122,7 @@ func TestRobotsHandlerModuleInfo(t *testing.T) {
 				template: tt.fields.template,
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
+				muCache:  tt.fields.muCache,
 			}
 			got := h.ModuleInfo()
 			if got.ID != tt.want.ID {
@@ -139,6 +142,7 @@ func TestRobotsHandlerInit(t *testing.T) {
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
+		muCache  *sync.RWMutex
 	}
 	type args struct {
 		config map[string]interface{}
@@ -190,6 +194,7 @@ func TestRobotsHandlerInit(t *testing.T) {
 				template: tt.fields.template,
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
+				muCache:  tt.fields.muCache,
 			}
 			if err := h.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
 				t.Errorf("robotsHandler.Init() error = %v, wantErr %v", err, tt.wantErr)
@@ -205,6 +210,7 @@ func TestRobotsHandlerRegister(t *testing.T) {
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
+		muCache  *sync.RWMutex
 	}
 	type args struct {
 		site core.ServerSite
@@ -239,6 +245,7 @@ func TestRobotsHandlerRegister(t *testing.T) {
 				template: tt.fields.template,
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
+				muCache:  tt.fields.muCache,
 			}
 			if err := h.Register(tt.args.site); (err != nil) != tt.wantErr {
 				t.Errorf("robotsHandler.Register() error = %v, wantErr %v", err, tt.wantErr)
@@ -254,6 +261,7 @@ func TestRobotsHandlerStart(t *testing.T) {
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
+		muCache  *sync.RWMutex
 	}
 	tests := []struct {
 		name    string
@@ -272,6 +280,7 @@ func TestRobotsHandlerStart(t *testing.T) {
 				template: tt.fields.template,
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
+				muCache:  tt.fields.muCache,
 			}
 			if err := h.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("robotsHandler.Start() error = %v, wantErr %v", err, tt.wantErr)
@@ -287,6 +296,7 @@ func TestRobotsHandlerStop(t *testing.T) {
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
+		muCache  *sync.RWMutex
 	}
 	tests := []struct {
 		name   string
@@ -294,6 +304,9 @@ func TestRobotsHandlerStop(t *testing.T) {
 	}{
 		{
 			name: "default",
+			fields: fields{
+				muCache: &sync.RWMutex{},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -304,6 +317,7 @@ func TestRobotsHandlerStop(t *testing.T) {
 				template: tt.fields.template,
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
+				muCache:  tt.fields.muCache,
 			}
 			h.Stop()
 		})
@@ -322,6 +336,7 @@ func TestRobotsHandlerServeHTTP(t *testing.T) {
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
+		muCache  *sync.RWMutex
 	}
 	type args struct {
 		w http.ResponseWriter
@@ -342,6 +357,8 @@ func TestRobotsHandlerServeHTTP(t *testing.T) {
 				logger:   log.Default(),
 				template: tmpl,
 				rwPool:   render.NewRenderWriterPool(),
+				cache:    &robotsHandlerCache{},
+				muCache:  &sync.RWMutex{},
 			},
 			args: args{
 				w: testRobotsHandlerResponseWriter{},
@@ -361,6 +378,7 @@ func TestRobotsHandlerServeHTTP(t *testing.T) {
 				template: tt.fields.template,
 				rwPool:   tt.fields.rwPool,
 				cache:    tt.fields.cache,
+				muCache:  tt.fields.muCache,
 			}
 			h.ServeHTTP(tt.args.w, tt.args.r)
 		})

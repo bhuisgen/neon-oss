@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -25,8 +26,10 @@ type fileHandler struct {
 	logger     *log.Logger
 	file       []byte
 	fileInfo   *time.Time
+	muFile     *sync.RWMutex
 	rwPool     render.RenderWriterPool
 	cache      *fileHandlerCache
+	muCache    *sync.RWMutex
 	osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 	osReadFile func(name string) ([]byte, error)
 	osClose    func(*os.File) error
@@ -86,6 +89,8 @@ func (h fileHandler) ModuleInfo() module.ModuleInfo {
 		ID: fileModuleID,
 		NewInstance: func() module.Module {
 			return &fileHandler{
+				muFile:     new(sync.RWMutex),
+				muCache:    new(sync.RWMutex),
 				osOpenFile: fileOsOpenFile,
 				osReadFile: fileOsReadFile,
 				osClose:    fileOsClose,
@@ -178,14 +183,23 @@ func (h *fileHandler) Start() error {
 
 // Stop stops the handler.
 func (h *fileHandler) Stop() {
+	h.muFile.Lock()
+	h.file = nil
+	h.fileInfo = nil
+	h.muFile.Unlock()
+
+	h.muCache.Lock()
 	h.cache = nil
+	h.muCache.Unlock()
 }
 
 // ServeHTTP implements the http handler.
 func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if *h.config.Cache {
+		h.muCache.RLock()
 		if h.cache != nil && h.cache.expire.After(time.Now()) {
 			render := h.cache.render
+			h.muCache.RUnlock()
 
 			w.WriteHeader(render.StatusCode())
 			w.Write(render.Body())
@@ -194,6 +208,7 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			return
 		}
+		h.muCache.RUnlock()
 	}
 
 	err := h.read()
@@ -220,10 +235,12 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	render := rw.Render()
 
 	if *h.config.Cache {
+		h.muCache.Lock()
 		h.cache = &fileHandlerCache{
 			render: render,
 			expire: time.Now().Add(time.Duration(*h.config.CacheTTL) * time.Second),
 		}
+		h.muCache.Unlock()
 	}
 
 	w.WriteHeader(render.StatusCode())
@@ -240,7 +257,10 @@ func (h *fileHandler) read() error {
 
 		return err
 	}
+
+	h.muFile.RLock()
 	if h.fileInfo == nil || fileInfo.ModTime().After(*h.fileInfo) {
+		h.muFile.RUnlock()
 		buf, err := h.osReadFile(h.config.Path)
 		if err != nil {
 			h.logger.Printf("Failed to read file '%s': %s", h.config.Path, err)
@@ -248,9 +268,13 @@ func (h *fileHandler) read() error {
 			return err
 		}
 
+		h.muFile.Lock()
 		h.file = buf
 		i := fileInfo.ModTime()
 		h.fileInfo = &i
+		h.muFile.Unlock()
+	} else {
+		h.muFile.RUnlock()
 	}
 
 	return nil
@@ -259,7 +283,18 @@ func (h *fileHandler) read() error {
 // render makes a new render.
 func (h *fileHandler) render(w render.RenderWriter, r *http.Request) error {
 	w.WriteHeader(*h.config.StatusCode)
-	w.Write(h.file)
+
+	h.muFile.RLock()
+	var err error
+	if h.file != nil {
+		_, err = w.Write(h.file)
+	} else {
+		err = errors.New("file not loaded")
+	}
+	h.muFile.RUnlock()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

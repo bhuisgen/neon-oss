@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"testing"
 	"text/template"
 
@@ -99,6 +100,7 @@ func TestSitemapHandlerModuleInfo(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                *sitemapHandlerCache
+		muCache              *sync.RWMutex
 		site                 core.ServerSite
 	}
 	tests := []struct {
@@ -123,6 +125,7 @@ func TestSitemapHandlerModuleInfo(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
+				muCache:              tt.fields.muCache,
 				site:                 tt.fields.site,
 			}
 			got := h.ModuleInfo()
@@ -144,6 +147,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                *sitemapHandlerCache
+		muCache              *sync.RWMutex
 		site                 core.ServerSite
 	}
 	type args struct {
@@ -366,6 +370,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
+				muCache:              tt.fields.muCache,
 				site:                 tt.fields.site,
 			}
 			if err := h.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
@@ -383,6 +388,7 @@ func TestSitemapHandlerRegister(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                *sitemapHandlerCache
+		muCache              *sync.RWMutex
 		site                 core.ServerSite
 	}
 	type args struct {
@@ -419,6 +425,7 @@ func TestSitemapHandlerRegister(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
+				muCache:              tt.fields.muCache,
 				site:                 tt.fields.site,
 			}
 			if err := h.Register(tt.args.site); (err != nil) != tt.wantErr {
@@ -436,6 +443,7 @@ func TestSitemapHandlerStart(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                *sitemapHandlerCache
+		muCache              *sync.RWMutex
 		site                 core.ServerSite
 	}
 	tests := []struct {
@@ -456,6 +464,7 @@ func TestSitemapHandlerStart(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
+				muCache:              tt.fields.muCache,
 				site:                 tt.fields.site,
 			}
 			if err := h.Start(); (err != nil) != tt.wantErr {
@@ -473,6 +482,7 @@ func TestSitemapHandlerStop(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                *sitemapHandlerCache
+		muCache              *sync.RWMutex
 		site                 core.ServerSite
 	}
 	tests := []struct {
@@ -481,6 +491,9 @@ func TestSitemapHandlerStop(t *testing.T) {
 	}{
 		{
 			name: "default",
+			fields: fields{
+				muCache: &sync.RWMutex{},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -492,6 +505,7 @@ func TestSitemapHandlerStop(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
+				muCache:              tt.fields.muCache,
 				site:                 tt.fields.site,
 			}
 			h.Stop()
@@ -517,6 +531,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
 		cache                *sitemapHandlerCache
+		muCache              *sync.RWMutex
 		site                 core.ServerSite
 	}
 	type args struct {
@@ -539,6 +554,8 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 				templateSitemapIndex: tmplSitemapIndex,
 				templateSitemap:      tmplSitemap,
 				rwPool:               render.NewRenderWriterPool(),
+				cache:                &sitemapHandlerCache{},
+				muCache:              &sync.RWMutex{},
 			},
 			args: args{
 				w: testSitemapHandlerResponseWriter{},
@@ -559,6 +576,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 				templateSitemap:      tt.fields.templateSitemap,
 				rwPool:               tt.fields.rwPool,
 				cache:                tt.fields.cache,
+				muCache:              tt.fields.muCache,
 				site:                 tt.fields.site,
 			}
 			h.ServeHTTP(tt.args.w, tt.args.r)

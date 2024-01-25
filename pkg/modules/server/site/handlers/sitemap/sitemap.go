@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -33,6 +34,7 @@ type sitemapHandler struct {
 	templateSitemap      *template.Template
 	rwPool               render.RenderWriterPool
 	cache                *sitemapHandlerCache
+	muCache              *sync.RWMutex
 	site                 core.ServerSite
 }
 
@@ -151,7 +153,9 @@ func (h sitemapHandler) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
 		ID: sitemapModuleID,
 		NewInstance: func() module.Module {
-			return &sitemapHandler{}
+			return &sitemapHandler{
+				muCache: new(sync.RWMutex),
+			}
 		},
 	}
 }
@@ -355,14 +359,18 @@ func (h *sitemapHandler) Start() error {
 
 // Stop stops the handler.
 func (h *sitemapHandler) Stop() {
+	h.muCache.Lock()
 	h.cache = nil
+	h.muCache.Unlock()
 }
 
 // ServeHTTP implements the http handler.
 func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if *h.config.Cache {
+		h.muCache.RLock()
 		if h.cache != nil && h.cache.expire.After(time.Now()) {
 			render := h.cache.render
+			h.muCache.RUnlock()
 
 			w.WriteHeader(render.StatusCode())
 			w.Write(render.Body())
@@ -370,6 +378,8 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), true)
 
 			return
+		} else {
+			h.muCache.RUnlock()
 		}
 	}
 
@@ -388,10 +398,12 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	render := rw.Render()
 
 	if *h.config.Cache {
+		h.muCache.Lock()
 		h.cache = &sitemapHandlerCache{
 			render: render,
 			expire: time.Now().Add(time.Duration(*h.config.CacheTTL) * time.Second),
 		}
+		h.muCache.Unlock()
 	}
 
 	w.WriteHeader(render.StatusCode())
@@ -420,7 +432,7 @@ func (h *sitemapHandler) render(w render.RenderWriter, r *http.Request) error {
 	return nil
 }
 
-// sitemapIndex generates a sitemap index.
+// sitemapIndex writes the sitemap index.
 func (h *sitemapHandler) sitemapIndex(s []SitemapIndexEntry, w io.Writer, r *http.Request) error {
 	var items []sitemapTemplateSitemapIndexItem
 	for _, sitemapEntry := range s {
@@ -439,7 +451,7 @@ func (h *sitemapHandler) sitemapIndex(s []SitemapIndexEntry, w io.Writer, r *htt
 	return nil
 }
 
-// sitemap generates a sitemap.
+// sitemap writes the sitemap.
 func (h *sitemapHandler) sitemap(s []SitemapEntry, w io.Writer, r *http.Request) error {
 	var items []sitemapTemplateSitemapItem
 	for _, sitemapEntry := range s {

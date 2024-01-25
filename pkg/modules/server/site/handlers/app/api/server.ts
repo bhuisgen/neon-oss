@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 /**
- * Resource interface
+ * Resource interface.
  *
  * @interface Resource
  */
@@ -20,7 +20,7 @@ export interface Resource {
 }
 
 /**
- * Handler interface
+ * Handler interface.
  *
  * @interface Handler
  */
@@ -32,7 +32,7 @@ interface Handler {
 }
 
 /**
- * Request interface
+ * Request interface.
  *
  * @interface Request
  */
@@ -84,7 +84,7 @@ interface Request {
 }
 
 /**
- * Response interface
+ * Response interface.
  *
  * @interface Response
  */
@@ -146,23 +146,23 @@ interface Response {
 }
 
 /**
- * Server interface
+ * Server interface.
  *
  * @interface Server
  */
 export interface Server {
   /**
-   * Returns the handler object.
+   * The handler object.
    */
   handler: Handler;
 
   /**
-   * Returns the request object.
+   * The request object.
    */
   request: Request;
 
   /**
-   * Returns the response object.
+   * The response object.
    */
   response: Response;
 }
