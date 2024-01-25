@@ -122,21 +122,21 @@ func (a *application) Serve() error {
 	for {
 		select {
 		case <-exit:
-			log.Print("Signal SIGTERM received, stopping instance")
+			a.logger.Print("Signal SIGTERM received, stopping instance")
 			if err := a.stop(); err != nil {
-				return err
+				a.logger.Printf("Failed to stop the instance: %s", err)
 			}
 
 		case <-shutdown:
-			log.Print("Signal SIGQUIT received, starting instance shutdown")
+			a.logger.Print("Signal SIGQUIT received, stopping instance gracefully")
 			if err := a.shutdown(); err != nil {
-				log.Printf("Failed to shutdown the instance: %s", err)
+				a.logger.Printf("Failed to shutdown the instance: %s", err)
 			}
 
 		case <-reload:
-			log.Print("Signal SIGHUP received, reloading instance")
+			a.logger.Print("Signal SIGHUP received, reloading instance")
 			if err := a.reload(); err != nil {
-				log.Printf("Failed to reload instance: %s", err)
+				a.logger.Printf("Failed to reload instance: %s", err)
 				continue
 			}
 		}
@@ -147,6 +147,8 @@ func (a *application) Serve() error {
 	signal.Stop(exit)
 	signal.Stop(shutdown)
 	signal.Stop(reload)
+
+	a.logger.Print("Instance terminated")
 
 	return nil
 }
