@@ -6,6 +6,7 @@ package neon
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
 	"net/http"
@@ -54,7 +55,7 @@ func TestServerListenerInit(t *testing.T) {
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	type args struct {
@@ -130,7 +131,7 @@ func TestServerListenerRegister(t *testing.T) {
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	type args struct {
@@ -215,7 +216,7 @@ func TestServerListenerServe(t *testing.T) {
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	tests := []struct {
@@ -266,7 +267,7 @@ func TestServerListenerShutdown(t *testing.T) {
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	type args struct {
@@ -321,7 +322,7 @@ func TestServerListenerClose(t *testing.T) {
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	tests := []struct {
@@ -372,7 +373,7 @@ func TestServerListenerRemove(t *testing.T) {
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	tests := []struct {
@@ -387,7 +388,7 @@ func TestServerListenerRemove(t *testing.T) {
 					listener: &testServerListenerModule{},
 				},
 				quit:   make(chan struct{}, 1),
-				update: make(chan struct{}, 1),
+				update: make(chan chan error, 1),
 			},
 		},
 	}
@@ -414,7 +415,7 @@ func TestServerListenerName(t *testing.T) {
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	tests := []struct {
@@ -448,12 +449,27 @@ func TestServerListenerName(t *testing.T) {
 }
 
 func TestServerListenerLink(t *testing.T) {
+	createUpdateChan := func(errUpdate bool) chan chan error {
+		updateChan := make(chan chan error)
+		go func() {
+			for {
+				errChan := <-updateChan
+				if errUpdate {
+					errChan <- errors.New("test error")
+				} else {
+					errChan <- nil
+				}
+			}
+		}()
+		return updateChan
+	}
+
 	type fields struct {
 		name    string
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	type args struct {
@@ -471,13 +487,28 @@ func TestServerListenerLink(t *testing.T) {
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
-				update: make(chan struct{}, 1),
+				update: createUpdateChan(false),
 			},
 			args: args{
 				site: &serverSite{
 					name: "test",
 				},
 			},
+		},
+		{
+			name: "error update",
+			fields: fields{
+				state: &serverListenerState{
+					sites: map[string]ServerSite{},
+				},
+				update: createUpdateChan(true),
+			},
+			args: args{
+				site: &serverSite{
+					name: "test",
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -498,12 +529,27 @@ func TestServerListenerLink(t *testing.T) {
 }
 
 func TestServerListenerUnlink(t *testing.T) {
+	createUpdateChan := func(errUpdate bool) chan chan error {
+		updateChan := make(chan chan error)
+		go func() {
+			for {
+				errChan := <-updateChan
+				if errUpdate {
+					errChan <- errors.New("test error")
+				} else {
+					errChan <- nil
+				}
+			}
+		}()
+		return updateChan
+	}
+
 	type fields struct {
 		name    string
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	type args struct {
@@ -521,13 +567,28 @@ func TestServerListenerUnlink(t *testing.T) {
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
-				update: make(chan struct{}, 1),
+				update: createUpdateChan(false),
 			},
 			args: args{
 				site: &serverSite{
 					name: "test",
 				},
 			},
+		},
+		{
+			name: "error update",
+			fields: fields{
+				state: &serverListenerState{
+					sites: map[string]ServerSite{},
+				},
+				update: createUpdateChan(true),
+			},
+			args: args{
+				site: &serverSite{
+					name: "test",
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -553,7 +614,7 @@ func TestServerListenerDescriptor(t *testing.T) {
 		logger  *log.Logger
 		state   *serverListenerState
 		quit    chan struct{}
-		update  chan struct{}
+		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	tests := []struct {
@@ -567,14 +628,14 @@ func TestServerListenerDescriptor(t *testing.T) {
 				state: &serverListenerState{
 					mediator: &serverListenerMediator{},
 				},
-				update: make(chan struct{}, 1),
+				update: make(chan chan error, 1),
 			},
 		},
 		{
 			name: "listener not ready",
 			fields: fields{
 				state:  &serverListenerState{},
-				update: make(chan struct{}, 1),
+				update: make(chan chan error, 1),
 			},
 			wantErr: true,
 		},

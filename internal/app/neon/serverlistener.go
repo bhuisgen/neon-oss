@@ -25,7 +25,7 @@ type serverListener struct {
 	state   *serverListenerState
 	mu      sync.RWMutex
 	quit    chan struct{}
-	update  chan struct{}
+	update  chan chan error
 	osClose func(f *os.File) error
 }
 
@@ -50,7 +50,7 @@ func newServerListener(name string) *serverListener {
 			sites: make(map[string]ServerSite),
 		},
 		quit:    make(chan struct{}),
-		update:  make(chan struct{}),
+		update:  make(chan chan error),
 		osClose: serverListenerOsClose,
 	}
 }
@@ -178,11 +178,15 @@ func (l *serverListener) Name() string {
 // Link links a site to the listener.
 func (l *serverListener) Link(site ServerSite) error {
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	l.state.sites[site.Name()] = site
+	l.mu.Unlock()
 
-	l.update <- struct{}{}
+	errChan := make(chan error)
+	l.update <- errChan
+	err := <-errChan
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -190,26 +194,34 @@ func (l *serverListener) Link(site ServerSite) error {
 // Unlink unlinks a site to the listener.
 func (l *serverListener) Unlink(site ServerSite) error {
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	delete(l.state.sites, site.Name())
+	l.mu.Unlock()
 
-	l.update <- struct{}{}
+	errChan := make(chan error)
+	l.update <- errChan
+	err := <-errChan
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 // waitForEvents waits for events.
-func (l *serverListener) waitForEvents() error {
+func (l *serverListener) waitForEvents() {
 	for {
 		select {
 		case <-l.quit:
-			return nil
+			return
 
-		case <-l.update:
+		case errChan := <-l.update:
 			if err := l.updateRouter(); err != nil {
-				l.logger.Print("failed to update router")
+				l.logger.Printf("failed to update router: %s", err)
+				errChan <- err
+			} else {
+				errChan <- nil
 			}
+			close(errChan)
 		}
 	}
 }
