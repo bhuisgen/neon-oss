@@ -180,6 +180,8 @@ func (v *vm) Configure(config *vmConfig) error {
 
 // Executes executes a script.
 func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResult, error) {
+	defer v.timeTrack("Execute()", time.Now())
+
 	worker := func(vals chan<- *v8go.Value, errs chan<- error) {
 		value, err := v.context.RunScript(source, name)
 		if err != nil {
@@ -188,31 +190,37 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 		}
 		vals <- value
 	}
-	vals := make(chan *v8go.Value, 1)
-	errs := make(chan error, 1)
+	jsVal := make(chan *v8go.Value, 1)
+	jsErr := make(chan error, 1)
 
-	go worker(vals, errs)
+	go worker(jsVal, jsErr)
 	select {
-	case <-vals:
+	case <-jsVal:
 
-	case err := <-errs:
+	case err := <-jsErr:
 		if debug, ok := os.LookupEnv("DEBUG"); ok && debug == "1" {
 			var jsError *v8go.JSError
 			if errors.As(err, &jsError) {
-				v.logger.Printf("javascript stack trace: %+v", jsError)
-			} else {
-				v.logger.Printf("javascript error: %v", err)
+				v.logger.Printf("Javascript stack trace: %+v", jsError)
 			}
 		}
 		return nil, vmErrExecute
 
 	case <-time.After(timeout):
 		v.isolate.TerminateExecution()
-		<-errs
+		<-jsErr
 		return nil, vmErrExecutionTimeout
 	}
 
 	return newVMResult(v.data), nil
+}
+
+// timeTrack outputs the execution time of a function or code block
+func (v *vm) timeTrack(label string, start time.Time) {
+	elapsed := time.Since(start)
+	if debug, ok := os.LookupEnv("DEBUG"); ok && debug == "1" {
+		v.logger.Printf("%s took %s", label, elapsed)
+	}
 }
 
 var _ VM = (*vm)(nil)

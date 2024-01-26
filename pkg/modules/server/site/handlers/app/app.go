@@ -102,7 +102,7 @@ const (
 	appConfigDefaultEnv             string = "production"
 	appConfigDefaultContainer       string = "root"
 	appConfigDefaultState           string = "state"
-	appConfigDefaultTimeout         int    = 4
+	appConfigDefaultTimeout         int    = 200
 	appConfigDefaultCache           bool   = false
 	appConfigDefaultCacheTTL        int    = 60
 	appConfigDefaultCacheMaxItems   int    = 100

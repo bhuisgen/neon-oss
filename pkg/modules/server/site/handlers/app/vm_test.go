@@ -273,7 +273,7 @@ func TestVMExecute(t *testing.T) {
 			args: args{
 				name:    "test1",
 				source:  `(() => { const test = "test"; })();`,
-				timeout: time.Duration(1) * time.Second,
+				timeout: 200 * time.Millisecond,
 			},
 			want: &vmResult{},
 		},
@@ -296,7 +296,7 @@ func TestVMExecute(t *testing.T) {
 			args: args{
 				name:    "test2",
 				source:  `(() => { error; })();`,
-				timeout: time.Duration(1) * time.Second,
+				timeout: 200 * time.Millisecond,
 			},
 			want:    nil,
 			wantErr: true,
@@ -320,7 +320,7 @@ func TestVMExecute(t *testing.T) {
 			args: args{
 				name:    "test",
 				source:  `(() => { for(;;) {} })();`,
-				timeout: time.Duration(1) * time.Second,
+				timeout: 200 * time.Millisecond,
 			},
 			want:    nil,
 			wantErr: true,
