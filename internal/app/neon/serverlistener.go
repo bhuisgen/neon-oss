@@ -231,7 +231,7 @@ func (l *serverListener) updateRouter() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	var serverRouters []ServerSiteRouter
+	serverRouters := make([]ServerSiteRouter, 0, len(l.state.sites))
 	for _, server := range l.state.sites {
 		serverRouter, err := server.Router()
 		if err != nil {
