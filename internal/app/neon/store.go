@@ -25,7 +25,7 @@ type store struct {
 
 // storeConfig implements the datastore configuration
 type storeConfig struct {
-	Storage map[string]map[string]interface{}
+	Storage map[string]map[string]interface{} `mapstructure:"storage"`
 }
 
 // storeState implements the datastore state

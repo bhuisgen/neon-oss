@@ -5,6 +5,7 @@
 package neon
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -743,7 +744,7 @@ func TestServerSiteMiddlewareHandler(t *testing.T) {
 			}
 			h := m.Handler(tt.args.next)
 			w := httptest.NewRecorder()
-			r, err := http.NewRequest("GET", "/", nil)
+			r, err := http.NewRequestWithContext(context.Background(), "GET", "/", nil)
 			if err != nil {
 				t.Fatal(err)
 			}

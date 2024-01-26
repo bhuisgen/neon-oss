@@ -32,13 +32,13 @@ type loader struct {
 
 // loaderConfig implements the loader configuration.
 type loaderConfig struct {
-	ExecStartup          *int
-	ExecInterval         *int
-	ExecFailsafeInterval *int
-	ExecWorkers          *int
-	ExecMaxOps           *int
-	ExecMaxDelay         *int
-	Rules                map[string]map[string]map[string]interface{}
+	ExecStartup          *int                                         `mapstructure:"execStartup"`
+	ExecInterval         *int                                         `mapstructure:"execInterval"`
+	ExecFailsafeInterval *int                                         `mapstructure:"execFailsafeInterval"`
+	ExecWorkers          *int                                         `mapstructure:"execWorkers"`
+	ExecMaxOps           *int                                         `mapstructure:"execMaxOps"`
+	ExecMaxDelay         *int                                         `mapstructure:"execMaxDelay"`
+	Rules                map[string]map[string]map[string]interface{} `mapstructure:"rules"`
 }
 
 // loaderState implements the loader state.
@@ -207,7 +207,7 @@ func (l *loader) execute(stop <-chan struct{}) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		worker := func(ctx context.Context, id int, jobs <-chan string, results chan<- error) {
+		worker := func(ctx context.Context, jobs <-chan string, results chan<- error) {
 			for ruleName := range jobs {
 				parser, ok := l.state.parsers[ruleName]
 				if !ok {
@@ -244,7 +244,7 @@ func (l *loader) execute(stop <-chan struct{}) {
 				results := make(chan error, rulesCount)
 
 				for w := 1; w <= *l.config.ExecWorkers; w++ {
-					go worker(ctx, w, jobs, results)
+					go worker(ctx, jobs, results)
 				}
 
 				ops := 0

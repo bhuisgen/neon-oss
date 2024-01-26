@@ -112,8 +112,8 @@ func (l *serverListener) Register(descriptor ServerListenerDescriptor) error {
 
 	if descriptor != nil {
 		for _, file := range descriptor.Files() {
-			defer l.osClose(file)
 			ln, err := net.FileListener(file)
+			_ = l.osClose(file)
 			if err != nil {
 				return err
 			}

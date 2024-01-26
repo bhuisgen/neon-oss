@@ -26,8 +26,8 @@ type server struct {
 
 // serverConfig implements the server configuration.
 type serverConfig struct {
-	Listeners map[string]map[string]interface{}
-	Sites     map[string]map[string]interface{}
+	Listeners map[string]map[string]interface{} `mapstructure:"listeners"`
+	Sites     map[string]map[string]interface{} `mapstructure:"sites"`
 }
 
 // serverState implements the server state.

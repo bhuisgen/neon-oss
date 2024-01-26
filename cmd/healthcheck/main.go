@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -60,7 +61,9 @@ func run() error {
 
 // healthcheck performs a request to the server endpoint.
 func healthcheck(url string, cacert string, cert string, key string, status int, timeout int) error {
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 
 	if cacert != "" {
 		ca, err := os.ReadFile(cacert)
@@ -86,32 +89,33 @@ func healthcheck(url string, cacert string, cert string, key string, status int,
 			tlsConfig.Certificates = []tls.Certificate{c}
 		}
 	}
-
-	transport := http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout: time.Duration(timeout) * time.Second,
-		}).Dial,
-		TLSClientConfig:       tlsConfig,
-		TLSHandshakeTimeout:   time.Duration(timeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(timeout) * time.Second,
-		ExpectContinueTimeout: time.Duration(timeout) * time.Second,
-		ForceAttemptHTTP2:     true,
-	}
-
 	client := http.Client{
-		Transport: &transport,
-		Timeout:   time.Duration(timeout) * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout: time.Duration(timeout) * time.Second,
+			}).Dial,
+			TLSClientConfig:       tlsConfig,
+			TLSHandshakeTimeout:   time.Duration(timeout) * time.Second,
+			ResponseHeaderTimeout: time.Duration(timeout) * time.Second,
+			ExpectContinueTimeout: time.Duration(timeout) * time.Second,
+			ForceAttemptHTTP2:     true,
+		},
+		Timeout: time.Duration(timeout) * time.Second,
 	}
 
-	response, err := client.Head(url)
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodHead, url, nil)
+	if err != nil {
+		return err
+	}
+	response, err := client.Do(request)
 	if response != nil {
 		defer response.Body.Close()
 	}
 	if err != nil {
 		return err
 	}
-	io.Copy(io.Discard, response.Body)
+	_, _ = io.Copy(io.Discard, response.Body)
 	if status > 0 {
 		if response.StatusCode != status {
 			return errors.New("invalid status")

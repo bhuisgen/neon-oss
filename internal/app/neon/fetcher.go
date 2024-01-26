@@ -28,7 +28,7 @@ type fetcher struct {
 
 // fetcherConfig implements the fetcher configuration.
 type fetcherConfig struct {
-	Providers map[string]map[string]map[string]interface{}
+	Providers map[string]map[string]map[string]interface{} `mapstructure:"providers"`
 }
 
 // fetcherState implements the fetcher state.

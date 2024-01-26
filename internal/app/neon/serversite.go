@@ -37,15 +37,15 @@ type serverSite struct {
 
 // serverSiteConfig implements the server site configuration.
 type serverSiteConfig struct {
-	Listeners []string
-	Hosts     []string
-	Routes    map[string]serverSiteRouteConfig
+	Listeners []string                         `mapstructure:"listeners"`
+	Hosts     []string                         `mapstructure:"hosts"`
+	Routes    map[string]serverSiteRouteConfig `mapstructure:"routes"`
 }
 
 // serverSiteRouteConfig implements a server site route configuration.
 type serverSiteRouteConfig struct {
-	Middlewares map[string]map[string]interface{}
-	Handler     map[string]map[string]interface{}
+	Middlewares map[string]map[string]interface{} `mapstructure:"middlewares"`
+	Handler     map[string]map[string]interface{} `mapstructure:"handler"`
 }
 
 // serverSiteState implements the server site state.

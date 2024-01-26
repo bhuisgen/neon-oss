@@ -83,7 +83,7 @@ func (a *application) Serve() error {
 	a.logger.Printf("%s version %s, commit %s", Name, Version, Commit)
 
 	if core.DEBUG {
-		a.logger.Print("debug enabled")
+		a.logger.Print("Debug enabled")
 	}
 
 	a.state = &applicationState{}
@@ -128,7 +128,7 @@ func (a *application) Serve() error {
 			}
 
 		case <-shutdown:
-			a.logger.Print("Signal SIGQUIT received, stopping instance gracefully")
+			a.logger.Print("Signal SIGQUIT received, shutting down instance gracefully")
 			if err := a.shutdown(); err != nil {
 				a.logger.Printf("Failed to shutdown the instance: %s", err)
 			}
@@ -393,8 +393,8 @@ func (a *application) listenChild(ch chan<- string, errorCh chan<- error) {
 		return
 	}
 	defer func() {
-		l.Close()
-		os.Remove(childSocketFile)
+		_ = l.Close()
+		_ = os.Remove(childSocketFile)
 	}()
 
 	ch <- "init"
