@@ -200,9 +200,10 @@ func (s *serverSite) Register() error {
 				return err
 			}
 		}
-
-		if err := s.state.routesMap[route].handler.Register(mediator); err != nil {
-			return err
+		if s.state.routesMap[route].handler != nil {
+			if err := s.state.routesMap[route].handler.Register(mediator); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -232,9 +233,10 @@ func (s *serverSite) Start() error {
 				return err
 			}
 		}
-
-		if err := s.state.routesMap[route].handler.Start(); err != nil {
-			return err
+		if s.state.routesMap[route].handler != nil {
+			if err := s.state.routesMap[route].handler.Start(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -250,8 +252,9 @@ func (s *serverSite) Stop() error {
 		for _, middleware := range s.state.routesMap[route].middlewares {
 			middleware.Stop()
 		}
-
-		s.state.routesMap[route].handler.Stop()
+		if s.state.routesMap[route].handler != nil {
+			s.state.routesMap[route].handler.Stop()
+		}
 	}
 
 	return nil
