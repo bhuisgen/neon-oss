@@ -45,29 +45,29 @@ type restProvider struct {
 
 // restProviderConfig implements the rest provider configuration.
 type restProviderConfig struct {
-	TLSCAFiles          *[]string
-	TLSCertFiles        *[]string
-	TLSKeyFiles         *[]string
-	Timeout             *int
-	MaxConnsPerHost     *int
-	MaxIdleConns        *int
-	MaxIdleConnsPerHost *int
-	IdleConnTimeout     *int
-	Retry               *int
-	RetryDelay          *int
-	Headers             map[string]string
-	Params              map[string]string
+	TLSCAFiles          *[]string         `mapstructure:"tlsCAFiles"`
+	TLSCertFiles        *[]string         `mapstructure:"tlsCertFiles"`
+	TLSKeyFiles         *[]string         `mapstructure:"tlsKeyFiles"`
+	Timeout             *int              `mapstructure:"timeout"`
+	MaxConnsPerHost     *int              `mapstructure:"maxConnsPerHost"`
+	MaxIdleConns        *int              `mapstructure:"maxIdleConns"`
+	MaxIdleConnsPerHost *int              `mapstructure:"maxIdleConnsPerHost"`
+	IdleConnTimeout     *int              `mapstructure:"idleConnTimeout"`
+	Retry               *int              `mapstructure:"retry"`
+	RetryDelay          *int              `mapstructure:"retryDelay"`
+	Headers             map[string]string `mapstructure:"headers"`
+	Params              map[string]string `mapstructure:"params"`
 }
 
 // restResourceConfig implements the rest resource configuration.
 type restResourceConfig struct {
-	Method     *string
-	URL        string
-	Params     map[string]string
-	Headers    map[string]string
-	Next       *bool
-	NextParser *string
-	NextFilter *string
+	Method     *string           `mapstructure:"method"`
+	URL        string            `mapstructure:"url"`
+	Params     map[string]string `mapstructure:"params"`
+	Headers    map[string]string `mapstructure:"headers"`
+	Next       *bool             `mapstructure:"next"`
+	NextParser *string           `mapstructure:"nextParser"`
+	NextFilter *string           `mapstructure:"nextFilter"`
 }
 
 const (
@@ -182,7 +182,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 				errInit = true
 				continue
 			}
-			p.osClose(file)
+			_ = p.osClose(file)
 			fi, err := p.osStat(item)
 			if err != nil {
 				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSCAFiles", item)
@@ -209,7 +209,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 				errInit = true
 				continue
 			}
-			p.osClose(file)
+			_ = p.osClose(file)
 			fi, err := p.osStat(item)
 			if err != nil {
 				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSCertFiles", item)
@@ -240,7 +240,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 				errInit = true
 				continue
 			}
-			p.osClose(file)
+			_ = p.osClose(file)
 			fi, err := p.osStat(item)
 			if err != nil {
 				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSKeyFiles", item)
@@ -327,7 +327,9 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 		return errors.New("init error")
 	}
 
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 
 	if p.config.TLSCAFiles != nil {
 		caCertPool := x509.NewCertPool()

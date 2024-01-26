@@ -29,7 +29,7 @@ type compressMiddleware struct {
 
 // compressMiddlewareConfig implements the compress middleware configuration.
 type compressMiddlewareConfig struct {
-	Level *int
+	Level *int `mapstructure:"level"`
 }
 
 const (

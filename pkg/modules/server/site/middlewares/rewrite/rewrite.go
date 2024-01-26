@@ -26,15 +26,15 @@ type rewriteMiddleware struct {
 
 // rewriteMiddlewareConfig implements the rewrite middleware configuration.
 type rewriteMiddlewareConfig struct {
-	Rules []RewriteRule
+	Rules []RewriteRule `mapstructure:"rules"`
 }
 
 // RewriteRule implements a rewrite rule.
 type RewriteRule struct {
-	Path        string
-	Replacement string
-	Flag        *string
-	Last        bool
+	Path        string  `mapstructure:"path"`
+	Replacement string  `mapstructure:"replacement"`
+	Flag        *string `mapstructure:"flag"`
+	Last        bool    `mapstructure:"last"`
 }
 
 const (

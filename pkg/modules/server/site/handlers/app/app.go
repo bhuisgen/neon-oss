@@ -53,31 +53,31 @@ type appHandler struct {
 
 // appHandlerConfig implements the app handler configuration.
 type appHandlerConfig struct {
-	Index         string
-	Bundle        string
-	Env           *string
-	Container     *string
-	State         *string
-	Timeout       *int
-	MaxVMs        *int
-	Cache         *bool
-	CacheTTL      *int
-	CacheMaxItems *int
-	Rules         []AppRule
+	Index         string    `mapstructure:"index"`
+	Bundle        string    `mapstructure:"bundle"`
+	Env           *string   `mapstructure:"env"`
+	Container     *string   `mapstructure:"container"`
+	State         *string   `mapstructure:"state"`
+	Timeout       *int      `mapstructure:"timeout"`
+	MaxVMs        *int      `mapstructure:"maxVMs"`
+	Cache         *bool     `mapstructure:"cache"`
+	CacheTTL      *int      `mapstructure:"cacheTTL"`
+	CacheMaxItems *int      `mapstructure:"cacheMaxItems"`
+	Rules         []AppRule `mapstructure:"rules"`
 }
 
 // AppRule implements a rule.
 type AppRule struct {
-	Path  string
-	State []AppRuleStateEntry
-	Last  bool
+	Path  string              `mapstructure:"path"`
+	State []AppRuleStateEntry `mapstructure:"state"`
+	Last  bool                `mapstructure:"last"`
 }
 
 // AppRuleStateEntry implements a rule state entry.
 type AppRuleStateEntry struct {
-	Key      string
-	Resource string
-	Export   *bool
+	Key      string `mapstructure:"key"`
+	Resource string `mapstructure:"resource"`
+	Export   *bool  `mapstructure:"export"`
 }
 
 // appCacheItem implements a app handler cache item.
@@ -181,7 +181,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *log.Logger) err
 			h.logger.Printf("option '%s', failed to open file '%s'", "Index", h.config.Index)
 			errInit = true
 		} else {
-			h.osClose(f)
+			_ = h.osClose(f)
 			fi, err := h.osStat(h.config.Index)
 			if err != nil {
 				h.logger.Printf("option '%s', failed to stat file '%s'", "Index", h.config.Index)
@@ -202,7 +202,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *log.Logger) err
 			h.logger.Printf("option '%s', failed to open file '%s'", "Bundle", h.config.Bundle)
 			errInit = true
 		} else {
-			h.osClose(f)
+			_ = h.osClose(f)
 			fi, err := h.osStat(h.config.Bundle)
 			if err != nil {
 				h.logger.Printf("option '%s', failed to stat file '%s'", "Bundle", h.config.Bundle)

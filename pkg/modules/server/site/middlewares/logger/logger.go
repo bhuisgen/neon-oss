@@ -32,7 +32,7 @@ type loggerMiddleware struct {
 
 // loggerMiddlewareConfig implements the logger middleware configuration.
 type loggerMiddlewareConfig struct {
-	File *string
+	File *string `mapstructure:"file"`
 }
 
 const (
@@ -89,12 +89,12 @@ func (m *loggerMiddleware) Init(config map[string]interface{}, logger *log.Logge
 			m.logger.Printf("option '%s', invalid value '%s'", "File", *m.config.File)
 			errInit = true
 		} else {
-			f, err := m.osOpenFile(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+			f, err := m.osOpenFile(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 			if err != nil {
 				m.logger.Printf("option '%s', failed to open file '%s'", "File", *m.config.File)
 				errInit = true
 			} else {
-				m.osClose(f)
+				_ = m.osClose(f)
 				fi, err := m.osStat(*m.config.File)
 				if err != nil {
 					m.logger.Printf("option '%s', failed to stat file '%s'", "File", *m.config.File)
@@ -129,7 +129,7 @@ func (m *loggerMiddleware) Register(site core.ServerSite) error {
 func (m *loggerMiddleware) Start() error {
 	var logFileWriter LogFileWriter
 	if m.config.File != nil {
-		w, err := CreateLogFileWriter(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+		w, err := CreateLogFileWriter(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 		if err != nil {
 			return err
 		}

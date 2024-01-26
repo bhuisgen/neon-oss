@@ -38,10 +38,10 @@ type fileHandler struct {
 
 // fileHandlerConfig implements the file handler configuration.
 type fileHandlerConfig struct {
-	Path       string
-	StatusCode *int
-	Cache      *bool
-	CacheTTL   *int
+	Path       string `mapstructure:"path"`
+	StatusCode *int   `mapstructure:"statusCode"`
+	Cache      *bool  `mapstructure:"cache"`
+	CacheTTL   *int   `mapstructure:"cacheTTL"`
 }
 
 // fileHandlerCache implments the file handler cache.
@@ -120,7 +120,7 @@ func (h *fileHandler) Init(config map[string]interface{}, logger *log.Logger) er
 			h.logger.Printf("option '%s', failed to open file '%s'", "Path", h.config.Path)
 			errInit = true
 		} else {
-			h.osClose(f)
+			_ = h.osClose(f)
 			fi, err := h.osStat(h.config.Path)
 			if err != nil {
 				h.logger.Printf("option '%s', failed to stat file '%s'", "Path", h.config.Path)

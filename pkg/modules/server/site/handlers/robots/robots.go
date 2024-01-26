@@ -32,10 +32,10 @@ type robotsHandler struct {
 
 // robotsHandlerConfig implements the robots handler configuration.
 type robotsHandlerConfig struct {
-	Hosts    []string
-	Cache    *bool
-	CacheTTL *int
-	Sitemaps []string
+	Hosts    []string `mapstructure:"hosts"`
+	Cache    *bool    `mapstructure:"cache"`
+	CacheTTL *int     `mapstructure:"cacheTTL"`
+	Sitemaps []string `mapstructure:"sitemaps"`
 }
 
 // robotsTemplateData implements the robots template data.
@@ -226,8 +226,6 @@ func (h *robotsHandler) render(w render.RenderWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-
-	w.WriteHeader(http.StatusOK)
 
 	return nil
 }

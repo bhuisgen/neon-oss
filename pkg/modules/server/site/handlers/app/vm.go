@@ -5,6 +5,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -179,35 +180,35 @@ func (v *vm) Configure(config *vmConfig) error {
 
 // Executes executes a script.
 func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResult, error) {
-	worker := func(values chan<- *v8go.Value, errors chan<- error) {
+	worker := func(vals chan<- *v8go.Value, errs chan<- error) {
 		value, err := v.context.RunScript(source, name)
 		if err != nil {
-			errors <- err
+			errs <- err
 			return
 		}
-		values <- value
+		vals <- value
 	}
-	values := make(chan *v8go.Value, 1)
-	errors := make(chan error, 1)
+	vals := make(chan *v8go.Value, 1)
+	errs := make(chan error, 1)
 
-	go worker(values, errors)
+	go worker(vals, errs)
 	select {
-	case <-values:
+	case <-vals:
 
-	case err := <-errors:
+	case err := <-errs:
 		if debug, ok := os.LookupEnv("DEBUG"); ok && debug == "1" {
-			e := err.(*v8go.JSError)
-			if e.StackTrace != "" {
-				v.logger.Printf("javascript stack trace: %+v", e)
+			var jsError *v8go.JSError
+			if errors.As(err, &jsError) {
+				v.logger.Printf("javascript stack trace: %+v", jsError)
 			} else {
-				v.logger.Printf("javascript error: %v", e)
+				v.logger.Printf("javascript error: %v", err)
 			}
 		}
 		return nil, vmErrExecute
 
 	case <-time.After(timeout):
 		v.isolate.TerminateExecution()
-		<-errors
+		<-errs
 		return nil, vmErrExecutionTimeout
 	}
 

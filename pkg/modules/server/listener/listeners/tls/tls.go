@@ -43,16 +43,16 @@ type tlsListener struct {
 
 // tlsListenerConfig implements the tls listener configuration.
 type tlsListenerConfig struct {
-	ListenAddr        *string
-	ListenPort        *int
-	CAFiles           *[]string
-	CertFiles         []string
-	KeyFiles          []string
-	ClientAuth        *string
-	ReadTimeout       *int
-	ReadHeaderTimeout *int
-	WriteTimeout      *int
-	IdleTimeout       *int
+	ListenAddr        *string   `mapstructure:"listenAddr"`
+	ListenPort        *int      `mapstructure:"listenPort"`
+	CAFiles           *[]string `mapstructure:"caFiles"`
+	CertFiles         []string  `mapstructure:"certFiles"`
+	KeyFiles          []string  `mapstructure:"keyFiles"`
+	ClientAuth        *string   `mapstructure:"clientAuth"`
+	ReadTimeout       *int      `mapstructure:"readTimeout"`
+	ReadHeaderTimeout *int      `mapstructure:"readHeaderTimeout"`
+	WriteTimeout      *int      `mapstructure:"writeTimeout"`
+	IdleTimeout       *int      `mapstructure:"idleTimeout"`
 }
 
 const (
@@ -185,7 +185,7 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 				errInit = true
 				continue
 			}
-			l.osClose(f)
+			_ = l.osClose(f)
 			fi, err := l.osStat(item)
 			if err != nil {
 				l.logger.Printf("option '%s', failed to stat file '%s'", "CAFiles", item)
@@ -215,7 +215,7 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 			errInit = true
 			continue
 		}
-		l.osClose(f)
+		_ = l.osClose(f)
 		fi, err := l.osStat(item)
 		if err != nil {
 			l.logger.Printf("option '%s', failed to stat file '%s'", "CertFiles", item)
@@ -244,7 +244,7 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 			errInit = true
 			continue
 		}
-		l.osClose(f)
+		_ = l.osClose(f)
 		fi, err := l.osStat(item)
 		if err != nil {
 			l.logger.Printf("option '%s', failed to stat file '%s'", "KeyFiles", item)
@@ -344,7 +344,9 @@ func (l *tlsListener) Serve(handler http.Handler) error {
 		ErrorLog:          l.logger,
 	}
 
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 
 	if l.config.CAFiles != nil {
 		caCertPool := x509.NewCertPool()
@@ -389,8 +391,8 @@ func (l *tlsListener) Serve(handler http.Handler) error {
 		l.logger.Printf("Listening at https://%s", l.server.Addr)
 
 		err := l.httpServerServeTLS(l.server, l.listener, "", "")
-		if err != nil && err != http.ErrServerClosed {
-			log.Print(err)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			l.logger.Print(err)
 		}
 	}()
 

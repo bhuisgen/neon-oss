@@ -40,51 +40,51 @@ type sitemapHandler struct {
 
 // sitemapHandlerConfig implements the sitemap handler configuration.
 type sitemapHandlerConfig struct {
-	Root         string
-	Cache        *bool
-	CacheTTL     *int
-	Kind         string
-	SitemapIndex []SitemapIndexEntry
-	Sitemap      []SitemapEntry
+	Root         string              `mapstructure:"root"`
+	Cache        *bool               `mapstructure:"cache"`
+	CacheTTL     *int                `mapstructure:"cacheTTL"`
+	Kind         string              `mapstructure:"kind"`
+	SitemapIndex []SitemapIndexEntry `mapstructure:"sitemapIndex"`
+	Sitemap      []SitemapEntry      `mapstructure:"sitemap"`
 }
 
 // SitemapIndexEntry implements a sitemap index entry.
 type SitemapIndexEntry struct {
-	Name   string
-	Type   string
-	Static SitemapIndexEntryStatic
+	Name   string                  `mapstructure:"name"`
+	Type   string                  `mapstructure:"type"`
+	Static SitemapIndexEntryStatic `mapstructure:"static"`
 }
 
 // SitemapIndexEntryStatic implements a static sitemap index entry.
 type SitemapIndexEntryStatic struct {
-	Loc string
+	Loc string `mapstructure:"loc"`
 }
 
 // SitemapEntry implements a sitemap entry.
 type SitemapEntry struct {
-	Name   string
-	Type   string
-	Static SitemapEntryStatic
-	List   SitemapEntryList
+	Name   string             `mapstructure:"name"`
+	Type   string             `mapstructure:"type"`
+	Static SitemapEntryStatic `mapstructure:"static"`
+	List   SitemapEntryList   `mapstructure:"list"`
 }
 
 // SitemapEntryStatic implements a static sitemap entry.
 type SitemapEntryStatic struct {
-	Loc        string
-	Lastmod    *string
-	Changefreq *string
-	Priority   *float64
+	Loc        string   `mapstructure:"loc"`
+	Lastmod    *string  `mapstructure:"lastmod"`
+	Changefreq *string  `mapstructure:"changefreq"`
+	Priority   *float64 `mapstructure:"priority"`
 }
 
 // SitemapEntryList implements a sitemap entry list.
 type SitemapEntryList struct {
-	Resource    string
-	Filter      string
-	ItemLoc     string
-	ItemLastmod *string
-	ItemIgnore  *string
-	Changefreq  *string
-	Priority    *float64
+	Resource    string   `mapstructure:"resource"`
+	Filter      string   `mapstructure:"filter"`
+	ItemLoc     string   `mapstructure:"itemLoc"`
+	ItemLastmod *string  `mapstructure:"itemLastmod"`
+	ItemIgnore  *string  `mapstructure:"itemIgnore"`
+	Changefreq  *string  `mapstructure:"changefreq"`
+	Priority    *float64 `mapstructure:"priority"`
 }
 
 // sitemapTemplateSitemapIndexData implements the sitemap index template data.

@@ -35,12 +35,12 @@ type localListener struct {
 
 // localListenerConfig implements the local listener configuration.
 type localListenerConfig struct {
-	ListenAddr        *string
-	ListenPort        *int
-	ReadTimeout       *int
-	ReadHeaderTimeout *int
-	WriteTimeout      *int
-	IdleTimeout       *int
+	ListenAddr        *string `mapstructure:"listenAddr"`
+	ListenPort        *int    `mapstructure:"listenPort"`
+	ReadTimeout       *int    `mapstructure:"readTimeout"`
+	ReadHeaderTimeout *int    `mapstructure:"readHeaderTimeout"`
+	WriteTimeout      *int    `mapstructure:"writeTimeout"`
+	IdleTimeout       *int    `mapstructure:"idleTimeout"`
 }
 
 const (
@@ -200,8 +200,8 @@ func (l *localListener) Serve(handler http.Handler) error {
 		l.logger.Printf("Listening at http://%s", l.server.Addr)
 
 		err := l.httpServerServe(l.server, l.listener)
-		if err != nil && err != http.ErrServerClosed {
-			log.Print(err)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			l.logger.Print(err)
 		}
 	}()
 

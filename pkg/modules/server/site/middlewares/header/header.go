@@ -25,14 +25,14 @@ type headerMiddleware struct {
 
 // headerMiddlewareConfig implements the header middleware configuration.
 type headerMiddlewareConfig struct {
-	Rules []HeaderRule
+	Rules []HeaderRule `mapstructure:"rules"`
 }
 
 // HeaderRule implements a header rule.
 type HeaderRule struct {
-	Path string
-	Set  map[string]string
-	Last bool
+	Path string            `mapstructure:"path"`
+	Set  map[string]string `mapstructure:"set"`
+	Last bool              `mapstructure:"last"`
 }
 
 const (

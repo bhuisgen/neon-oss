@@ -6,6 +6,7 @@ package logger
 
 import (
 	"os"
+	"path"
 	"testing"
 )
 
@@ -34,7 +35,7 @@ func TestCreateLogFileWriter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := CreateLogFileWriter(tt.args.name, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+			_, err := CreateLogFileWriter(tt.args.name, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateLogFileWriter() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -44,7 +45,7 @@ func TestCreateLogFileWriter(t *testing.T) {
 }
 
 func TestLogFileWriterClose(t *testing.T) {
-	f, err := os.Create(os.DevNull)
+	f, err := os.Create(path.Join(t.TempDir(), "test"))
 	if err != nil {
 		t.Error("failed to create file")
 	}
@@ -66,7 +67,7 @@ func TestLogFileWriterClose(t *testing.T) {
 			fields: fields{
 				name: os.DevNull,
 				flag: os.O_WRONLY | os.O_CREATE | os.O_APPEND,
-				perm: 0666,
+				perm: 0600,
 				f:    f,
 			},
 		},
@@ -75,7 +76,7 @@ func TestLogFileWriterClose(t *testing.T) {
 			fields: fields{
 				name: os.DevNull,
 				flag: os.O_WRONLY | os.O_CREATE | os.O_APPEND,
-				perm: 0666,
+				perm: 0600,
 				f:    f,
 			},
 			wantErr: true,
@@ -97,7 +98,7 @@ func TestLogFileWriterClose(t *testing.T) {
 }
 
 func TestLogFileWriterReopen(t *testing.T) {
-	f, err := os.Create(os.DevNull)
+	f, err := os.Create(path.Join(t.TempDir(), "test"))
 	if err != nil {
 		t.Error("failed to create file")
 	}
@@ -119,7 +120,7 @@ func TestLogFileWriterReopen(t *testing.T) {
 			fields: fields{
 				name: os.DevNull,
 				flag: os.O_WRONLY | os.O_CREATE | os.O_APPEND,
-				perm: 0666,
+				perm: 0600,
 				f:    f,
 			},
 		},
@@ -128,7 +129,7 @@ func TestLogFileWriterReopen(t *testing.T) {
 			fields: fields{
 				name: "",
 				flag: os.O_WRONLY | os.O_CREATE | os.O_APPEND,
-				perm: 0666,
+				perm: 0600,
 				f:    f,
 			},
 			wantErr: true,
@@ -150,7 +151,7 @@ func TestLogFileWriterReopen(t *testing.T) {
 }
 
 func TestLogFileWriterWrite(t *testing.T) {
-	f, err := os.Create(os.DevNull)
+	f, err := os.Create(path.Join(t.TempDir(), "test"))
 	if err != nil {
 		t.Error("failed to create file")
 	}
@@ -177,7 +178,7 @@ func TestLogFileWriterWrite(t *testing.T) {
 			fields: fields{
 				name: os.DevNull,
 				flag: os.O_WRONLY | os.O_CREATE | os.O_APPEND,
-				perm: 0666,
+				perm: 0600,
 				f:    f,
 			},
 		},
@@ -200,7 +201,7 @@ func TestLogFileWriterWrite(t *testing.T) {
 }
 
 func TestLogFileWriterSync(t *testing.T) {
-	f, err := os.Create(os.DevNull)
+	f, err := os.Create(path.Join(t.TempDir(), "test"))
 	if err != nil {
 		t.Error("failed to create file")
 	}
@@ -232,7 +233,10 @@ func TestLogFileWriterSync(t *testing.T) {
 				perm: tt.fields.perm,
 				f:    tt.fields.f,
 			}
-			w.Sync()
+			if err := w.Sync(); (err != nil) != tt.wantErr {
+				t.Errorf("logFileWriter.Sync() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 		})
 	}
 }

@@ -33,8 +33,8 @@ type staticMiddleware struct {
 
 // staticMiddlewareConfig implements the static middleware configuration.
 type staticMiddlewareConfig struct {
-	Path  string
-	Index *bool
+	Path  string `mapstructure:"path"`
+	Index *bool  `mapstructure:"index"`
 }
 
 const (
@@ -97,7 +97,7 @@ func (m *staticMiddleware) Init(config map[string]interface{}, logger *log.Logge
 			m.logger.Printf("option '%s', failed to open file '%s'", "Path", m.config.Path)
 			errInit = true
 		} else {
-			m.osClose(f)
+			_ = m.osClose(f)
 			fi, err := m.osStat(m.config.Path)
 			if err != nil {
 				m.logger.Printf("option '%s', failed to stat file '%s'", "Path", m.config.Path)

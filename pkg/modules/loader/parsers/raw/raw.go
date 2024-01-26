@@ -23,7 +23,7 @@ type rawParser struct {
 
 // rawParserConfig implements the raw parser configuration.
 type rawParserConfig struct {
-	Resource map[string]map[string]interface{}
+	Resource map[string]map[string]interface{} `mapstructure:"resource"`
 }
 
 const (

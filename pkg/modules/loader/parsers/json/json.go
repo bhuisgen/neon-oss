@@ -29,10 +29,10 @@ type jsonParser struct {
 
 // jsonParserConfig implements the json parser configuration.
 type jsonParserConfig struct {
-	Resource     map[string]map[string]interface{}
-	Filter       string
-	ItemParams   map[string]string
-	ItemResource map[string]map[string]interface{}
+	Resource     map[string]map[string]interface{} `mapstructure:"resource"`
+	Filter       string                            `mapstructure:"filter"`
+	ItemParams   map[string]string                 `mapstructure:"itemParams"`
+	ItemResource map[string]map[string]interface{} `mapstructure:"itemResource"`
 }
 
 const (
