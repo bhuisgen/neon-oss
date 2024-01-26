@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
@@ -242,51 +242,38 @@ func LoadConfig() (*config, error) {
 	return c, nil
 }
 
-//go:embed templates/init/*
-var configTemplatesInit embed.FS
+//go:embed templates/config/*
+var configTemplates embed.FS
 
 // GenerateConfig creates a default configuration file.
-func GenerateConfig(template string) error {
-	name := configDefaultFile
+func GenerateConfig(syntax string, template string) error {
+	var src string
+	switch syntax {
+	case "yaml":
+		src = "./neon.yaml"
+	case "toml":
+		src = "./neon.toml"
+	case "json":
+		src = "./neon.json"
+	}
+	var dst string
 	if core.CONFIG_FILE != "" {
-		name = core.CONFIG_FILE
+		dst = core.CONFIG_FILE
+	} else {
+		dst = src
 	}
 
-	_, err := os.Stat(name)
+	_, err := os.Stat(dst)
 	if err == nil {
-		return fmt.Errorf("configuration file '%s' already exists", name)
+		return fmt.Errorf("file '%s' already exists", dst)
 	}
 
-	err = fs.WalkDir(configTemplatesInit, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		data, err := fs.ReadFile(configTemplatesInit, path)
-		if err != nil {
-			return err
-		}
-
-		dst, err := filepath.Rel(filepath.Join("templates", "init", template), path)
-		if err != nil {
-			return nil
-		}
-
-		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(dst, data, 0644); err != nil {
-			return err
-		}
-
-		return nil
-	})
+	data, err := configTemplates.ReadFile(path.Join("templates", "config", template, src))
 	if err != nil {
-		return errors.New("failed to process template")
+		return errors.New("failed to generate config")
+	}
+	if err := os.WriteFile(dst, data, 0600); err != nil {
+		return errors.New("failed to generate config")
 	}
 
 	return nil

@@ -15,6 +15,7 @@ import (
 // initCommand implements the init command.
 type initCommand struct {
 	flagset  *flag.FlagSet
+	syntax   string
 	template string
 	verbose  bool
 }
@@ -23,7 +24,8 @@ type initCommand struct {
 func NewInitCommand() *initCommand {
 	c := initCommand{}
 	c.flagset = flag.NewFlagSet("init", flag.ExitOnError)
-	c.flagset.StringVar(&c.template, "template", "default", "Template name")
+	c.flagset.StringVar(&c.syntax, "s", "yaml", "Syntax (yaml,toml,json)")
+	c.flagset.StringVar(&c.template, "t", "default", "Template name (default,example)")
 	c.flagset.BoolVar(&c.verbose, "verbose", false, "Use verbose output")
 	c.flagset.Usage = func() {
 		fmt.Println("Usage: neon init [OPTIONS]")
@@ -65,13 +67,12 @@ func (c *initCommand) Parse(args []string) error {
 
 // Execute executes the command.
 func (c *initCommand) Execute() error {
-	err := neon.GenerateConfig(c.template)
+	err := neon.GenerateConfig(c.syntax, c.template)
 	if err != nil {
-		fmt.Printf("Failed to generate configuration: %s\n", err)
+		fmt.Printf("Failed to init: %s\n", err)
 		return err
 	}
 
-	fmt.Println("Configuration file generated")
 	return nil
 }
 
