@@ -142,9 +142,13 @@ func (m *loggerMiddleware) Start() error {
 			for {
 				<-m.reopen
 
-				m.logger.Print("Reopening access log file")
+				m.logger.Print("Reopening log file")
 
-				logFileWriter.Reopen()
+				if err := logFileWriter.Reopen(); err != nil {
+					m.logger.Print("Failed to reopen file")
+
+					return
+				}
 			}
 		}()
 	}
