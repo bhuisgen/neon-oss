@@ -442,7 +442,7 @@ func (h *sitemapHandler) render(w render.RenderWriter, r *http.Request) error {
 
 // sitemapIndex writes the sitemap index.
 func (h *sitemapHandler) sitemapIndex(s []SitemapIndexEntry, w io.Writer, r *http.Request) error {
-	var items []sitemapTemplateSitemapIndexItem
+	items := make([]sitemapTemplateSitemapIndexItem, 0, len(s))
 	for _, sitemapEntry := range s {
 		items = append(items, sitemapTemplateSitemapIndexItem{
 			Loc: h.absURL(sitemapEntry.Static.Loc, h.config.Root),
@@ -496,10 +496,10 @@ func (h *sitemapHandler) sitemapTemplateStaticItem(entry SitemapEntry) (sitemapT
 		Loc: h.absURL(entry.Static.Loc, h.config.Root),
 	}
 	if entry.Static.Lastmod != nil {
-		item.Lastmod = fmt.Sprintf("%v", *entry.Static.Lastmod)
+		item.Lastmod = *entry.Static.Lastmod
 	}
 	if entry.Static.Changefreq != nil {
-		item.Changefreq = fmt.Sprintf("%v", *entry.Static.Changefreq)
+		item.Changefreq = *entry.Static.Changefreq
 	}
 	if entry.Static.Priority != nil {
 		item.Priority = fmt.Sprintf("%v", *entry.Static.Priority)
@@ -576,7 +576,7 @@ func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemap
 				Lastmod: lastmod,
 			}
 			if entry.List.Changefreq != nil {
-				item.Changefreq = fmt.Sprintf("%v", *entry.List.Changefreq)
+				item.Changefreq = *entry.List.Changefreq
 			}
 			if entry.List.Priority != nil {
 				item.Priority = fmt.Sprintf("%v", *entry.List.Priority)

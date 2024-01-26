@@ -16,6 +16,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -521,7 +522,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 		if len(m) > 1 {
 			for i, value := range m {
 				if i > 0 {
-					params[fmt.Sprint(i)] = value
+					params[strconv.Itoa(i)] = value
 				}
 			}
 			for i, name := range h.regexps[index].SubexpNames() {
