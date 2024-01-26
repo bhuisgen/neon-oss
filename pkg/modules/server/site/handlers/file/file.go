@@ -202,7 +202,11 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.muCache.RUnlock()
 
 			w.WriteHeader(render.StatusCode())
-			w.Write(render.Body())
+			if _, err := w.Write(render.Body()); err != nil {
+				h.logger.Printf("Failed to write render: %s", err)
+
+				return
+			}
 
 			h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), true)
 
@@ -244,7 +248,11 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(render.StatusCode())
-	w.Write(render.Body())
+	if _, err := w.Write(render.Body()); err != nil {
+		h.logger.Printf("Failed to write render: %s", err)
+
+		return
+	}
 
 	h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), false)
 }
