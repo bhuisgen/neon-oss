@@ -6,7 +6,7 @@ package rewrite
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"testing"
@@ -66,7 +66,7 @@ var _ core.ServerSite = (*testRewriteMiddlewareServerSite)(nil)
 func TestRewriteMiddlewareModuleInfo(t *testing.T) {
 	type fields struct {
 		config  *rewriteMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	tests := []struct {
@@ -103,12 +103,12 @@ func TestRewriteMiddlewareModuleInfo(t *testing.T) {
 func TestRewriteMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config  *rewriteMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -120,7 +120,7 @@ func TestRewriteMiddlewareInit(t *testing.T) {
 			name: "minimal",
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -135,7 +135,7 @@ func TestRewriteMiddlewareInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -150,7 +150,7 @@ func TestRewriteMiddlewareInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -165,7 +165,7 @@ func TestRewriteMiddlewareInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -187,7 +187,7 @@ func TestRewriteMiddlewareInit(t *testing.T) {
 func TestRewriteMiddlewareRegister(t *testing.T) {
 	type fields struct {
 		config  *rewriteMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	type args struct {
@@ -232,7 +232,7 @@ func TestRewriteMiddlewareRegister(t *testing.T) {
 func TestRewriteMiddlewareStart(t *testing.T) {
 	type fields struct {
 		config  *rewriteMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	tests := []struct {
@@ -261,7 +261,7 @@ func TestRewriteMiddlewareStart(t *testing.T) {
 func TestRewriteMiddlewareStop(t *testing.T) {
 	type fields struct {
 		config  *rewriteMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	tests := []struct {
@@ -287,7 +287,7 @@ func TestRewriteMiddlewareStop(t *testing.T) {
 func TestRewriteMiddlewareHandler(t *testing.T) {
 	type fields struct {
 		config  *rewriteMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	type args struct {

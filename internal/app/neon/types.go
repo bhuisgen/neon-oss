@@ -6,7 +6,6 @@ package neon
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 
@@ -50,7 +49,7 @@ type Server interface {
 
 // ServerListener
 type ServerListener interface {
-	Init(config map[string]interface{}, logger *log.Logger) error
+	Init(config map[string]interface{}) error
 	Register(descriptor ServerListenerDescriptor) error
 	Serve() error
 	Shutdown(ctx context.Context) error
@@ -74,7 +73,7 @@ type ServerListenerDescriptor interface {
 
 // ServerSite
 type ServerSite interface {
-	Init(config map[string]interface{}, logger *log.Logger) error
+	Init(config map[string]interface{}) error
 	Register() error
 	Start() error
 	Stop() error

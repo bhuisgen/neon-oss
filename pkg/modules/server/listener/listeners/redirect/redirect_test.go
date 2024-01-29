@@ -7,7 +7,7 @@ package redirect
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"testing"
@@ -48,7 +48,7 @@ var _ core.ServerListener = (*testRedirectListener)(nil)
 func TestRedirectListenerModuleInfo(t *testing.T) {
 	type fields struct {
 		config             *redirectListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -97,7 +97,7 @@ func TestRedirectListenerModuleInfo(t *testing.T) {
 func TestRedirectListenerInit(t *testing.T) {
 	type fields struct {
 		config             *redirectListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -108,7 +108,7 @@ func TestRedirectListenerInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -120,7 +120,7 @@ func TestRedirectListenerInit(t *testing.T) {
 			name: "minimal",
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -148,7 +148,7 @@ func TestRedirectListenerInit(t *testing.T) {
 					"IdleTimeout":       -1,
 					"RedirectPort":      -1,
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -176,7 +176,7 @@ func TestRedirectListenerInit(t *testing.T) {
 func TestRedirectListenerRegister(t *testing.T) {
 	type fields struct {
 		config             *redirectListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -267,7 +267,7 @@ func TestRedirectListenerRegister(t *testing.T) {
 func TestRedirectListenerServe(t *testing.T) {
 	type fields struct {
 		config             *redirectListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -296,7 +296,7 @@ func TestRedirectListenerServe(t *testing.T) {
 					WriteTimeout:      intPtr(30),
 					IdleTimeout:       intPtr(60),
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				httpServerServe: func(server *http.Server, listener net.Listener) error {
 					return nil
 				},
@@ -326,7 +326,7 @@ func TestRedirectListenerServe(t *testing.T) {
 func TestRedirectListenerShutdown(t *testing.T) {
 	type fields struct {
 		config             *redirectListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -385,7 +385,7 @@ func TestRedirectListenerShutdown(t *testing.T) {
 func TestRedirectListenerClose(t *testing.T) {
 	type fields struct {
 		config             *redirectListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)

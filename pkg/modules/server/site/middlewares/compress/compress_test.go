@@ -6,7 +6,7 @@ package compress
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"testing"
 
@@ -66,7 +66,7 @@ var _ core.ServerSite = (*testCompressMiddlewareServerSite)(nil)
 func TestCompressMiddlewareModuleInfo(t *testing.T) {
 	type fields struct {
 		config *compressMiddlewareConfig
-		logger *log.Logger
+		logger *slog.Logger
 		pool   *gzipPool
 	}
 	tests := []struct {
@@ -103,12 +103,12 @@ func TestCompressMiddlewareModuleInfo(t *testing.T) {
 func TestCompressMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config *compressMiddlewareConfig
-		logger *log.Logger
+		logger *slog.Logger
 		pool   *gzipPool
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -120,7 +120,7 @@ func TestCompressMiddlewareInit(t *testing.T) {
 			name: "minimal",
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -129,7 +129,7 @@ func TestCompressMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Level": -1,
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -138,7 +138,7 @@ func TestCompressMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Level": 100,
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -161,7 +161,7 @@ func TestCompressMiddlewareInit(t *testing.T) {
 func TestCompressMiddlewareRegister(t *testing.T) {
 	type fields struct {
 		config *compressMiddlewareConfig
-		logger *log.Logger
+		logger *slog.Logger
 		pool   *gzipPool
 	}
 	type args struct {
@@ -206,7 +206,7 @@ func TestCompressMiddlewareRegister(t *testing.T) {
 func TestCompressMiddlewareStart(t *testing.T) {
 	type fields struct {
 		config *compressMiddlewareConfig
-		logger *log.Logger
+		logger *slog.Logger
 		pool   *gzipPool
 	}
 	tests := []struct {
@@ -235,7 +235,7 @@ func TestCompressMiddlewareStart(t *testing.T) {
 func TestCompressMiddlewareStop(t *testing.T) {
 	type fields struct {
 		config *compressMiddlewareConfig
-		logger *log.Logger
+		logger *slog.Logger
 		pool   *gzipPool
 	}
 	tests := []struct {
@@ -261,7 +261,7 @@ func TestCompressMiddlewareStop(t *testing.T) {
 func TestCompressMiddlewareHandler(t *testing.T) {
 	type fields struct {
 		config *compressMiddlewareConfig
-		logger *log.Logger
+		logger *slog.Logger
 		pool   *gzipPool
 	}
 	type args struct {

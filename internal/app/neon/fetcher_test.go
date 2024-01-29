@@ -6,7 +6,7 @@ package neon
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"reflect"
 	"testing"
 
@@ -16,7 +16,7 @@ import (
 func TestFetcherInit(t *testing.T) {
 	type fields struct {
 		config *fetcherConfig
-		logger *log.Logger
+		logger *slog.Logger
 		state  *fetcherState
 	}
 	type args struct {
@@ -31,7 +31,7 @@ func TestFetcherInit(t *testing.T) {
 		{
 			name: "no configuration",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{},
 				},
@@ -40,7 +40,7 @@ func TestFetcherInit(t *testing.T) {
 		{
 			name: "empty configuration",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{},
 				},
@@ -52,7 +52,7 @@ func TestFetcherInit(t *testing.T) {
 		{
 			name: "full",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{
 						"default": testFetcherProviderModule{},
@@ -72,7 +72,7 @@ func TestFetcherInit(t *testing.T) {
 		{
 			name: "error unregistered provider module",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &fetcherState{},
 			},
 			args: args{
@@ -104,7 +104,7 @@ func TestFetcherInit(t *testing.T) {
 func TestFetcherFetch(t *testing.T) {
 	type fields struct {
 		config *fetcherConfig
-		logger *log.Logger
+		logger *slog.Logger
 		state  *fetcherState
 	}
 	type args struct {

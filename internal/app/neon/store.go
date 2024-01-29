@@ -6,8 +6,7 @@ package neon
 
 import (
 	"errors"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/mitchellh/mapstructure"
@@ -19,7 +18,7 @@ import (
 // store implements the datastore
 type store struct {
 	config *storeConfig
-	logger *log.Logger
+	logger *slog.Logger
 	state  *storeState
 }
 
@@ -40,7 +39,7 @@ const (
 // newStore creates a new store.
 func newStore() *store {
 	return &store{
-		logger: log.New(os.Stderr, fmt.Sprint(storeLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		logger: slog.New(NewLogHandler(os.Stderr, storeLogger, nil)),
 		state:  &storeState{},
 	}
 }
@@ -55,7 +54,7 @@ func (s *store) Init(config map[string]interface{}) error {
 		}
 	} else {
 		if err := mapstructure.Decode(config, &s.config); err != nil {
-			s.logger.Print("failed to parse configuration")
+			s.logger.Error("Failed to parse configuration", "err", err)
 			return err
 		}
 	}
@@ -63,19 +62,20 @@ func (s *store) Init(config map[string]interface{}) error {
 	var errInit bool
 
 	if len(s.config.Storage) == 0 {
-		s.logger.Print("no storage defined")
+		s.logger.Error("No storage defined")
 		errInit = true
 	}
 	for storage, storageConfig := range s.config.Storage {
 		moduleInfo, err := module.Lookup(module.ModuleID("store.storage." + storage))
 		if err != nil {
-			s.logger.Printf("unregistered storage module '%s'", storage)
+			s.logger.Error("Unregistered storage module", "module", storage, "err", err)
 			errInit = true
 			break
 		}
 		module, ok := moduleInfo.NewInstance().(core.StoreStorageModule)
 		if !ok {
-			s.logger.Printf("invalid storage module '%s'", storage)
+			err := errors.New("module instance not valid")
+			s.logger.Error("Invalid storage module", "module", storage, "err", err)
 			errInit = true
 			break
 		}
@@ -85,9 +85,9 @@ func (s *store) Init(config map[string]interface{}) error {
 		}
 		if err := module.Init(
 			storageConfig,
-			log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "storage[", storage, "]: "), log.LstdFlags|log.Lmsgprefix),
+			slog.New(NewLogHandler(os.Stderr, storeLogger, nil)).With("storage", storage),
 		); err != nil {
-			s.logger.Printf("failed to init storage module '%s'", storage)
+			s.logger.Error("Failed to init storage module", "module", storage, "err", err)
 			errInit = true
 			break
 		}

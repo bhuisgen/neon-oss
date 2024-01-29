@@ -9,7 +9,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -23,7 +23,7 @@ import (
 // compressMiddleware implements the compress middleware.
 type compressMiddleware struct {
 	config *compressMiddlewareConfig
-	logger *log.Logger
+	logger *slog.Logger
 	pool   *gzipPool
 }
 
@@ -60,11 +60,11 @@ func (m compressMiddleware) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the middleware.
-func (m *compressMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m *compressMiddleware) Init(config map[string]interface{}, logger *slog.Logger) error {
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Print("failed to parse configuration")
+		m.logger.Error("Failed to parse configuration")
 		return err
 	}
 
@@ -75,7 +75,7 @@ func (m *compressMiddleware) Init(config map[string]interface{}, logger *log.Log
 		m.config.Level = &defaultValue
 	}
 	if *m.config.Level < -2 || *m.config.Level > 9 {
-		m.logger.Printf("option '%s', invalid value '%d'", "Level", *m.config.Level)
+		m.logger.Error("Invalid value", "option", "Level", "value", *m.config.Level)
 		errInit = true
 	}
 

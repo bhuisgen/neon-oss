@@ -7,7 +7,7 @@ package local
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"testing"
@@ -48,7 +48,7 @@ var _ core.ServerListener = (*testLocalListener)(nil)
 func TestLocalListenerModuleInfo(t *testing.T) {
 	type fields struct {
 		config             *localListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -97,7 +97,7 @@ func TestLocalListenerModuleInfo(t *testing.T) {
 func TestLocalListenerInit(t *testing.T) {
 	type fields struct {
 		config             *localListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -108,7 +108,7 @@ func TestLocalListenerInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -120,7 +120,7 @@ func TestLocalListenerInit(t *testing.T) {
 			name: "minimal",
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -146,7 +146,7 @@ func TestLocalListenerInit(t *testing.T) {
 					"WriteTimeout":      -1,
 					"IdleTimeout":       -1,
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -174,7 +174,7 @@ func TestLocalListenerInit(t *testing.T) {
 func TestLocalListenerRegister(t *testing.T) {
 	type fields struct {
 		config             *localListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -265,7 +265,7 @@ func TestLocalListenerRegister(t *testing.T) {
 func TestLocalListenerServe(t *testing.T) {
 	type fields struct {
 		config             *localListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -294,7 +294,7 @@ func TestLocalListenerServe(t *testing.T) {
 					WriteTimeout:      intPtr(30),
 					IdleTimeout:       intPtr(60),
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				httpServerServe: func(server *http.Server, listener net.Listener) error {
 					return nil
 				},
@@ -324,7 +324,7 @@ func TestLocalListenerServe(t *testing.T) {
 func TestLocalListenerShutdown(t *testing.T) {
 	type fields struct {
 		config             *localListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)
@@ -383,7 +383,7 @@ func TestLocalListenerShutdown(t *testing.T) {
 func TestLocalListenerClose(t *testing.T) {
 	type fields struct {
 		config             *localListenerConfig
-		logger             *log.Logger
+		logger             *slog.Logger
 		listener           net.Listener
 		server             *http.Server
 		osReadFile         func(name string) ([]byte, error)

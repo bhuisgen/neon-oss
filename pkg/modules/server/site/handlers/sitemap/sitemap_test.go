@@ -7,7 +7,7 @@ package app
 import (
 	_ "embed"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sync"
@@ -95,7 +95,7 @@ var _ http.ResponseWriter = (*testSitemapHandlerResponseWriter)(nil)
 func TestSitemapHandlerModuleInfo(t *testing.T) {
 	type fields struct {
 		config               *sitemapHandlerConfig
-		logger               *log.Logger
+		logger               *slog.Logger
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
@@ -142,7 +142,7 @@ func TestSitemapHandlerModuleInfo(t *testing.T) {
 func TestSitemapHandlerInit(t *testing.T) {
 	type fields struct {
 		config               *sitemapHandlerConfig
-		logger               *log.Logger
+		logger               *slog.Logger
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
@@ -152,7 +152,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -176,7 +176,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -197,7 +197,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -216,7 +216,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -250,7 +250,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -261,7 +261,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 					"CacheTTL": -1,
 					"Kind":     "",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -272,7 +272,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 					"Root": "http://localhost",
 					"Kind": "sitemapIndex",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -289,7 +289,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -309,7 +309,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -320,7 +320,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 					"Root": "http://localhost",
 					"Kind": "sitemap",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -356,7 +356,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -383,7 +383,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 func TestSitemapHandlerRegister(t *testing.T) {
 	type fields struct {
 		config               *sitemapHandlerConfig
-		logger               *log.Logger
+		logger               *slog.Logger
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
@@ -438,7 +438,7 @@ func TestSitemapHandlerRegister(t *testing.T) {
 func TestSitemapHandlerStart(t *testing.T) {
 	type fields struct {
 		config               *sitemapHandlerConfig
-		logger               *log.Logger
+		logger               *slog.Logger
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
@@ -477,7 +477,7 @@ func TestSitemapHandlerStart(t *testing.T) {
 func TestSitemapHandlerStop(t *testing.T) {
 	type fields struct {
 		config               *sitemapHandlerConfig
-		logger               *log.Logger
+		logger               *slog.Logger
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
@@ -526,7 +526,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 
 	type fields struct {
 		config               *sitemapHandlerConfig
-		logger               *log.Logger
+		logger               *slog.Logger
 		templateSitemapIndex *template.Template
 		templateSitemap      *template.Template
 		rwPool               render.RenderWriterPool
@@ -550,7 +550,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 					Cache:    boolPtr(true),
 					CacheTTL: intPtr(60),
 				},
-				logger:               log.Default(),
+				logger:               slog.Default(),
 				templateSitemapIndex: tmplSitemapIndex,
 				templateSitemap:      tmplSitemap,
 				rwPool:               render.NewRenderWriterPool(),

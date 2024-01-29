@@ -7,9 +7,8 @@ package app
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
-	"os"
 	"time"
 
 	"rogchap.com/v8go"
@@ -19,13 +18,12 @@ import (
 type VM interface {
 	Close()
 	Reset()
-	Configure(config *vmConfig) error
+	Configure(config *vmConfig, logger *slog.Logger) error
 	Execute(name string, source string, timeout time.Duration) (*vmResult, error)
 }
 
 // vm implements a VM.
 type vm struct {
-	logger                      *log.Logger
 	isolate                     *v8go.Isolate
 	processObject               *v8go.ObjectTemplate
 	envObject                   *v8go.ObjectTemplate
@@ -35,6 +33,7 @@ type vm struct {
 	serverResponseObject        *v8go.ObjectTemplate
 	context                     *v8go.Context
 	config                      *vmConfig
+	logger                      *slog.Logger
 	status                      vmStatus
 	data                        *vmData
 	v8NewFunctionTemplate       func(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate
@@ -88,7 +87,6 @@ func vmV8ObjectTemplateNewInstance(template *v8go.ObjectTemplate, context *v8go.
 func newVM() *vm {
 	isolate := v8go.NewIsolate()
 	return &vm{
-		logger:                      log.New(os.Stderr, fmt.Sprint(vmLogger, ": "), log.LstdFlags|log.Lmsgprefix),
 		isolate:                     isolate,
 		processObject:               v8go.NewObjectTemplate(isolate),
 		envObject:                   v8go.NewObjectTemplate(isolate),
@@ -116,7 +114,7 @@ func (v *vm) Reset() {
 }
 
 // Configure configures the VM
-func (v *vm) Configure(config *vmConfig) error {
+func (v *vm) Configure(config *vmConfig, logger *slog.Logger) error {
 	if v.status == vmStatusNew {
 		if err := api(v); err != nil {
 			return vmErrConfigure
@@ -174,6 +172,7 @@ func (v *vm) Configure(config *vmConfig) error {
 	}
 
 	v.config = config
+	v.logger = logger
 
 	return nil
 }
@@ -198,11 +197,9 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 	case <-jsVal:
 
 	case err := <-jsErr:
-		if debug, ok := os.LookupEnv("DEBUG"); ok && debug == "1" {
-			var jsError *v8go.JSError
-			if errors.As(err, &jsError) {
-				v.logger.Printf("Javascript stack trace: %+v", jsError)
-			}
+		var jsError *v8go.JSError
+		if errors.As(err, &jsError) {
+			v.logger.Debug("Failed to execute script", "name", name, "stackTrace", fmt.Sprintf("%+v", jsError))
 		}
 		return nil, vmErrExecute
 
@@ -218,9 +215,7 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 // timeTrack outputs the execution time of a function or code block
 func (v *vm) timeTrack(label string, start time.Time) {
 	elapsed := time.Since(start)
-	if debug, ok := os.LookupEnv("DEBUG"); ok && debug == "1" {
-		v.logger.Printf("%s took %s", label, elapsed)
-	}
+	v.logger.Debug("Execution of %s took %s", label, elapsed)
 }
 
 var _ VM = (*vm)(nil)

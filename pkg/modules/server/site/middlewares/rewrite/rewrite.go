@@ -6,7 +6,7 @@ package rewrite
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -20,7 +20,7 @@ import (
 // rewriteMiddleware implements the rewrite middleware.
 type rewriteMiddleware struct {
 	config  *rewriteMiddlewareConfig
-	logger  *log.Logger
+	logger  *slog.Logger
 	regexps []*regexp.Regexp
 }
 
@@ -60,31 +60,31 @@ func (m rewriteMiddleware) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the middleware.
-func (m *rewriteMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m *rewriteMiddleware) Init(config map[string]interface{}, logger *slog.Logger) error {
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Print("failed to parse configuration")
+		m.logger.Error("Failed to parse configuration")
 		return err
 	}
 
 	var errInit bool
 
-	for _, rule := range m.config.Rules {
+	for index, rule := range m.config.Rules {
 		if rule.Path == "" {
-			m.logger.Printf("rule option '%s', missing option or value", "Path")
+			m.logger.Error("Missing option or value", "rule", index+1, "option", "Path")
 			errInit = true
 		} else {
 			re, err := regexp.Compile(rule.Path)
 			if err != nil {
-				m.logger.Printf("rule option '%s', invalid regular expression '%s'", "Path", rule.Path)
+				m.logger.Error("Invalid regular expression", "rule", index+1, "option", "Path", "value", rule.Path)
 				errInit = true
 			} else {
 				m.regexps = append(m.regexps, re)
 			}
 		}
 		if rule.Replacement == "" {
-			m.logger.Printf("rule option '%s', missing option or value", "Replacement")
+			m.logger.Error("Missing option or value", "rule", index+1, "option", "Replacement")
 			errInit = true
 		}
 		if rule.Flag != nil {
@@ -92,7 +92,7 @@ func (m *rewriteMiddleware) Init(config map[string]interface{}, logger *log.Logg
 			case rewriteRuleFlagPermanent:
 			case rewriteRuleFlagRedirect:
 			default:
-				m.logger.Printf("rule option '%s', invalid value '%s'", "Flag", *rule.Flag)
+				m.logger.Error("Invalid value '%s'", "rule", index+1, "option", "Flag", "value", *rule.Flag)
 				errInit = true
 			}
 		}

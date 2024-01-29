@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -23,7 +23,7 @@ import (
 // jsonParser implements the json parser.
 type jsonParser struct {
 	config        *jsonParserConfig
-	logger        *log.Logger
+	logger        *slog.Logger
 	jsonUnmarshal func(data []byte, v any) error
 }
 
@@ -62,26 +62,26 @@ func (p jsonParser) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the parser.
-func (p *jsonParser) Init(config map[string]interface{}, logger *log.Logger) error {
+func (p *jsonParser) Init(config map[string]interface{}, logger *slog.Logger) error {
 	p.logger = logger
 
 	if err := mapstructure.Decode(config, &p.config); err != nil {
-		p.logger.Print("failed to parse configuration")
+		p.logger.Error("Failed to parse configuration")
 		return err
 	}
 
 	var errInit bool
 
 	if p.config.Resource == nil {
-		p.logger.Printf("option '%s', invalid value '%s'", "Resource", p.config.Resource)
+		p.logger.Error("Invalid value", "option", "Resource", "value", p.config.Resource)
 		errInit = true
 	}
 	if p.config.Filter == "" {
-		p.logger.Printf("option '%s', invalid value '%s'", "Filter", p.config.Filter)
+		p.logger.Error("Invalid value", "option", "Filter", "value", p.config.Filter)
 		errInit = true
 	}
 	if p.config.ItemResource == nil {
-		p.logger.Printf("option '%s', invalid value '%s'", "ItemResource", p.config.ItemResource)
+		p.logger.Error("Invalid value", "option", "ItemResource", "value", p.config.ItemResource)
 		errInit = true
 	}
 

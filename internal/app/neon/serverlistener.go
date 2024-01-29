@@ -7,8 +7,7 @@ package neon
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -21,7 +20,7 @@ import (
 // serverListener implements a server listener.
 type serverListener struct {
 	name    string
-	logger  *log.Logger
+	logger  *slog.Logger
 	state   *serverListenerState
 	mu      sync.RWMutex
 	quit    chan struct{}
@@ -37,6 +36,10 @@ type serverListenerState struct {
 	handler  *serverListenerHandler
 }
 
+const (
+	serverListenerLogger string = "listener"
+)
+
 // serverListenerOsClose redirects to os.Close.
 func serverListenerOsClose(f *os.File) error {
 	return f.Close()
@@ -45,7 +48,8 @@ func serverListenerOsClose(f *os.File) error {
 // newServerListener creates a new server listener.
 func newServerListener(name string) *serverListener {
 	return &serverListener{
-		name: name,
+		name:   name,
+		logger: slog.New(NewLogHandler(os.Stderr, serverListenerLogger, nil)).With("name", name),
 		state: &serverListenerState{
 			sites: make(map[string]ServerSite),
 		},
@@ -56,30 +60,29 @@ func newServerListener(name string) *serverListener {
 }
 
 // Init initializes the listener.
-func (l *serverListener) Init(config map[string]interface{}, logger *log.Logger) error {
-	l.logger = logger
-
+func (l *serverListener) Init(config map[string]interface{}) error {
 	if config == nil {
-		l.logger.Print("missing configuration")
-		return errors.New("missing configuration")
+		err := errors.New("missing configuration")
+		l.logger.Error("Missing configuration")
+		return err
 	}
 
 	var errInit bool
 
 	if len(config) == 0 {
-		l.logger.Print("missing listener configuration")
+		l.logger.Error("Missing listener configuration")
 		errInit = true
 	}
 	for listener, listenerConfig := range config {
 		moduleInfo, err := module.Lookup(module.ModuleID("server.listener." + listener))
 		if err != nil {
-			l.logger.Printf("unregistered module '%s'", listener)
+			l.logger.Error("Unregistered module", "module", listener)
 			errInit = true
 			break
 		}
 		module, ok := moduleInfo.NewInstance().(core.ServerListenerModule)
 		if !ok {
-			l.logger.Printf("invalid module '%s'", listener)
+			l.logger.Error("Invalid module", "module", listener)
 			errInit = true
 			break
 		}
@@ -89,7 +92,7 @@ func (l *serverListener) Init(config map[string]interface{}, logger *log.Logger)
 			moduleConfig = map[string]interface{}{}
 		}
 		if err := module.Init(moduleConfig, l.logger); err != nil {
-			l.logger.Printf("failed to init module '%s'", listener)
+			l.logger.Error("Failed to init module", "module", listener)
 			errInit = true
 			break
 		}
@@ -108,6 +111,8 @@ func (l *serverListener) Init(config map[string]interface{}, logger *log.Logger)
 
 // Register registers the listener.
 func (l *serverListener) Register(descriptor ServerListenerDescriptor) error {
+	l.logger.Debug("Registering listener")
+
 	mediator := newServerListenerMediator(l)
 
 	if descriptor != nil {
@@ -135,6 +140,8 @@ func (l *serverListener) Register(descriptor ServerListenerDescriptor) error {
 
 // Serve starts the listener serving.
 func (l *serverListener) Serve() error {
+	l.logger.Debug("Accepting connections")
+
 	if err := l.state.listener.Serve(l.state.handler); err != nil {
 		return err
 	}
@@ -144,6 +151,8 @@ func (l *serverListener) Serve() error {
 
 // Shutdown shutdowns the listener gracefully.
 func (l *serverListener) Shutdown(ctx context.Context) error {
+	l.logger.Debug("Shutting down listener")
+
 	if err := l.state.listener.Shutdown(ctx); err != nil {
 		return err
 	}
@@ -153,6 +162,8 @@ func (l *serverListener) Shutdown(ctx context.Context) error {
 
 // Close stops the listener listening.
 func (l *serverListener) Close() error {
+	l.logger.Debug("Closing listener")
+
 	if err := l.state.listener.Close(); err != nil {
 		return err
 	}
@@ -162,6 +173,8 @@ func (l *serverListener) Close() error {
 
 // Remove removes the listener.
 func (l *serverListener) Remove() error {
+	l.logger.Debug("Removing listener")
+
 	l.quit <- struct{}{}
 
 	close(l.quit)
@@ -178,8 +191,10 @@ func (l *serverListener) Name() string {
 // Link links a site to the listener.
 func (l *serverListener) Link(site ServerSite) error {
 	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.logger.Debug("Linking site", "site", site.Name())
 	l.state.sites[site.Name()] = site
-	l.mu.Unlock()
 
 	errChan := make(chan error)
 	l.update <- errChan
@@ -194,8 +209,10 @@ func (l *serverListener) Link(site ServerSite) error {
 // Unlink unlinks a site to the listener.
 func (l *serverListener) Unlink(site ServerSite) error {
 	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.logger.Debug("Unlinking site", "site", site.Name())
 	delete(l.state.sites, site.Name())
-	l.mu.Unlock()
 
 	errChan := make(chan error)
 	l.update <- errChan
@@ -215,8 +232,10 @@ func (l *serverListener) waitForEvents() {
 			return
 
 		case errChan := <-l.update:
+			l.logger.Debug("New update event received, updating router")
+
 			if err := l.updateRouter(); err != nil {
-				l.logger.Printf("failed to update router: %s", err)
+				l.logger.Error("Failed to update router", "err", err)
 				errChan <- err
 			} else {
 				errChan <- nil
@@ -228,9 +247,7 @@ func (l *serverListener) waitForEvents() {
 
 // updateRouter updates the listener router.
 func (l *serverListener) updateRouter() error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
+	l.logger.Debug("Updating router")
 	serverRouters := make([]ServerSiteRouter, 0, len(l.state.sites))
 	for _, server := range l.state.sites {
 		serverRouter, err := server.Router()
@@ -359,7 +376,7 @@ var _ ServerListenerDescriptor = (*serverListenerDescriptor)(nil)
 
 // serverListenerRouter implements the server listener router.
 type serverListenerRouter struct {
-	logger *log.Logger
+	logger *slog.Logger
 	mux    *http.ServeMux
 }
 
@@ -374,7 +391,7 @@ func newServerListenerRouter(l *serverListener, routers ...ServerSiteRouter) *se
 	}
 
 	return &serverListenerRouter{
-		logger: log.New(os.Stderr, fmt.Sprintf(l.logger.Prefix(), "router: "), log.LstdFlags|log.Lmsgprefix),
+		logger: l.logger,
 		mux:    mux,
 	}
 }
@@ -386,20 +403,22 @@ func (r *serverListenerRouter) ServeHTTP(w http.ResponseWriter, req *http.Reques
 
 // serverListenerHandler implements the server listener handler.
 type serverListenerHandler struct {
-	logger *log.Logger
+	logger *slog.Logger
 	router ServerListenerRouter
 }
 
 // newServerListenerHandler creates a new server listener handler.
 func newServerListenerHandler(l *serverListener) *serverListenerHandler {
 	return &serverListenerHandler{
-		logger: log.New(os.Stderr, fmt.Sprint(l.logger.Prefix(), "handler: "), log.LstdFlags|log.Lmsgprefix),
+		logger: l.logger,
 	}
 }
 
 // ServeHTTP implements the http handler.
 func (h *serverListenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.router == nil {
+		h.logger.Error("No router available")
+
 		w.WriteHeader(http.StatusServiceUnavailable)
 
 		return

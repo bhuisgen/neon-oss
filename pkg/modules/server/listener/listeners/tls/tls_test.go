@@ -10,7 +10,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -87,7 +87,7 @@ var _ os.FileInfo = (*testTLSListenerFileInfo)(nil)
 func TestTLSListenerModuleInfo(t *testing.T) {
 	type fields struct {
 		config                         *tlsListenerConfig
-		logger                         *log.Logger
+		logger                         *slog.Logger
 		listener                       net.Listener
 		server                         *http.Server
 		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -146,7 +146,7 @@ func TestTLSListenerModuleInfo(t *testing.T) {
 func TestTLSListenerInit(t *testing.T) {
 	type fields struct {
 		config                         *tlsListenerConfig
-		logger                         *log.Logger
+		logger                         *slog.Logger
 		listener                       net.Listener
 		server                         *http.Server
 		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -162,7 +162,7 @@ func TestTLSListenerInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -188,7 +188,7 @@ func TestTLSListenerInit(t *testing.T) {
 					"CertFiles": []string{"cert.pem"},
 					"KeyFiles":  []string{"key.pem"},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -217,7 +217,7 @@ func TestTLSListenerInit(t *testing.T) {
 					"WriteTimeout":      30,
 					"IdleTimeout":       60,
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -246,7 +246,7 @@ func TestTLSListenerInit(t *testing.T) {
 					"WriteTimeout":      -1,
 					"IdleTimeout":       -1,
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -269,7 +269,7 @@ func TestTLSListenerInit(t *testing.T) {
 					"CertFiles": []string{"cert.pem"},
 					"KeyFiles":  []string{"key.pem"},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -292,7 +292,7 @@ func TestTLSListenerInit(t *testing.T) {
 					"CertFiles": []string{"cert.pem"},
 					"KeyFiles":  []string{"key.pem"},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -317,7 +317,7 @@ func TestTLSListenerInit(t *testing.T) {
 					"CertFiles": []string{"cert.pem"},
 					"KeyFiles":  []string{"key.pem"},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -350,7 +350,7 @@ func TestTLSListenerInit(t *testing.T) {
 func TestTLSListenerRegister(t *testing.T) {
 	type fields struct {
 		config                         *tlsListenerConfig
-		logger                         *log.Logger
+		logger                         *slog.Logger
 		listener                       net.Listener
 		server                         *http.Server
 		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -451,7 +451,7 @@ func TestTLSListenerRegister(t *testing.T) {
 func TestTLSListenerServe(t *testing.T) {
 	type fields struct {
 		config                         *tlsListenerConfig
-		logger                         *log.Logger
+		logger                         *slog.Logger
 		listener                       net.Listener
 		server                         *http.Server
 		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -485,7 +485,7 @@ func TestTLSListenerServe(t *testing.T) {
 					WriteTimeout:      intPtr(30),
 					IdleTimeout:       intPtr(60),
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				httpServerServeTLS: func(server *http.Server, listener net.Listener, certFile, keyFile string) error {
 					return nil
 				},
@@ -520,7 +520,7 @@ func TestTLSListenerServe(t *testing.T) {
 func TestTLSListenerShutdown(t *testing.T) {
 	type fields struct {
 		config                         *tlsListenerConfig
-		logger                         *log.Logger
+		logger                         *slog.Logger
 		listener                       net.Listener
 		server                         *http.Server
 		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -589,7 +589,7 @@ func TestTLSListenerShutdown(t *testing.T) {
 func TestTLSListenerClose(t *testing.T) {
 	type fields struct {
 		config                         *tlsListenerConfig
-		logger                         *log.Logger
+		logger                         *slog.Logger
 		listener                       net.Listener
 		server                         *http.Server
 		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)

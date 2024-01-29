@@ -7,7 +7,7 @@ package raw
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 
 	"github.com/mitchellh/mapstructure"
 
@@ -18,7 +18,7 @@ import (
 // rawParser implements the raw parser.
 type rawParser struct {
 	config *rawParserConfig
-	logger *log.Logger
+	logger *slog.Logger
 }
 
 // rawParserConfig implements the raw parser configuration.
@@ -46,18 +46,18 @@ func (p rawParser) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the parser configuration.
-func (p *rawParser) Init(config map[string]interface{}, logger *log.Logger) error {
+func (p *rawParser) Init(config map[string]interface{}, logger *slog.Logger) error {
 	p.logger = logger
 
 	if err := mapstructure.Decode(config, &p.config); err != nil {
-		p.logger.Print("failed to parse configuration")
+		p.logger.Error("Failed to parse configuration")
 		return err
 	}
 
 	var errInit bool
 
 	if p.config.Resource == nil {
-		p.logger.Printf("option '%s', invalid value '%s'", "Resource", p.config.Resource)
+		p.logger.Error("Invalid value", "option", "Resource", "value", p.config.Resource)
 		errInit = true
 	}
 

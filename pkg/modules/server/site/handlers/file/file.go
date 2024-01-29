@@ -7,7 +7,7 @@ package file
 import (
 	"errors"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"sync"
@@ -23,7 +23,7 @@ import (
 // fileHandler implements the file handler.
 type fileHandler struct {
 	config     *fileHandlerConfig
-	logger     *log.Logger
+	logger     *slog.Logger
 	file       []byte
 	fileInfo   *time.Time
 	muFile     *sync.RWMutex
@@ -101,33 +101,33 @@ func (h fileHandler) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the handler.
-func (h *fileHandler) Init(config map[string]interface{}, logger *log.Logger) error {
+func (h *fileHandler) Init(config map[string]interface{}, logger *slog.Logger) error {
 	h.logger = logger
 
 	if err := mapstructure.Decode(config, &h.config); err != nil {
-		h.logger.Print("failed to parse configuration")
+		h.logger.Error("Failed to parse configuration")
 		return err
 	}
 
 	var errInit bool
 
 	if h.config.Path == "" {
-		h.logger.Printf("option '%s', missing option or value", "Path")
+		h.logger.Error("Missing option or value", "option", "Path")
 		errInit = true
 	} else {
 		f, err := h.osOpenFile(h.config.Path, os.O_RDONLY, 0)
 		if err != nil {
-			h.logger.Printf("option '%s', failed to open file '%s'", "Path", h.config.Path)
+			h.logger.Error("Failed to open file", "option", "Path", "value", h.config.Path)
 			errInit = true
 		} else {
 			_ = h.osClose(f)
 			fi, err := h.osStat(h.config.Path)
 			if err != nil {
-				h.logger.Printf("option '%s', failed to stat file '%s'", "Path", h.config.Path)
+				h.logger.Error("Failed to stat file", "option", "Path", "value", h.config.Path)
 				errInit = true
 			}
 			if err == nil && fi.IsDir() {
-				h.logger.Printf("option '%s', '%s' is a directory", "Path", h.config.Path)
+				h.logger.Error("File is a directory", "option", "Path", "value", h.config.Path)
 				errInit = true
 			}
 		}
@@ -137,7 +137,7 @@ func (h *fileHandler) Init(config map[string]interface{}, logger *log.Logger) er
 		h.config.StatusCode = &defaultValue
 	}
 	if *h.config.StatusCode < 100 || *h.config.StatusCode > 599 {
-		h.logger.Printf("option '%s', invalid value '%d'", "StatusCode", *h.config.StatusCode)
+		h.logger.Error("Invalid value", "option", "StatusCode", "value", *h.config.StatusCode)
 		errInit = true
 	}
 	if h.config.Cache == nil {
@@ -149,7 +149,7 @@ func (h *fileHandler) Init(config map[string]interface{}, logger *log.Logger) er
 		h.config.CacheTTL = &defaultValue
 	}
 	if *h.config.CacheTTL < 0 {
-		h.logger.Printf("option '%s', invalid value '%d'", "CacheTTL", *h.config.CacheTTL)
+		h.logger.Error("Invalid value", "option", "CacheTTL", "value", *h.config.CacheTTL)
 	}
 
 	if errInit {
@@ -203,12 +203,11 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			w.WriteHeader(render.StatusCode())
 			if _, err := w.Write(render.Body()); err != nil {
-				h.logger.Printf("Failed to write render: %s", err)
-
+				h.logger.Error("Failed to write render", "err", err)
 				return
 			}
 
-			h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), true)
+			h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
 
 			return
 		}
@@ -219,7 +218,7 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
-		h.logger.Printf("Render error (url=%s, status=%d)", r.URL.Path, http.StatusServiceUnavailable)
+		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
 
 		return
 	}
@@ -231,7 +230,7 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
-		h.logger.Printf("Render error (url=%s, status=%d)", r.URL.Path, http.StatusServiceUnavailable)
+		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
 
 		return
 	}
@@ -249,19 +248,18 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(render.StatusCode())
 	if _, err := w.Write(render.Body()); err != nil {
-		h.logger.Printf("Failed to write render: %s", err)
-
+		h.logger.Error("Failed to write render", "err", err)
 		return
 	}
 
-	h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), false)
+	h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
 }
 
 // read reads the file.
 func (h *fileHandler) read() error {
 	fileInfo, err := h.osStat(h.config.Path)
 	if err != nil {
-		h.logger.Printf("Failed to stat file '%s': %s", h.config.Path, err)
+		h.logger.Debug("Failed to stat file", "file", h.config.Path, "err", err)
 
 		return err
 	}
@@ -271,7 +269,7 @@ func (h *fileHandler) read() error {
 		h.muFile.RUnlock()
 		buf, err := h.osReadFile(h.config.Path)
 		if err != nil {
-			h.logger.Printf("Failed to read file '%s': %s", h.config.Path, err)
+			h.logger.Debug("Failed to read file", "file", h.config.Path, "err", err)
 
 			return err
 		}

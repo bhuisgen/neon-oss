@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,7 +29,7 @@ import (
 // sitemapHandler implements the sitemap handler.
 type sitemapHandler struct {
 	config               *sitemapHandlerConfig
-	logger               *log.Logger
+	logger               *slog.Logger
 	templateSitemapIndex *template.Template
 	templateSitemap      *template.Template
 	rwPool               render.RenderWriterPool
@@ -161,18 +161,18 @@ func (h sitemapHandler) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the handler.
-func (h *sitemapHandler) Init(config map[string]interface{}, logger *log.Logger) error {
+func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger) error {
 	h.logger = logger
 
 	if err := mapstructure.Decode(config, &h.config); err != nil {
-		h.logger.Print("failed to parse configuration")
+		h.logger.Error("Failed to parse configuration")
 		return err
 	}
 
 	var errInit bool
 
 	if h.config.Root == "" {
-		h.logger.Printf("option '%s', missing option or value", "Root")
+		h.logger.Error("Missing option or value", "option", "Root")
 	}
 	if h.config.Cache == nil {
 		defaultValue := sitemapConfigDefaultCache
@@ -183,46 +183,47 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *log.Logger)
 		h.config.CacheTTL = &defaultValue
 	}
 	if *h.config.CacheTTL < 0 {
-		h.logger.Printf("option '%s', invalid value '%d'", "CacheTTL", *h.config.CacheTTL)
+		h.logger.Error("Invalid value", "option", "CacheTTL", "value", *h.config.CacheTTL)
 		errInit = true
 	}
 	var sitemapIndex, sitemap bool
 	switch h.config.Kind {
 	case "":
-		h.logger.Printf("option '%s', missing option or value", "Kind")
+		h.logger.Error("Missing option or value", "option", "Kind")
 		errInit = true
 	case sitemapKindSitemapIndex:
 		sitemapIndex = true
 	case sitemapKindSitemap:
 		sitemap = true
 	default:
-		h.logger.Printf("option '%s', invalid value '%s'", "Kind", h.config.Kind)
+		h.logger.Error("Invalid value", "option", "Kind", "value", h.config.Kind)
 		errInit = true
 	}
 
 	if sitemapIndex {
 		if len(h.config.SitemapIndex) == 0 {
-			h.logger.Print("sitemapIndex entry is missing")
+			h.logger.Error("Entry is missing", "kind", "sitemapIndex")
 			errInit = true
 		}
-		for _, entry := range h.config.SitemapIndex {
+		for index, entry := range h.config.SitemapIndex {
 			if entry.Name == "" {
-				h.logger.Printf("sitemapIndex entry option '%s', missing option or value", "Name")
+				h.logger.Error("Missing option or value", "kind", "sitemapIndex", "entry", index+1, "option", "Name")
 				errInit = true
 			}
 			switch entry.Type {
 			case "":
-				h.logger.Printf("sitemapIndex entry option '%s', missing option or value", "Type")
+				h.logger.Error("Missing option or value", "kind", "sitemapIndex", "entry", index+1, "option", "Type")
 				errInit = true
 			case sitemapEntrySitemapIndexTypeStatic:
 			default:
-				h.logger.Printf("sitemapIndex entry option '%s', invalid value '%s'", "Type", entry.Type)
+				h.logger.Error("Invalid value", "kind", "sitemapIndex", "entry", index+1, "option", "Type", "value", entry.Type)
 				errInit = true
 			}
 
 			if entry.Type == sitemapEntrySitemapIndexTypeStatic {
 				if entry.Static.Loc == "" {
-					h.logger.Printf("sitemapIndex static entry option '%s', missing option or value", "Loc")
+					h.logger.Error("Missing option or value", "kind", "sitemapIndex", "entry", index+1, "type", "static",
+						"option", "Loc")
 					errInit = true
 				}
 			}
@@ -231,29 +232,31 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *log.Logger)
 
 	if sitemap {
 		if len(h.config.Sitemap) == 0 {
-			h.logger.Print("sitemap entry is missing")
+			h.logger.Error("Entry is missing", "kind", "sitemap")
 			errInit = true
 		}
-		for _, entry := range h.config.Sitemap {
+		for index, entry := range h.config.Sitemap {
 			if entry.Name == "" {
-				h.logger.Printf("sitemap entry option '%s', missing option or value", "Name")
+				h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "option", "Name")
 			}
 			switch entry.Type {
 			case "":
-				h.logger.Printf("sitemap entry option '%s', missing option or value", "Type")
+				h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "option", "Type")
 			case sitemapEntrySitemapTypeStatic:
 			case sitemapEntrySitemapTypeList:
 			default:
-				h.logger.Printf("sitemap entry option '%s', invalid value '%s'", "Type", entry.Type)
+				h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "option", "Type", "value", entry.Type)
 			}
 
 			if entry.Type == sitemapEntrySitemapTypeStatic {
 				if entry.Static.Loc == "" {
-					h.logger.Printf("sitemap static entry option '%s', missing option or value", "Loc")
+					h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "type", "static",
+						"option", "Loc")
 					errInit = true
 				}
 				if entry.Static.Lastmod != nil && *entry.Static.Lastmod == "" {
-					h.logger.Printf("sitemap static entry option '%s', invalid value '%s'", "Lastmod", *entry.Static.Lastmod)
+					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "static", "option", "Lastmod",
+						"value", *entry.Static.Lastmod)
 					errInit = true
 				}
 				if entry.Static.Changefreq != nil {
@@ -266,37 +269,42 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *log.Logger)
 					case sitemapChangefreqYearly:
 					case sitemapChangefreqNever:
 					default:
-						h.logger.Printf("sitemap static entry option '%s', invalid value '%s'", "Changefreq",
-							*entry.Static.Changefreq)
+						h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "static",
+							"option", "Changefreq", "value", *entry.Static.Changefreq)
 						errInit = true
 					}
 				}
 				if entry.Static.Priority != nil && (*entry.Static.Priority < 0 || *entry.Static.Priority > 1) {
-					h.logger.Printf("sitemap static entry option '%s', invalid value '%.1f'", "Priority", *entry.Static.Priority)
+					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "static", "option", "Priority",
+						"value", *entry.Static.Priority)
 					errInit = true
 				}
 			}
 
 			if entry.Type == sitemapEntrySitemapTypeList {
 				if entry.List.Resource == "" {
-					h.logger.Printf("sitemap list entry option '%s', missing option or value", "Resource")
+					h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "type", "list",
+						"option", "Resource")
 					errInit = true
 				}
 				if entry.List.Filter == "" {
-					h.logger.Printf("sitemap list entry option '%s', missing option or value", "Filter")
+					h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "type", "list",
+						"option", "Filter")
 					errInit = true
 				}
 				if entry.List.ItemLoc == "" {
-					h.logger.Printf("sitemap list entry option '%s', missing option or value", "ItemLoc")
+					h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "type", "list",
+						"option", "ItemLoc")
 					errInit = true
 				}
 				if entry.List.ItemLastmod != nil && *entry.List.ItemLastmod == "" {
-					h.logger.Printf("sitemap list entry option '%s', invalid value '%s'", "ItemLastmod",
-						*entry.List.ItemLastmod)
+					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "option", "type", "list",
+						"ItemLastmod", "value", *entry.List.ItemLastmod)
 					errInit = true
 				}
 				if entry.List.ItemIgnore != nil && *entry.List.ItemIgnore == "" {
-					h.logger.Printf("sitemap list entry option '%s', invalid value '%s'", "ItemIgnore", *entry.List.ItemIgnore)
+					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "option", "type", "list",
+						"ItemIgnore", "value", *entry.List.ItemIgnore)
 					errInit = true
 				}
 				if entry.List.Changefreq != nil {
@@ -309,12 +317,14 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *log.Logger)
 					case sitemapChangefreqYearly:
 					case sitemapChangefreqNever:
 					default:
-						h.logger.Printf("sitemap list entry option '%s', invalid value '%s'", "Changefreq", *entry.List.Changefreq)
+						h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "list", "option", "Changefreq",
+							"value", *entry.List.Changefreq)
 						errInit = true
 					}
 				}
 				if entry.List.Priority != nil && (*entry.List.Priority < 0 || *entry.List.Priority > 1) {
-					h.logger.Printf("sitemap list entry option '%s', invalid value '%.1f'", "Priority", *entry.List.Priority)
+					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "list", "option", "Priority",
+						"value", *entry.List.Priority)
 					errInit = true
 				}
 			}
@@ -374,12 +384,11 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			w.WriteHeader(render.StatusCode())
 			if _, err := w.Write(render.Body()); err != nil {
-				h.logger.Printf("Failed to write render: %s", err)
-
+				h.logger.Error("Failed to write render", "err", err)
 				return
 			}
 
-			h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), true)
+			h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
 
 			return
 		} else {
@@ -394,7 +403,7 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
-		h.logger.Printf("Render error (url=%s, status=%d)", r.URL.Path, http.StatusServiceUnavailable)
+		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
 
 		return
 	}
@@ -412,12 +421,11 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(render.StatusCode())
 	if _, err := w.Write(render.Body()); err != nil {
-		h.logger.Printf("Failed to write render: %s", err)
-
+		h.logger.Error("Failed to write render", "err", err)
 		return
 	}
 
-	h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), false)
+	h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
 }
 
 // render makes a new render.
@@ -432,8 +440,7 @@ func (h *sitemapHandler) render(w render.RenderWriter, r *http.Request) error {
 		err = h.sitemap(h.config.Sitemap, w, r)
 	}
 	if err != nil {
-		h.logger.Printf("Failed to render: %s", err)
-
+		h.logger.Debug("Failed to render", "err", err)
 		return err
 	}
 

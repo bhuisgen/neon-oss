@@ -5,7 +5,7 @@
 package neon
 
 import (
-	"log"
+	"log/slog"
 	"testing"
 )
 
@@ -16,7 +16,7 @@ func intPtr(i int) *int {
 func TestLoaderInit(t *testing.T) {
 	type fields struct {
 		config  *loaderConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *loaderState
 		fetcher Fetcher
 		stop    chan struct{}
@@ -33,13 +33,13 @@ func TestLoaderInit(t *testing.T) {
 		{
 			name: "no configuration",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
 			name: "empty configuration",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				config: map[string]interface{}{},
@@ -48,7 +48,7 @@ func TestLoaderInit(t *testing.T) {
 		{
 			name: "full",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				config: map[string]interface{}{
@@ -67,7 +67,7 @@ func TestLoaderInit(t *testing.T) {
 		{
 			name: "invalid values",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				config: map[string]interface{}{
@@ -84,7 +84,7 @@ func TestLoaderInit(t *testing.T) {
 		{
 			name: "error unregistered parser module",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				config: map[string]interface{}{
@@ -117,7 +117,7 @@ func TestLoaderInit(t *testing.T) {
 func TestLoaderStart(t *testing.T) {
 	type fields struct {
 		config  *loaderConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *loaderState
 		fetcher Fetcher
 		stop    chan struct{}
@@ -134,7 +134,7 @@ func TestLoaderStart(t *testing.T) {
 					ExecInterval: intPtr(loaderConfigDefaultExecInterval),
 					ExecStartup:  intPtr(loaderConfigDefaultExecStartup),
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &loaderState{},
 				stop:   make(chan struct{}, 1),
 			},
@@ -146,7 +146,7 @@ func TestLoaderStart(t *testing.T) {
 					ExecInterval: intPtr(0),
 					ExecStartup:  intPtr(loaderConfigDefaultExecStartup),
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &loaderState{},
 				stop:   make(chan struct{}, 1),
 			},
@@ -171,7 +171,7 @@ func TestLoaderStart(t *testing.T) {
 func TestLoaderStop(t *testing.T) {
 	type fields struct {
 		config  *loaderConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *loaderState
 		fetcher Fetcher
 		stop    chan struct{}
@@ -187,7 +187,7 @@ func TestLoaderStop(t *testing.T) {
 				config: &loaderConfig{
 					ExecInterval: intPtr(loaderConfigDefaultExecInterval),
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &loaderState{},
 				stop:   make(chan struct{}, 1),
 			},
@@ -198,7 +198,7 @@ func TestLoaderStop(t *testing.T) {
 				config: &loaderConfig{
 					ExecInterval: intPtr(0),
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &loaderState{},
 				stop:   make(chan struct{}, 1),
 			},

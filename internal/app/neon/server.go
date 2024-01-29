@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/mitchellh/mapstructure"
@@ -17,7 +17,7 @@ import (
 // server implements the server.
 type server struct {
 	config  *serverConfig
-	logger  *log.Logger
+	logger  *slog.Logger
 	state   *serverState
 	store   Store
 	fetcher Fetcher
@@ -44,7 +44,7 @@ const (
 // newServer creates a new server.
 func newServer(store Store, fetcher Fetcher, loader Loader) *server {
 	return &server{
-		logger: log.New(os.Stderr, fmt.Sprint(serverLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		logger: slog.New(NewLogHandler(os.Stderr, serverLogger, nil)),
 		state: &serverState{
 			listenersMap:   make(map[string]ServerListener),
 			sitesMap:       make(map[string]ServerSite),
@@ -59,19 +59,20 @@ func newServer(store Store, fetcher Fetcher, loader Loader) *server {
 // Init initializes the server.
 func (s *server) Init(config map[string]interface{}) error {
 	if config == nil {
-		s.logger.Print("missing configuration")
-		return errors.New("missing configuration")
+		err := errors.New("missing configuration")
+		s.logger.Error("Missing configuration")
+		return err
 	}
 
 	if err := mapstructure.Decode(config, &s.config); err != nil {
-		s.logger.Print("failed to parse configuration")
+		s.logger.Error("Failed to parse configuration", "err", err)
 		return err
 	}
 
 	var errInit bool
 
 	if len(s.config.Listeners) == 0 {
-		s.logger.Print("no listener defined")
+		s.logger.Error("No listener defined")
 		errInit = true
 	}
 	for listenerName, listenerConfig := range s.config.Listeners {
@@ -82,9 +83,8 @@ func (s *server) Init(config map[string]interface{}) error {
 		}
 		if err := listener.Init(
 			listenerConfig,
-			log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "listener[", listenerName, "]: "), log.LstdFlags|log.Lmsgprefix),
 		); err != nil {
-			s.logger.Printf("failed to init listener '%s'", listenerName)
+			s.logger.Error("Failed to init listener", "name", listenerName, "err", err)
 			errInit = true
 			continue
 		}
@@ -93,23 +93,30 @@ func (s *server) Init(config map[string]interface{}) error {
 	}
 
 	if len(s.config.Sites) == 0 {
-		s.logger.Print("no site defined")
+		s.logger.Error("No site defined")
 		errInit = true
 	}
+	var defaultSiteName string
 	for siteName, siteConfig := range s.config.Sites {
 		site := newServerSite(siteName, s.store, s.fetcher, s.loader, s)
 
 		if siteConfig == nil {
 			siteConfig = map[string]interface{}{}
 		}
+
 		if err := site.Init(
 			siteConfig,
-			log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "site[", siteName, "]: "), log.LstdFlags|log.Lmsgprefix),
 		); err != nil {
-			s.logger.Printf("failed to init site '%s'", siteName)
+			s.logger.Error("Failed to init site", "site", siteName, "err", err)
 			errInit = true
 			continue
 		}
+		if site.Default() && defaultSiteName != "" {
+			err := fmt.Errorf("default site already defined (%s)", defaultSiteName)
+			s.logger.Error("Failed to init site", "site", siteName, "err", err)
+			errInit = true
+		}
+		defaultSiteName = site.Name()
 
 		s.state.sitesMap[siteName] = site
 	}
@@ -121,8 +128,10 @@ func (s *server) Init(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server listeners descriptors.
+// Register registers the server listeners and sites.
 func (s *server) Register(descriptors map[string]ServerListenerDescriptor) error {
+	s.logger.Debug("Registering server")
+
 	for listenerName, listener := range s.state.listenersMap {
 		if err := listener.Register(descriptors[listenerName]); err != nil {
 			return err
@@ -140,6 +149,8 @@ func (s *server) Register(descriptors map[string]ServerListenerDescriptor) error
 
 // Start starts the server.
 func (s *server) Start() error {
+	s.logger.Info("Starting server")
+
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Serve(); err != nil {
 			return err
@@ -165,6 +176,8 @@ func (s *server) Start() error {
 
 // Stop stops the server.
 func (s *server) Stop() error {
+	s.logger.Info("Stopping server")
+
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Close(); err != nil {
 			return err
@@ -182,6 +195,8 @@ func (s *server) Stop() error {
 
 // Shutdown shutdowns the server gracefully.
 func (s *server) Shutdown(ctx context.Context) error {
+	s.logger.Info("Shutting down server")
+
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Shutdown(ctx); err != nil {
 			return err
@@ -191,7 +206,7 @@ func (s *server) Shutdown(ctx context.Context) error {
 	for _, site := range s.state.sitesMap {
 		listeners, ok := s.state.sitesListeners[site.Name()]
 		if !ok {
-			s.logger.Print("site is not linked")
+			s.logger.Warn("Site is not linked")
 			continue
 		}
 		for _, listener := range listeners {

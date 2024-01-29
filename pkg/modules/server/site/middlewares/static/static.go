@@ -7,7 +7,7 @@ package static
 import (
 	"errors"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -23,7 +23,7 @@ import (
 // staticMiddleware implements the static middleware.
 type staticMiddleware struct {
 	config        *staticMiddlewareConfig
-	logger        *log.Logger
+	logger        *slog.Logger
 	staticFS      StaticFileSystem
 	staticHandler http.Handler
 	osOpenFile    func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -78,33 +78,33 @@ func (m staticMiddleware) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the middleware.
-func (m *staticMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m *staticMiddleware) Init(config map[string]interface{}, logger *slog.Logger) error {
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Print("failed to parse configuration")
+		m.logger.Error("Failed to parse configuration")
 		return err
 	}
 
 	var errInit bool
 
 	if m.config.Path == "" {
-		m.logger.Printf("option '%s', missing option or value", "Path")
+		m.logger.Error("Missing option or value", "option", "Path")
 		errInit = true
 	} else {
 		f, err := m.osOpenFile(m.config.Path, os.O_RDONLY, 0)
 		if err != nil {
-			m.logger.Printf("option '%s', failed to open file '%s'", "Path", m.config.Path)
+			m.logger.Error("Failed to open file", "option", "Path", "value", m.config.Path)
 			errInit = true
 		} else {
 			_ = m.osClose(f)
 			fi, err := m.osStat(m.config.Path)
 			if err != nil {
-				m.logger.Printf("option '%s', failed to stat file '%s'", "Path", m.config.Path)
+				m.logger.Error("Failed to stat file", "option", "Path", "value", m.config.Path)
 				errInit = true
 			}
 			if err == nil && !fi.IsDir() {
-				m.logger.Printf("option '%s', '%s' is not a directory", "Path", m.config.Path)
+				m.logger.Error("File is not a directory", "option", "Path", "value", m.config.Path)
 				errInit = true
 			}
 		}

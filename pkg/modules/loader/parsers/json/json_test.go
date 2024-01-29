@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/core"
@@ -53,12 +53,12 @@ var _ core.Fetcher = (*testJSONParserFetcher)(nil)
 func TestJSONParserInit(t *testing.T) {
 	type fields struct {
 		config        *jsonParserConfig
-		logger        *log.Logger
+		logger        *slog.Logger
 		jsonUnmarshal func(data []byte, v any) error
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -83,7 +83,7 @@ func TestJSONParserInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 	}
@@ -105,7 +105,7 @@ func TestJSONParserInit(t *testing.T) {
 func TestJSONParserParse(t *testing.T) {
 	type fields struct {
 		config        *jsonParserConfig
-		logger        *log.Logger
+		logger        *slog.Logger
 		jsonUnmarshal func(data []byte, v any) error
 	}
 	type args struct {
@@ -135,7 +135,7 @@ func TestJSONParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger:        log.Default(),
+				logger:        slog.Default(),
 				jsonUnmarshal: json.Unmarshal,
 			},
 			args: args{
@@ -159,7 +159,7 @@ func TestJSONParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx:     context.Background(),
@@ -178,7 +178,7 @@ func TestJSONParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx:     context.Background(),
@@ -197,7 +197,7 @@ func TestJSONParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx:   context.Background(),
@@ -218,7 +218,7 @@ func TestJSONParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx: context.Background(),
@@ -249,7 +249,7 @@ func TestJSONParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger:        log.Default(),
+				logger:        slog.Default(),
 				jsonUnmarshal: json.Unmarshal,
 			},
 			args: args{

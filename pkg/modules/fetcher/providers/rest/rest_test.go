@@ -11,7 +11,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -58,7 +58,7 @@ var _ os.FileInfo = (*testRestProviderFileInfo)(nil)
 func TestRestProviderInit(t *testing.T) {
 	type fields struct {
 		config                         *restProviderConfig
-		logger                         *log.Logger
+		logger                         *slog.Logger
 		client                         http.Client
 		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile                     func(name string) ([]byte, error)
@@ -72,7 +72,7 @@ func TestRestProviderInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -95,7 +95,7 @@ func TestRestProviderInit(t *testing.T) {
 			},
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -173,7 +173,7 @@ func TestRestProviderInit(t *testing.T) {
 						"": "",
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -196,7 +196,7 @@ func TestRestProviderInit(t *testing.T) {
 					"TLSCertFiles": []string{"cert.pem"},
 					"TLSKeyFiles":  []string{"key.pem"},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -219,7 +219,7 @@ func TestRestProviderInit(t *testing.T) {
 					"TLSCertFiles": []string{"cert.pem"},
 					"TLSKeyFiles":  []string{"key.pem"},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -244,7 +244,7 @@ func TestRestProviderInit(t *testing.T) {
 					"TLSCertFiles": []string{"cert.pem"},
 					"TLSKeyFiles":  []string{"key.pem"},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -276,7 +276,7 @@ func TestRestProviderInit(t *testing.T) {
 func TestRestProviderFetch(t *testing.T) {
 	type fields struct {
 		config                         *restProviderConfig
-		logger                         *log.Logger
+		logger                         *slog.Logger
 		client                         http.Client
 		osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osReadFile                     func(name string) ([]byte, error)
@@ -311,7 +311,7 @@ func TestRestProviderFetch(t *testing.T) {
 						"global": "value",
 					},
 				},
-				logger:                    log.Default(),
+				logger:                    slog.Default(),
 				httpNewRequestWithContext: restHttpNewRequestWithContext,
 				httpClientDo: func(client *http.Client, req *http.Request) (*http.Response, error) {
 					return &http.Response{
@@ -332,7 +332,7 @@ func TestRestProviderFetch(t *testing.T) {
 			name: "error http create request",
 			fields: fields{
 				config: &restProviderConfig{},
-				logger: log.Default(),
+				logger: slog.Default(),
 				httpNewRequestWithContext: func(ctx context.Context, method, url string, body io.Reader) (*http.Request,
 					error) {
 					return nil, errors.New("test error")
@@ -348,7 +348,7 @@ func TestRestProviderFetch(t *testing.T) {
 			name: "error http client do",
 			fields: fields{
 				config: &restProviderConfig{},
-				logger: log.Default(),
+				logger: slog.Default(),
 				httpNewRequestWithContext: func(ctx context.Context, method, u string, body io.Reader) (*http.Request,
 					error) {
 					return &http.Request{
@@ -370,7 +370,7 @@ func TestRestProviderFetch(t *testing.T) {
 			name: "error io read all",
 			fields: fields{
 				config: &restProviderConfig{},
-				logger: log.Default(),
+				logger: slog.Default(),
 				httpNewRequestWithContext: func(ctx context.Context, method, u string, body io.Reader) (*http.Request,
 					error) {
 					return &http.Request{

@@ -7,7 +7,7 @@ package logger
 import (
 	"errors"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"testing"
@@ -102,7 +102,7 @@ var _ os.FileInfo = (*testLoggerMiddlewareFileInfo)(nil)
 func TestLoggerMiddlewareModuleInfo(t *testing.T) {
 	type fields struct {
 		config     *loggerMiddlewareConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		reopen     chan os.Signal
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osClose    func(f *os.File) error
@@ -145,7 +145,7 @@ func TestLoggerMiddlewareModuleInfo(t *testing.T) {
 func TestLoggerMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config     *loggerMiddlewareConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		reopen     chan os.Signal
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osClose    func(f *os.File) error
@@ -153,7 +153,7 @@ func TestLoggerMiddlewareInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -176,7 +176,7 @@ func TestLoggerMiddlewareInit(t *testing.T) {
 			},
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -196,7 +196,7 @@ func TestLoggerMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "access.log",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -216,7 +216,7 @@ func TestLoggerMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -237,7 +237,7 @@ func TestLoggerMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "access.log",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -258,7 +258,7 @@ func TestLoggerMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "access.log",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -281,7 +281,7 @@ func TestLoggerMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"File": "dir",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -306,7 +306,7 @@ func TestLoggerMiddlewareInit(t *testing.T) {
 func TestLoggerMiddlewareRegister(t *testing.T) {
 	type fields struct {
 		config     *loggerMiddlewareConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		reopen     chan os.Signal
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osClose    func(f *os.File) error
@@ -357,7 +357,7 @@ func TestLoggerMiddlewareRegister(t *testing.T) {
 func TestLoggerMiddlewareStart(t *testing.T) {
 	type fields struct {
 		config     *loggerMiddlewareConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		reopen     chan os.Signal
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osClose    func(f *os.File) error
@@ -395,7 +395,7 @@ func TestLoggerMiddlewareStart(t *testing.T) {
 func TestLoggerMiddlewareStop(t *testing.T) {
 	type fields struct {
 		config     *loggerMiddlewareConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		reopen     chan os.Signal
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osClose    func(f *os.File) error
@@ -430,7 +430,7 @@ func TestLoggerMiddlewareStop(t *testing.T) {
 func TestLoggerMiddlewareHandler(t *testing.T) {
 	type fields struct {
 		config     *loggerMiddlewareConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		reopen     chan os.Signal
 		osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 		osClose    func(f *os.File) error

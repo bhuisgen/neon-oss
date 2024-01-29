@@ -7,7 +7,7 @@ package neon
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"testing"
@@ -35,7 +35,7 @@ func (m testStoreStorageModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testStoreStorageModule) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m testStoreStorageModule) Init(config map[string]interface{}, logger *slog.Logger) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -79,7 +79,7 @@ func (m testFetcherProviderModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testFetcherProviderModule) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m testFetcherProviderModule) Init(config map[string]interface{}, logger *slog.Logger) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -117,7 +117,7 @@ func (m testLoaderParserModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testLoaderParserModule) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m testLoaderParserModule) Init(config map[string]interface{}, logger *slog.Logger) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -154,7 +154,7 @@ func (m testServerListenerModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerListenerModule) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m testServerListenerModule) Init(config map[string]interface{}, logger *slog.Logger) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -210,7 +210,7 @@ func (m testServerSiteMiddlewareModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerSiteMiddlewareModule) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m testServerSiteMiddlewareModule) Init(config map[string]interface{}, logger *slog.Logger) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -255,7 +255,7 @@ func (m testServerSiteHandlerModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerSiteHandlerModule) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m testServerSiteHandlerModule) Init(config map[string]interface{}, logger *slog.Logger) error {
 	if m.errInit {
 		return errors.New("test error")
 	}

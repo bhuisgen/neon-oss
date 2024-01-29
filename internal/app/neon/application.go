@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -17,14 +17,12 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/bhuisgen/neon/pkg/core"
 )
 
 // application implements the application.
 type application struct {
 	config  *config
-	logger  *log.Logger
+	logger  *slog.Logger
 	state   *applicationState
 	store   *store
 	fetcher *fetcher
@@ -43,9 +41,18 @@ const (
 
 // NewApplication creates a new application.
 func NewApplication(config *config) *application {
+	if v, ok := os.LookupEnv("CONFIG_FILE"); ok {
+		CONFIG_FILE = v
+	}
+	if _, ok := os.LookupEnv("DEBUG"); ok {
+		DEBUG = true
+	}
+	if DEBUG {
+		programLevel.Set(slog.LevelDebug)
+	}
 	return &application{
 		config: config,
-		logger: log.New(os.Stderr, fmt.Sprint(applicationLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		logger: slog.New(NewLogHandler(os.Stderr, applicationLogger, nil)),
 	}
 }
 
@@ -80,10 +87,12 @@ func (a *application) Check() error {
 
 // Serve executes the instance.
 func (a *application) Serve() error {
-	a.logger.Printf("%s version %s, commit %s", Name, Version, Commit)
+	a.logger.Info(fmt.Sprintf("%s version %s, commit %s", Name, Version, Commit))
 
-	if core.DEBUG {
-		a.logger.Print("Debug enabled")
+	a.logger.Info("Starting instance")
+
+	if DEBUG {
+		a.logger.Warn("Debug enabled")
 	}
 
 	a.state = &applicationState{}
@@ -112,6 +121,8 @@ func (a *application) Serve() error {
 		return err
 	}
 
+	a.logger.Info("Instance ready")
+
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
 	shutdown := make(chan os.Signal, 1)
@@ -122,21 +133,21 @@ func (a *application) Serve() error {
 	for {
 		select {
 		case <-exit:
-			a.logger.Print("Signal SIGTERM received, stopping instance")
+			a.logger.Info("Signal SIGTERM received, stopping instance")
 			if err := a.stop(); err != nil {
-				a.logger.Printf("Failed to stop the instance: %s", err)
+				a.logger.Error("Failed to stop the instance", "err", err)
 			}
 
 		case <-shutdown:
-			a.logger.Print("Signal SIGQUIT received, shutting down instance gracefully")
+			a.logger.Info("Signal SIGQUIT received, shutting down instance gracefully")
 			if err := a.shutdown(); err != nil {
-				a.logger.Printf("Failed to shutdown the instance: %s", err)
+				a.logger.Error("Failed to shutdown the instance", "err", err)
 			}
 
 		case <-reload:
-			a.logger.Print("Signal SIGHUP received, reloading instance")
+			a.logger.Info("Signal SIGHUP received, reloading instance")
 			if err := a.reload(); err != nil {
-				a.logger.Printf("Failed to reload instance: %s", err)
+				a.logger.Error("Failed to reload instance", "err", err)
 				continue
 			}
 		}
@@ -148,7 +159,7 @@ func (a *application) Serve() error {
 	signal.Stop(shutdown)
 	signal.Stop(reload)
 
-	a.logger.Print("Instance terminated")
+	a.logger.Info("Instance terminated")
 
 	return nil
 }
@@ -237,10 +248,10 @@ func (a *application) reload() error {
 					return err
 				}
 
-				a.logger.Print("child process started, waiting for connection")
+				a.logger.Info("Child process started, waiting for connection")
 
 			case "done":
-				a.logger.Print("child process ready, stopping parent process")
+				a.logger.Info("Child process ready, stopping parent process")
 
 				return nil
 			}

@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -24,7 +24,7 @@ import (
 // redirectListener implements the redirect listener.
 type redirectListener struct {
 	config             *redirectListenerConfig
-	logger             *log.Logger
+	logger             *slog.Logger
 	listener           net.Listener
 	server             *http.Server
 	osReadFile         func(name string) ([]byte, error)
@@ -103,11 +103,11 @@ func (l redirectListener) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the listener.
-func (l *redirectListener) Init(config map[string]interface{}, logger *log.Logger) error {
+func (l *redirectListener) Init(config map[string]interface{}, logger *slog.Logger) error {
 	l.logger = logger
 
 	if err := mapstructure.Decode(config, &l.config); err != nil {
-		l.logger.Print("failed to parse configuration")
+		l.logger.Error("Failed to parse configuration")
 		return err
 	}
 
@@ -122,7 +122,7 @@ func (l *redirectListener) Init(config map[string]interface{}, logger *log.Logge
 		l.config.ListenPort = &defaultValue
 	}
 	if *l.config.ListenPort < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ListenPort", *l.config.ListenPort)
+		l.logger.Error("Invalid value", "option", "ListenPort", "value", *l.config.ListenPort)
 		errInit = true
 	}
 	if l.config.ReadTimeout == nil {
@@ -130,7 +130,7 @@ func (l *redirectListener) Init(config map[string]interface{}, logger *log.Logge
 		l.config.ReadTimeout = &defaultValue
 	}
 	if *l.config.ReadTimeout < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ReadTimeout", *l.config.ReadTimeout)
+		l.logger.Error("Invalid value", "option", "ReadTimeout", "value", *l.config.ReadTimeout)
 		errInit = true
 	}
 	if l.config.ReadHeaderTimeout == nil {
@@ -138,7 +138,7 @@ func (l *redirectListener) Init(config map[string]interface{}, logger *log.Logge
 		l.config.ReadHeaderTimeout = &defaultValue
 	}
 	if *l.config.ReadHeaderTimeout < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ReadHeaderTimeout", *l.config.ReadHeaderTimeout)
+		l.logger.Error("Invalid value", "option", "ReadHeaderTimeout", "value", *l.config.ReadHeaderTimeout)
 		errInit = true
 	}
 	if l.config.WriteTimeout == nil {
@@ -146,7 +146,7 @@ func (l *redirectListener) Init(config map[string]interface{}, logger *log.Logge
 		l.config.WriteTimeout = &defaultValue
 	}
 	if *l.config.WriteTimeout < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "WriteTimeout", *l.config.WriteTimeout)
+		l.logger.Error("Invalid value", "option", "WriteTimeout", "value", *l.config.WriteTimeout)
 		errInit = true
 	}
 	if l.config.IdleTimeout == nil {
@@ -154,11 +154,11 @@ func (l *redirectListener) Init(config map[string]interface{}, logger *log.Logge
 		l.config.IdleTimeout = &defaultValue
 	}
 	if *l.config.IdleTimeout < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "IdleTimeout", *l.config.IdleTimeout)
+		l.logger.Error("Invalid value", "option", "IdleTimeout", "value", *l.config.IdleTimeout)
 		errInit = true
 	}
 	if l.config.RedirectPort != nil && *l.config.RedirectPort < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "RedirectPort", *l.config.RedirectPort)
+		l.logger.Error("Invalid value", "option", "RedirectPort", "value", *l.config.RedirectPort)
 		errInit = true
 	}
 
@@ -199,15 +199,15 @@ func (l *redirectListener) Serve(handler http.Handler) error {
 		ReadHeaderTimeout: time.Duration(*l.config.ReadHeaderTimeout) * time.Second,
 		WriteTimeout:      time.Duration(*l.config.WriteTimeout) * time.Second,
 		IdleTimeout:       time.Duration(*l.config.IdleTimeout) * time.Second,
-		ErrorLog:          l.logger,
 	}
 
 	go func() {
-		l.logger.Printf("Listening at http://%s", l.server.Addr)
+		l.logger.Info("Starting listener", "addr", l.server.Addr)
 
-		err := l.httpServerServe(l.server, l.listener)
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			l.logger.Print(err)
+		if err := l.httpServerServe(l.server, l.listener); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				l.logger.Error("Service error", "err", err)
+			}
 		}
 	}()
 

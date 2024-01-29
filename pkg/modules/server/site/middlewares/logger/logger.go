@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -23,7 +24,8 @@ import (
 // loggerMiddleware implements the logger middleware.
 type loggerMiddleware struct {
 	config     *loggerMiddlewareConfig
-	logger     *log.Logger
+	logger     *slog.Logger
+	log        *log.Logger
 	reopen     chan os.Signal
 	osOpenFile func(name string, flag int, perm fs.FileMode) (*os.File, error)
 	osClose    func(*os.File) error
@@ -74,11 +76,11 @@ func (m loggerMiddleware) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the middleware.
-func (m *loggerMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m *loggerMiddleware) Init(config map[string]interface{}, logger *slog.Logger) error {
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Print("failed to parse configuration")
+		m.logger.Error("Failed to parse configuration")
 		return err
 	}
 
@@ -86,22 +88,22 @@ func (m *loggerMiddleware) Init(config map[string]interface{}, logger *log.Logge
 
 	if m.config.File != nil {
 		if *m.config.File == "" {
-			m.logger.Printf("option '%s', invalid value '%s'", "File", *m.config.File)
+			m.logger.Error("Invalid value", "option", "File", "value", *m.config.File)
 			errInit = true
 		} else {
 			f, err := m.osOpenFile(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 			if err != nil {
-				m.logger.Printf("option '%s', failed to open file '%s'", "File", *m.config.File)
+				m.logger.Error("failed to open file", "option", "File", "value", *m.config.File)
 				errInit = true
 			} else {
 				_ = m.osClose(f)
 				fi, err := m.osStat(*m.config.File)
 				if err != nil {
-					m.logger.Printf("option '%s', failed to stat file '%s'", "File", *m.config.File)
+					m.logger.Error("failed to stat file", "option", "File", "value", *m.config.File)
 					errInit = true
 				}
 				if err == nil && fi.IsDir() {
-					m.logger.Printf("option '%s', '%s' is a directory", "File", *m.config.File)
+					m.logger.Error("File is a directory", "option", "File", "value", *m.config.File)
 					errInit = true
 				}
 			}
@@ -141,21 +143,19 @@ func (m *loggerMiddleware) Start() error {
 		go func() {
 			for {
 				<-m.reopen
-
-				m.logger.Print("Reopening log file")
+				m.logger.Info("Reopening log file")
 
 				if err := logFileWriter.Reopen(); err != nil {
-					m.logger.Print("Failed to reopen file")
-
+					m.logger.Error("Failed to reopen file")
 					return
 				}
 			}
 		}()
 	}
 
-	m.logger = log.New(os.Stdout, "", log.LstdFlags|log.Lmsgprefix)
+	m.log = log.New(os.Stdout, "", log.LstdFlags|log.Lmsgprefix)
 	if logFileWriter != nil {
-		m.logger.SetOutput(logFileWriter)
+		m.log.SetOutput(logFileWriter)
 	}
 
 	return nil
@@ -176,7 +176,7 @@ func (m *loggerMiddleware) Handler(next http.Handler) http.Handler {
 
 		next.ServeHTTP(&wrapped, r)
 
-		m.logger.Println(r.Method, r.URL.EscapedPath(), wrapped.status, time.Since(start))
+		m.log.Println(r.Method, r.URL.EscapedPath(), wrapped.status, time.Since(start))
 	}
 
 	return http.HandlerFunc(f)

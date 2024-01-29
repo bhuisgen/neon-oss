@@ -7,8 +7,7 @@ package neon
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -22,7 +21,7 @@ import (
 // loader implements the loader.
 type loader struct {
 	config  *loaderConfig
-	logger  *log.Logger
+	logger  *slog.Logger
 	state   *loaderState
 	store   Store
 	fetcher Fetcher
@@ -61,7 +60,7 @@ const (
 // newLoader creates a new loader.
 func newLoader(store Store, fetcher Fetcher) *loader {
 	return &loader{
-		logger: log.New(os.Stderr, fmt.Sprint(loaderLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		logger: slog.New(NewLogHandler(os.Stderr, loaderLogger, nil)),
 		state: &loaderState{
 			parsers: make(map[string]core.LoaderParserModule),
 		},
@@ -77,7 +76,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 		l.config = &loaderConfig{}
 	} else {
 		if err := mapstructure.Decode(config, &l.config); err != nil {
-			l.logger.Printf("failed to parse configuration")
+			l.logger.Error("Failed to parse configuration", "err", err)
 			return err
 		}
 	}
@@ -89,7 +88,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 		l.config.ExecStartup = &defaultValue
 	}
 	if *l.config.ExecStartup < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ExecStartup", *l.config.ExecStartup)
+		l.logger.Error("Invalid value", "option", "ExecStartup", "value", *l.config.ExecStartup)
 		errInit = true
 	}
 	if l.config.ExecInterval == nil {
@@ -97,7 +96,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 		l.config.ExecInterval = &defaultValue
 	}
 	if *l.config.ExecInterval < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ExecInterval", *l.config.ExecInterval)
+		l.logger.Error("Invalid value", "option", "ExecInterval", "value", *l.config.ExecInterval)
 		errInit = true
 	}
 	if l.config.ExecFailsafeInterval == nil {
@@ -105,7 +104,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 		l.config.ExecFailsafeInterval = &defaultValue
 	}
 	if *l.config.ExecFailsafeInterval < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ExecFailsafeInterval", *l.config.ExecFailsafeInterval)
+		l.logger.Error("Invalid value", "option", "ExecFailsafeInterval", "value", *l.config.ExecFailsafeInterval)
 		errInit = true
 	}
 	if l.config.ExecWorkers == nil {
@@ -113,7 +112,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 		l.config.ExecWorkers = &defaultValue
 	}
 	if *l.config.ExecWorkers < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ExecWorkers", *l.config.ExecWorkers)
+		l.logger.Error("Invalid value", "option", "ExecWorkers", "value", *l.config.ExecWorkers)
 		errInit = true
 	}
 	if l.config.ExecMaxOps == nil {
@@ -121,7 +120,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 		l.config.ExecMaxOps = &defaultValue
 	}
 	if *l.config.ExecMaxOps < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ExecMaxOps", *l.config.ExecMaxOps)
+		l.logger.Error("Invalid value", "option", "ExecMaxOps", "value", *l.config.ExecMaxOps)
 		errInit = true
 	}
 	if l.config.ExecMaxDelay == nil {
@@ -129,7 +128,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 		l.config.ExecMaxDelay = &defaultValue
 	}
 	if *l.config.ExecMaxDelay < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ExecMaxDelay", *l.config.ExecMaxDelay)
+		l.logger.Error("Invalid value", "option", "ExecMaxDelay", "value", *l.config.ExecMaxDelay)
 		errInit = true
 	}
 
@@ -137,13 +136,14 @@ func (l *loader) Init(config map[string]interface{}) error {
 		for moduleName, moduleConfig := range ruleConfig {
 			moduleInfo, err := module.Lookup(module.ModuleID("loader.parser." + moduleName))
 			if err != nil {
-				l.logger.Printf("rule '%s', unregistered parser module '%s'", ruleName, moduleName)
+				l.logger.Error("Unregistered parser module", "rule", ruleName, "module", moduleName, "err", err)
 				errInit = true
 				continue
 			}
 			module, ok := moduleInfo.NewInstance().(core.LoaderParserModule)
 			if !ok {
-				l.logger.Printf("rule '%s', invalid parser module '%s'", ruleName, moduleName)
+				err := errors.New("module instance not valid")
+				l.logger.Error("Invalid parser module", "rule", ruleName, "module", moduleName, "err", err)
 				errInit = true
 				continue
 			}
@@ -153,10 +153,9 @@ func (l *loader) Init(config map[string]interface{}) error {
 			}
 			if err := module.Init(
 				moduleConfig,
-				log.New(os.Stderr, fmt.Sprint(l.logger.Prefix(), "parser[", moduleName, "]: "),
-					log.LstdFlags|log.Lmsgprefix),
+				slog.New(NewLogHandler(os.Stderr, loaderLogger, nil)).With("parser", moduleName),
 			); err != nil {
-				l.logger.Printf("rule '%s', failed to init parser module '%s'", ruleName, moduleName)
+				l.logger.Error("Failed to init parser module", "rule", ruleName, "module", moduleName, "err", err)
 				errInit = true
 				continue
 			}
@@ -179,6 +178,8 @@ func (l *loader) Start() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	l.logger.Info("Starting loader")
+
 	if *l.config.ExecInterval > 0 {
 		l.execute(l.stop)
 	}
@@ -190,6 +191,8 @@ func (l *loader) Start() error {
 func (l *loader) Stop() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	l.logger.Info("Stopping loader")
 
 	if *l.config.ExecInterval > 0 {
 		l.stop <- struct{}{}
@@ -211,15 +214,15 @@ func (l *loader) execute(stop <-chan struct{}) {
 			for ruleName := range jobs {
 				parser, ok := l.state.parsers[ruleName]
 				if !ok {
-					err := fmt.Errorf("parser module not found")
-					l.logger.Printf("rule '%s', parser error: %s", ruleName, err)
+					err := errors.New("parser not found")
+					l.logger.Error("Execution error", "rule", ruleName, "err", err)
 					results <- err
 					continue
 				}
 
 				err := parser.Parse(ctx, l.store, l.fetcher)
 				if err != nil {
-					l.logger.Printf("rule '%s', parser error: %s", ruleName, err)
+					l.logger.Error("Execution error", "rule", ruleName, "err", err)
 				}
 				results <- err
 			}
@@ -239,6 +242,8 @@ func (l *loader) execute(stop <-chan struct{}) {
 					ticker = time.NewTicker(time.Duration(*l.config.ExecInterval) * time.Second)
 				}
 
+				l.logger.Info("Starting execution")
+
 				rulesCount := len(l.config.Rules)
 				jobs := make(chan string, rulesCount)
 				results := make(chan error, rulesCount)
@@ -253,8 +258,7 @@ func (l *loader) execute(stop <-chan struct{}) {
 					ops += 1
 
 					if *l.config.ExecMaxOps > 0 && ops > *l.config.ExecMaxOps {
-						l.logger.Printf("Max operations per execution reached, delaying execution for %d seconds",
-							l.config.ExecMaxDelay)
+						l.logger.Warn("Max operations per execution reached, delaying execution", "delay", l.config.ExecMaxDelay)
 
 						time.Sleep(time.Duration(*l.config.ExecMaxDelay) * time.Second)
 						ops = 1
@@ -283,16 +287,16 @@ func (l *loader) execute(stop <-chan struct{}) {
 					}
 				}
 
-				l.logger.Printf("Execution finished (success=%d, failure=%d, total=%d)", success, failure, rulesCount)
+				l.logger.Info("Execution finished", "success", success, "failure", failure, "total", rulesCount)
 
 				if failure > 0 && !l.state.failsafe && *l.config.ExecFailsafeInterval > 0 {
-					l.logger.Print("Last execution failed, enabling failsafe mode")
+					l.logger.Warn("Last execution failed, enabling failsafe mode")
 
 					ticker.Stop()
 					ticker = time.NewTicker(time.Duration(*l.config.ExecFailsafeInterval) * time.Second)
 				}
 				if failure == 0 && l.state.failsafe {
-					l.logger.Print("Last execution succeeded, disabling failsafe mode")
+					l.logger.Warn("Last execution succeeded, disabling failsafe mode")
 
 					ticker.Stop()
 					ticker = time.NewTicker(time.Duration(*l.config.ExecInterval) * time.Second)

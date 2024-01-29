@@ -6,7 +6,7 @@ package memory
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/core"
@@ -66,7 +66,7 @@ var _ Cache = (*testMemoryStorageCache)(nil)
 func TestMemoryStorageModuleInfo(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		storage Cache
 	}
 	tests := []struct {
@@ -103,12 +103,12 @@ func TestMemoryStorageModuleInfo(t *testing.T) {
 func TestMemoryStorageInit(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		storage Cache
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -139,7 +139,7 @@ func TestMemoryStorageInit(t *testing.T) {
 func TestMemoryStorageLoadResource(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		storage Cache
 	}
 	type args struct {
@@ -195,7 +195,7 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 func TestMemoryStorageStoreResource(t *testing.T) {
 	type fields struct {
 		config  *memoryStorageConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		storage Cache
 	}
 	type args struct {

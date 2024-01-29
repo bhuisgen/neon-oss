@@ -5,6 +5,7 @@
 package app
 
 import (
+	"log/slog"
 	"net/http"
 	"reflect"
 	"testing"
@@ -59,7 +60,7 @@ func TestVMAPIServerHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := newVM()
 			c := tt.args.config
-			if err := v.Configure(&c); err != nil {
+			if err := v.Configure(&c, slog.Default()); err != nil {
 				t.Errorf("failed to configure VM: %s", err)
 			}
 			got, err := v.Execute(tt.args.name, tt.args.source, tt.args.timeout)
@@ -232,7 +233,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := newVM()
 			c := tt.args.config
-			if err := v.Configure(&c); err != nil {
+			if err := v.Configure(&c, slog.Default()); err != nil {
 				t.Errorf("failed to configure VM: %s", err)
 			}
 			got, err := v.Execute(tt.args.name, tt.args.source, tt.args.timeout)
@@ -487,7 +488,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			v := newVM()
 			c := tt.args.config
-			if err := v.Configure(&c); err != nil {
+			if err := v.Configure(&c, slog.Default()); err != nil {
 				t.Errorf("failed to configure VM: %s", err)
 			}
 			got, err := v.Execute(tt.args.name, tt.args.source, tt.args.timeout)

@@ -7,7 +7,7 @@ package robots
 import (
 	_ "embed"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"text/template"
@@ -23,7 +23,7 @@ import (
 // robotsHandler implements the robots handler.
 type robotsHandler struct {
 	config   *robotsHandlerConfig
-	logger   *log.Logger
+	logger   *slog.Logger
 	template *template.Template
 	rwPool   render.RenderWriterPool
 	cache    *robotsHandlerCache
@@ -80,11 +80,11 @@ func (h robotsHandler) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the handler.
-func (h *robotsHandler) Init(config map[string]interface{}, logger *log.Logger) error {
+func (h *robotsHandler) Init(config map[string]interface{}, logger *slog.Logger) error {
 	h.logger = logger
 
 	if err := mapstructure.Decode(config, &h.config); err != nil {
-		h.logger.Print("failed to parse configuration")
+		h.logger.Error("Failed to parse configuration")
 		return err
 	}
 
@@ -92,7 +92,7 @@ func (h *robotsHandler) Init(config map[string]interface{}, logger *log.Logger) 
 
 	for _, item := range h.config.Hosts {
 		if item == "" {
-			h.logger.Printf("option '%s', missing option or value", "Hosts")
+			h.logger.Error("Mmissing option or value", "option", "Hosts")
 			errInit = true
 		}
 	}
@@ -105,12 +105,12 @@ func (h *robotsHandler) Init(config map[string]interface{}, logger *log.Logger) 
 		h.config.CacheTTL = &defaultValue
 	}
 	if *h.config.CacheTTL < 0 {
-		h.logger.Printf("option '%s', invalid value '%d'", "CacheTTL", *h.config.CacheTTL)
+		h.logger.Error("Invalid value", "option", "CacheTTL", "value", *h.config.CacheTTL)
 		errInit = true
 	}
 	for _, item := range h.config.Sitemaps {
 		if item == "" {
-			h.logger.Printf("option '%s', invalid value '%s'", "Sitemaps", item)
+			h.logger.Error("Invalid value", "option", "Sitemaps", "value", item)
 			errInit = true
 		}
 	}
@@ -162,12 +162,12 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			w.WriteHeader(render.StatusCode())
 			if _, err := w.Write(render.Body()); err != nil {
-				h.logger.Printf("Failed to write render: %s", err)
+				h.logger.Error("Failed to write render", "err", err)
 
 				return
 			}
 
-			h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), true)
+			h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
 
 			return
 		} else {
@@ -182,7 +182,7 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
-		h.logger.Printf("Render error (url=%s, status=%d)", r.URL.Path, http.StatusServiceUnavailable)
+		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
 
 		return
 	}
@@ -200,12 +200,12 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(render.StatusCode())
 	if _, err := w.Write(render.Body()); err != nil {
-		h.logger.Printf("Failed to write render: %s", err)
+		h.logger.Error("Failed to write render", "err", err)
 
 		return
 	}
 
-	h.logger.Printf("Render completed (url=%s, status=%d, cache=%t)", r.URL.Path, render.StatusCode(), false)
+	h.logger.Info("Render completed ", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
 }
 
 // render makes a new render.
@@ -224,6 +224,7 @@ func (h *robotsHandler) render(w render.RenderWriter, r *http.Request) error {
 		Sitemaps: h.config.Sitemaps,
 	})
 	if err != nil {
+		h.logger.Debug("Failed to render template", "err", err)
 		return err
 	}
 

@@ -7,7 +7,7 @@ package file
 import (
 	"errors"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -130,7 +130,7 @@ var _ http.ResponseWriter = (*testFileHandlerResponseWriter)(nil)
 func TestFileHandlerModuleInfo(t *testing.T) {
 	type fields struct {
 		config     *fileHandlerConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		file       []byte
 		fileInfo   *time.Time
 		muFile     *sync.RWMutex
@@ -185,7 +185,7 @@ func TestFileHandlerModuleInfo(t *testing.T) {
 func TestFileHandlerInit(t *testing.T) {
 	type fields struct {
 		config     *fileHandlerConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		file       []byte
 		fileInfo   *time.Time
 		muFile     *sync.RWMutex
@@ -199,7 +199,7 @@ func TestFileHandlerInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -224,7 +224,7 @@ func TestFileHandlerInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "file",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -247,7 +247,7 @@ func TestFileHandlerInit(t *testing.T) {
 					"Cache":      true,
 					"CacheTTL":   60,
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -269,7 +269,7 @@ func TestFileHandlerInit(t *testing.T) {
 					"StatusCode": -1,
 					"CacheTTL":   -1,
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -290,7 +290,7 @@ func TestFileHandlerInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "file",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -311,7 +311,7 @@ func TestFileHandlerInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "file",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -334,7 +334,7 @@ func TestFileHandlerInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "dir",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -365,7 +365,7 @@ func TestFileHandlerInit(t *testing.T) {
 func TestFileHandlerRegister(t *testing.T) {
 	type fields struct {
 		config     *fileHandlerConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		file       []byte
 		fileInfo   *time.Time
 		muFile     *sync.RWMutex
@@ -428,7 +428,7 @@ func TestFileHandlerRegister(t *testing.T) {
 func TestFileHandlerStart(t *testing.T) {
 	type fields struct {
 		config     *fileHandlerConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		file       []byte
 		fileInfo   *time.Time
 		muFile     *sync.RWMutex
@@ -451,7 +451,7 @@ func TestFileHandlerStart(t *testing.T) {
 				config: &fileHandlerConfig{
 					Path: "test",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				muFile: &sync.RWMutex{},
 				osStat: func(name string) (fs.FileInfo, error) {
 					return testFileHandlerFileInfo{}, nil
@@ -467,7 +467,7 @@ func TestFileHandlerStart(t *testing.T) {
 				config: &fileHandlerConfig{
 					Path: "test",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 				muFile: &sync.RWMutex{},
 				osStat: func(name string) (fs.FileInfo, error) {
 					return nil, errors.New("test error")
@@ -502,7 +502,7 @@ func TestFileHandlerStart(t *testing.T) {
 func TestFileHandlerStop(t *testing.T) {
 	type fields struct {
 		config     *fileHandlerConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		file       []byte
 		fileInfo   *time.Time
 		muFile     *sync.RWMutex
@@ -550,7 +550,7 @@ func TestFileHandlerStop(t *testing.T) {
 func TestFileHandlerServeHTTP(t *testing.T) {
 	type fields struct {
 		config     *fileHandlerConfig
-		logger     *log.Logger
+		logger     *slog.Logger
 		file       []byte
 		fileInfo   *time.Time
 		muFile     *sync.RWMutex
@@ -580,7 +580,7 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 					Cache:      boolPtr(true),
 					CacheTTL:   intPtr(60),
 				},
-				logger:  log.Default(),
+				logger:  slog.Default(),
 				muFile:  &sync.RWMutex{},
 				rwPool:  render.NewRenderWriterPool(),
 				muCache: &sync.RWMutex{},

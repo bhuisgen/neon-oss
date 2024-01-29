@@ -7,7 +7,7 @@ package static
 import (
 	"errors"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"testing"
@@ -106,7 +106,7 @@ var _ os.FileInfo = (*testStaticMiddlewareFileInfo)(nil)
 func TestStaticMiddlewareModuleInfo(t *testing.T) {
 	type fields struct {
 		config        *staticMiddlewareConfig
-		logger        *log.Logger
+		logger        *slog.Logger
 		staticFS      StaticFileSystem
 		staticHandler http.Handler
 		osOpenFile    func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -151,7 +151,7 @@ func TestStaticMiddlewareModuleInfo(t *testing.T) {
 func TestStaticMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config        *staticMiddlewareConfig
-		logger        *log.Logger
+		logger        *slog.Logger
 		staticFS      StaticFileSystem
 		staticHandler http.Handler
 		osOpenFile    func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -160,7 +160,7 @@ func TestStaticMiddlewareInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -174,7 +174,7 @@ func TestStaticMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "/static",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			fields: fields{
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
@@ -196,7 +196,7 @@ func TestStaticMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -206,7 +206,7 @@ func TestStaticMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "/test",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			fields: fields{
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
@@ -221,7 +221,7 @@ func TestStaticMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "/test",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			fields: fields{
 				osOpenFile: func(name string, flag int, perm fs.FileMode) (*os.File, error) {
@@ -255,7 +255,7 @@ func TestStaticMiddlewareInit(t *testing.T) {
 				config: map[string]interface{}{
 					"Path": "dir",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -281,7 +281,7 @@ func TestStaticMiddlewareInit(t *testing.T) {
 func TestStaticMiddlewareRegister(t *testing.T) {
 	type fields struct {
 		config        *staticMiddlewareConfig
-		logger        *log.Logger
+		logger        *slog.Logger
 		staticFS      StaticFileSystem
 		staticHandler http.Handler
 		osOpenFile    func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -334,7 +334,7 @@ func TestStaticMiddlewareRegister(t *testing.T) {
 func TestStaticMiddlewareStart(t *testing.T) {
 	type fields struct {
 		config        *staticMiddlewareConfig
-		logger        *log.Logger
+		logger        *slog.Logger
 		staticFS      StaticFileSystem
 		staticHandler http.Handler
 		osOpenFile    func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -377,7 +377,7 @@ func TestStaticMiddlewareStart(t *testing.T) {
 func TestStaticMiddlewareStop(t *testing.T) {
 	type fields struct {
 		config        *staticMiddlewareConfig
-		logger        *log.Logger
+		logger        *slog.Logger
 		staticFS      StaticFileSystem
 		staticHandler http.Handler
 		osOpenFile    func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -411,7 +411,7 @@ func TestStaticMiddlewareStop(t *testing.T) {
 func TestStaticMiddlewareHandler(t *testing.T) {
 	type fields struct {
 		config        *staticMiddlewareConfig
-		logger        *log.Logger
+		logger        *slog.Logger
 		staticFS      StaticFileSystem
 		staticHandler http.Handler
 		osOpenFile    func(name string, flag int, perm fs.FileMode) (*os.File, error)

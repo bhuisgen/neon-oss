@@ -5,14 +5,14 @@
 package neon
 
 import (
-	"log"
+	"log/slog"
 	"testing"
 )
 
 func TestApplicationCheck(t *testing.T) {
 	type fields struct {
 		config  *config
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *applicationState
 		store   *store
 		fetcher *fetcher
@@ -55,7 +55,7 @@ func TestApplicationCheck(t *testing.T) {
 						},
 					},
 				},
-				logger:  log.Default(),
+				logger:  slog.Default(),
 				store:   &store{},
 				fetcher: &fetcher{},
 				loader:  &loader{},
@@ -101,7 +101,7 @@ func TestApplicationCheck(t *testing.T) {
 						},
 					},
 				},
-				logger:  log.Default(),
+				logger:  slog.Default(),
 				store:   &store{},
 				fetcher: &fetcher{},
 				loader:  &loader{},

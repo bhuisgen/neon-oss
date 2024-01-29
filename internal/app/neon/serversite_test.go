@@ -6,7 +6,7 @@ package neon
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -36,29 +36,30 @@ func TestServerSiteInit(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
+		want    bool
 		wantErr bool
 	}{
 		{
 			name: "default",
 			fields: fields{
+				name:   "main",
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routesMap: map[string]serverSiteRouteState{},
 				},
 			},
 			args: args{
-				logger: log.Default(),
 				config: map[string]interface{}{
 					"listeners": []string{"test"},
 					"routes": map[string]interface{}{
@@ -77,12 +78,13 @@ func TestServerSiteInit(t *testing.T) {
 		{
 			name: "error no listener",
 			fields: fields{
+				name:   "main",
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routesMap: map[string]serverSiteRouteState{},
 				},
 			},
 			args: args{
-				logger: log.Default(),
 				config: map[string]interface{}{},
 			},
 			wantErr: true,
@@ -90,12 +92,13 @@ func TestServerSiteInit(t *testing.T) {
 		{
 			name: "error unregistered modules",
 			fields: fields{
+				name:   "main",
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routesMap: map[string]serverSiteRouteState{},
 				},
 			},
 			args: args{
-				logger: log.Default(),
 				config: map[string]interface{}{
 					"listeners": []string{"test"},
 					"routes": map[string]interface{}{
@@ -122,7 +125,7 @@ func TestServerSiteInit(t *testing.T) {
 				state:   tt.fields.state,
 				fetcher: tt.fields.fetcher,
 			}
-			if err := s.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+			if err := s.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("server.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -133,7 +136,7 @@ func TestServerSiteRegister(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
@@ -145,14 +148,14 @@ func TestServerSiteRegister(t *testing.T) {
 		{
 			name: "without routes",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &serverSiteState{},
 			},
 		},
 		{
 			name: "with routes",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routes: []string{"/"},
 					routesMap: map[string]serverSiteRouteState{
@@ -169,7 +172,7 @@ func TestServerSiteRegister(t *testing.T) {
 		{
 			name: "error register middleware",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routes: []string{"/"},
 					routesMap: map[string]serverSiteRouteState{
@@ -188,7 +191,7 @@ func TestServerSiteRegister(t *testing.T) {
 		{
 			name: "error register handler",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routes: []string{"/"},
 					routesMap: map[string]serverSiteRouteState{
@@ -222,7 +225,7 @@ func TestServerSiteStart(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
@@ -234,12 +237,14 @@ func TestServerSiteStart(t *testing.T) {
 		{
 			name: "without routes",
 			fields: fields{
-				state: &serverSiteState{},
+				logger: slog.Default(),
+				state:  &serverSiteState{},
 			},
 		},
 		{
 			name: "with routes",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routes: []string{"/"},
 					routesMap: map[string]serverSiteRouteState{
@@ -256,6 +261,7 @@ func TestServerSiteStart(t *testing.T) {
 		{
 			name: "error start middleware",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routes: []string{"/"},
 					routesMap: map[string]serverSiteRouteState{
@@ -275,6 +281,7 @@ func TestServerSiteStart(t *testing.T) {
 		{
 			name: "error start handler",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routes: []string{"/"},
 					routesMap: map[string]serverSiteRouteState{
@@ -309,7 +316,7 @@ func TestServerSiteStop(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
@@ -321,12 +328,14 @@ func TestServerSiteStop(t *testing.T) {
 		{
 			name: "without routes",
 			fields: fields{
-				state: &serverSiteState{},
+				logger: slog.Default(),
+				state:  &serverSiteState{},
 			},
 		},
 		{
 			name: "with routes",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverSiteState{
 					routes: []string{"/"},
 					routesMap: map[string]serverSiteRouteState{
@@ -361,7 +370,7 @@ func TestServerSiteName(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
@@ -398,7 +407,7 @@ func TestServerSiteListeners(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
@@ -437,7 +446,7 @@ func TestServerSiteHosts(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
@@ -476,7 +485,7 @@ func TestServerSiteDefault(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
@@ -524,7 +533,7 @@ func TestServerSiteRouter(t *testing.T) {
 	type fields struct {
 		name    string
 		config  *serverSiteConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverSiteState
 		fetcher Fetcher
 	}
@@ -688,7 +697,7 @@ func TestServerSiteMediatorRegisterHandler(t *testing.T) {
 
 func TestServerSiteRouterRoutes(t *testing.T) {
 	type fields struct {
-		logger *log.Logger
+		logger *slog.Logger
 		routes map[string]http.Handler
 	}
 	tests := []struct {
@@ -719,7 +728,7 @@ func TestServerSiteRouterRoutes(t *testing.T) {
 
 func TestServerSiteMiddlewareHandler(t *testing.T) {
 	type fields struct {
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	type args struct {
 		next http.Handler
@@ -733,7 +742,7 @@ func TestServerSiteMiddlewareHandler(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 	}
@@ -765,11 +774,11 @@ func TestServerSiteHandlerServeHTTP(t *testing.T) {
 
 	req, err := http.NewRequest(http.MethodGet, "/test", nil)
 	if err != nil {
-		t.Fail()
+		t.Error(err)
 	}
 
 	type fields struct {
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	type args struct {
 		w http.ResponseWriter
@@ -783,7 +792,7 @@ func TestServerSiteHandlerServeHTTP(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				w: testServerListenerHandlerResponseWriter{

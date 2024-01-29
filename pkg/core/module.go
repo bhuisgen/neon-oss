@@ -5,7 +5,7 @@
 package core
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/bhuisgen/neon/pkg/module"
 )
@@ -13,5 +13,5 @@ import (
 // Module
 type Module interface {
 	module.Module
-	Init(config map[string]interface{}, logger *log.Logger) error
+	Init(config map[string]interface{}, logger *slog.Logger) error
 }

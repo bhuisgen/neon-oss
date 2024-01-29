@@ -7,8 +7,7 @@ package neon
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -21,7 +20,7 @@ import (
 // fetcher implements the fetcher.
 type fetcher struct {
 	config *fetcherConfig
-	logger *log.Logger
+	logger *slog.Logger
 	state  *fetcherState
 	mu     sync.RWMutex
 }
@@ -43,7 +42,7 @@ const (
 // newFetcher creates a new fetcher.
 func newFetcher() *fetcher {
 	return &fetcher{
-		logger: log.New(os.Stderr, fmt.Sprint(fetcherLogger, ": "), log.LstdFlags|log.Lmsgprefix),
+		logger: slog.New(NewLogHandler(os.Stderr, fetcherLogger, nil)),
 		state: &fetcherState{
 			providers: make(map[string]core.FetcherProviderModule),
 		},
@@ -56,7 +55,7 @@ func (f *fetcher) Init(config map[string]interface{}) error {
 		f.config = &fetcherConfig{}
 	} else {
 		if err := mapstructure.Decode(config, &f.config); err != nil {
-			f.logger.Print("failed to parse configuration")
+			f.logger.Error("Failed to parse configuration", "err", err)
 			return err
 		}
 	}
@@ -67,13 +66,14 @@ func (f *fetcher) Init(config map[string]interface{}) error {
 		for moduleName, moduleConfig := range providerConfig {
 			moduleInfo, err := module.Lookup(module.ModuleID("fetcher.provider." + moduleName))
 			if err != nil {
-				f.logger.Printf("provider '%s', unregistered module '%s'", provider, moduleName)
+				f.logger.Error("Unregistered provider module", "provider", provider, "module", moduleName, "err", err)
 				errInit = true
 				continue
 			}
 			module, ok := moduleInfo.NewInstance().(core.FetcherProviderModule)
 			if !ok {
-				f.logger.Printf("provider '%s', invalid module '%s'", provider, moduleName)
+				err := errors.New("module instance not valid")
+				f.logger.Error("Invalid provider module", "provide", provider, "module", moduleName, "err", err)
 				errInit = true
 				continue
 			}
@@ -83,9 +83,9 @@ func (f *fetcher) Init(config map[string]interface{}) error {
 			}
 			if err := module.Init(
 				moduleConfig,
-				log.New(os.Stderr, fmt.Sprint(f.logger.Prefix(), "provider[", provider, "]: "), log.LstdFlags|log.Lmsgprefix),
+				slog.New(NewLogHandler(os.Stderr, fetcherLogger, nil)).With("provider", provider),
 			); err != nil {
-				f.logger.Printf("provider '%s', failed to init module '%s'", provider, moduleName)
+				f.logger.Error("Failed to init provider module", "provider", provider, "module", moduleName, "err", err)
 				errInit = true
 				continue
 			}
@@ -107,11 +107,11 @@ func (f *fetcher) Init(config map[string]interface{}) error {
 func (f *fetcher) Fetch(ctx context.Context, name string, provider string, config map[string]interface{}) (
 	*core.Resource, error) {
 	f.mu.RLock()
-	defer f.mu.RUnlock()
-
 	module, ok := f.state.providers[provider]
+	f.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("provider module not found")
+		err := errors.New("provider not found")
+		return nil, err
 	}
 
 	resource, err := module.Fetch(ctx, name, config)

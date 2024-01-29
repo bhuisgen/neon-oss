@@ -11,7 +11,6 @@ import (
 	"os"
 
 	"github.com/bhuisgen/neon/internal/app/neon"
-	"github.com/bhuisgen/neon/pkg/core"
 )
 
 // command
@@ -64,15 +63,6 @@ func run() error {
 	if len(flag.Args()) == 0 {
 		flag.Usage()
 		return nil
-	}
-
-	if v, ok := os.LookupEnv("CONFIG_FILE"); ok {
-		core.CONFIG_FILE = v
-	}
-	if v, ok := os.LookupEnv("DEBUG"); ok {
-		if v != "0" {
-			core.DEBUG = true
-		}
 	}
 
 	for _, c := range commands {

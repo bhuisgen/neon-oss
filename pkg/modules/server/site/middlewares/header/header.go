@@ -6,7 +6,7 @@ package header
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"regexp"
 
@@ -19,7 +19,7 @@ import (
 // headerMiddleware implements the header middleware.
 type headerMiddleware struct {
 	config  *headerMiddlewareConfig
-	logger  *log.Logger
+	logger  *slog.Logger
 	regexps []*regexp.Regexp
 }
 
@@ -55,25 +55,25 @@ func (m headerMiddleware) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the middleware.
-func (m *headerMiddleware) Init(config map[string]interface{}, logger *log.Logger) error {
+func (m *headerMiddleware) Init(config map[string]interface{}, logger *slog.Logger) error {
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Print("failed to parse configuration")
+		m.logger.Error("Failed to parse configuration")
 		return err
 	}
 
 	var errInit bool
 
-	for _, rule := range m.config.Rules {
+	for index, rule := range m.config.Rules {
 		if rule.Path == "" {
-			m.logger.Printf("rule option '%s', missing option or value", "Path")
+			m.logger.Error("Missing option or value", "rule", index+1, "option", "Path")
 			errInit = true
 			continue
 		}
 		re, err := regexp.Compile(rule.Path)
 		if err != nil {
-			m.logger.Printf("rule option '%s', invalid regular expression '%s'", "Path", rule.Path)
+			m.logger.Error("Invalid regular expression", "rule", index+1, "option", "Path", "value", rule.Path)
 			errInit = true
 			continue
 		} else {
@@ -81,7 +81,7 @@ func (m *headerMiddleware) Init(config map[string]interface{}, logger *log.Logge
 		}
 		for key := range rule.Set {
 			if key == "" {
-				m.logger.Printf("rule option '%s', invalid key '%s'", "Set", key)
+				m.logger.Error("Invalid key", "rule", index+1, "option", "Set", "value", key)
 				errInit = true
 				continue
 			}

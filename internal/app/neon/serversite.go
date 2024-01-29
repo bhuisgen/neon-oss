@@ -6,8 +6,7 @@ package neon
 
 import (
 	"errors"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -26,7 +25,7 @@ import (
 type serverSite struct {
 	name    string
 	config  *serverSiteConfig
-	logger  *log.Logger
+	logger  *slog.Logger
 	state   *serverSiteState
 	store   Store
 	fetcher Fetcher
@@ -68,13 +67,16 @@ type serverSiteRouteState struct {
 }
 
 const (
+	serverSiteLogger       string = "site"
 	serverSiteRouteDefault string = "default"
 )
 
 // newServerSite creates a new site.
-func newServerSite(name string, store Store, fetcher Fetcher, loader Loader, server Server) *serverSite {
+func newServerSite(name string, store Store, fetcher Fetcher, loader Loader,
+	server Server) *serverSite {
 	return &serverSite{
-		name: name,
+		name:   name,
+		logger: slog.New(NewLogHandler(os.Stderr, serverSiteLogger, nil)).With("name", name),
 		state: &serverSiteState{
 			routesMap: make(map[string]serverSiteRouteState),
 		},
@@ -86,28 +88,29 @@ func newServerSite(name string, store Store, fetcher Fetcher, loader Loader, ser
 }
 
 // Init initializes the site.
-func (s *serverSite) Init(config map[string]interface{}, logger *log.Logger) error {
-	s.logger = logger
-
+func (s *serverSite) Init(config map[string]interface{}) error {
 	if config == nil {
-		s.logger.Print("missing configuration")
+		s.logger.Error("Missing configuration")
 		return errors.New("missing configuration")
 	}
 
 	if err := mapstructure.Decode(config, &s.config); err != nil {
-		s.logger.Print("failed to parse configuration")
+		s.logger.Error("Failed to parse configuration")
 		return err
 	}
 
 	var errInit bool
 
 	if len(s.config.Listeners) == 0 {
-		s.logger.Print("no listener defined")
+		s.logger.Error("No listener defined")
 		errInit = true
 	}
 
 	s.state.listeners = append(s.state.listeners, s.config.Listeners...)
 	s.state.hosts = append(s.state.hosts, s.config.Hosts...)
+	if len(s.state.hosts) == 0 {
+		s.state.defaultSite = true
+	}
 
 	for route, routeConfig := range s.config.Routes {
 		stateRoute := serverSiteRouteState{
@@ -117,13 +120,13 @@ func (s *serverSite) Init(config map[string]interface{}, logger *log.Logger) err
 		for middleware, middlewareConfig := range routeConfig.Middlewares {
 			moduleInfo, err := module.Lookup(module.ModuleID("server.site.middleware." + middleware))
 			if err != nil {
-				s.logger.Printf("unregistered middleware module '%s'", middleware)
+				s.logger.Error("Unregistered middleware module", "middleware", middleware)
 				errInit = true
 				continue
 			}
 			module, ok := moduleInfo.NewInstance().(core.ServerSiteMiddlewareModule)
 			if !ok {
-				s.logger.Printf("invalid middleware module '%s'", middleware)
+				s.logger.Error("Invalid middleware module", "middleware", middleware)
 				errInit = true
 				continue
 			}
@@ -132,10 +135,9 @@ func (s *serverSite) Init(config map[string]interface{}, logger *log.Logger) err
 			}
 			if err := module.Init(
 				middlewareConfig,
-				log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "middleware[", middleware, "]: "),
-					log.LstdFlags|log.Lmsgprefix),
+				slog.New(NewLogHandler(os.Stderr, serverSiteLogger, nil)).With("middleware", middleware),
 			); err != nil {
-				s.logger.Printf("failed to init middleware module '%s'", middleware)
+				s.logger.Error("Failed to init middleware module", "middleware", middleware)
 				errInit = true
 				continue
 			}
@@ -146,13 +148,13 @@ func (s *serverSite) Init(config map[string]interface{}, logger *log.Logger) err
 		for handler, handlerConfig := range routeConfig.Handler {
 			moduleInfo, err := module.Lookup(module.ModuleID("server.site.handler." + handler))
 			if err != nil {
-				s.logger.Printf("unregistered handler module '%s'", handler)
+				s.logger.Error("Unregistered handler module", "handler", handler)
 				errInit = true
 				break
 			}
 			module, ok := moduleInfo.NewInstance().(core.ServerSiteHandlerModule)
 			if !ok {
-				s.logger.Printf("invalid handler module '%s'", handler)
+				s.logger.Error("Invalid handler module", "handler", handler)
 				errInit = true
 				break
 			}
@@ -161,10 +163,9 @@ func (s *serverSite) Init(config map[string]interface{}, logger *log.Logger) err
 			}
 			if err := module.Init(
 				handlerConfig,
-				log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "handler[", handler, "]: "),
-					log.LstdFlags|log.Lmsgprefix),
+				slog.New(NewLogHandler(os.Stderr, serverSiteLogger, nil)).With("handler", handler),
 			); err != nil {
-				s.logger.Printf("failed to init handler module '%s'", handler)
+				s.logger.Error("Failed to init handler module", "handler", handler)
 				errInit = true
 				break
 			}
@@ -189,6 +190,8 @@ func (s *serverSite) Init(config map[string]interface{}, logger *log.Logger) err
 func (s *serverSite) Register() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.logger.Debug("Registering site")
 
 	mediator := newServerSiteMediator(s)
 
@@ -226,6 +229,8 @@ func (s *serverSite) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.logger.Info("Starting site")
+
 	for _, route := range s.state.routes {
 		for _, middleware := range s.state.routesMap[route].middlewares {
 			err := middleware.Start()
@@ -247,6 +252,8 @@ func (s *serverSite) Start() error {
 func (s *serverSite) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.logger.Info("Stopping site")
 
 	for _, route := range s.state.routes {
 		for _, middleware := range s.state.routesMap[route].middlewares {
@@ -467,32 +474,25 @@ var _ core.ServerSite = (*serverSiteMediator)(nil)
 
 // serverSiteRouter implements the server site router.
 type serverSiteRouter struct {
-	logger *log.Logger
+	logger *slog.Logger
 	routes map[string]http.Handler
-	mu     sync.RWMutex
 }
 
 // newServerSiteRouter creates a new server site router.
 func newServerSiteRouter(s *serverSite) *serverSiteRouter {
 	return &serverSiteRouter{
-		logger: log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "router: "), log.LstdFlags|log.Lmsgprefix),
+		logger: s.logger,
 		routes: make(map[string]http.Handler),
 	}
 }
 
 // AddRoute adds a route to the router.
 func (r *serverSiteRouter) addRoute(pattern string, handler http.Handler) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.routes[pattern] = handler
 }
 
 // Routes returns the router routes.
 func (r *serverSiteRouter) Routes() map[string]http.Handler {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	return r.routes
 }
 
@@ -500,7 +500,7 @@ var _ ServerSiteRouter = (*serverSiteRouter)(nil)
 
 // serverSiteMiddleware implements the server site middleware.
 type serverSiteMiddleware struct {
-	logger *log.Logger
+	logger *slog.Logger
 }
 
 const (
@@ -513,7 +513,7 @@ const (
 // newServerSiteMiddleware creates the server site middleware.
 func newServerSiteMiddleware(s *serverSite) *serverSiteMiddleware {
 	return &serverSiteMiddleware{
-		logger: log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "middleware[server]: "), log.LstdFlags|log.Lmsgprefix),
+		logger: s.logger,
 	}
 }
 
@@ -523,9 +523,7 @@ func (m *serverSiteMiddleware) Handler(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				if core.DEBUG {
-					m.logger.Printf("%s, %s", err, debug.Stack())
-				}
+				m.logger.Error("Error handler", "err", err, "stack", debug.Stack())
 			}
 		}()
 
@@ -540,17 +538,19 @@ func (m *serverSiteMiddleware) Handler(next http.Handler) http.Handler {
 
 // serverSiteHandler implements the default server site handler.
 type serverSiteHandler struct {
-	logger *log.Logger
+	logger *slog.Logger
 }
 
 // newServerSiteHandler creates the site handler.
 func newServerSiteHandler(s *serverSite) *serverSiteHandler {
 	return &serverSiteHandler{
-		logger: log.New(os.Stderr, fmt.Sprint(s.logger.Prefix(), "handler[server]: "), log.LstdFlags|log.Lmsgprefix),
+		logger: s.logger,
 	}
 }
 
 // ServeHTTP implements the http handler.
 func (h *serverSiteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.logger.Error("No handler available")
+
 	http.NotFound(w, r)
 }

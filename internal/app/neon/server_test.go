@@ -7,7 +7,7 @@ package neon
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"testing"
 )
 
@@ -21,7 +21,7 @@ type testServerServerListener struct {
 	errRemove   bool
 }
 
-func (l testServerServerListener) Init(config map[string]interface{}, logger *log.Logger) error {
+func (l testServerServerListener) Init(config map[string]interface{}) error {
 	if l.errInit {
 		return errors.New("test error")
 	}
@@ -90,7 +90,7 @@ type testServerServerSite struct {
 	errStop     bool
 }
 
-func (s testServerServerSite) Init(config map[string]interface{}, logger *log.Logger) error {
+func (s testServerServerSite) Init(config map[string]interface{}) error {
 	if s.errInit {
 		return errors.New("test error")
 	}
@@ -139,7 +139,7 @@ var _ (ServerSite) = (*testServerServerSite)(nil)
 func TestServerInit(t *testing.T) {
 	type fields struct {
 		config  *serverConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverState
 		store   Store
 		fetcher Fetcher
@@ -157,7 +157,7 @@ func TestServerInit(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{},
 					sitesMap:     map[string]ServerSite{},
@@ -191,7 +191,7 @@ func TestServerInit(t *testing.T) {
 		{
 			name: "error no listener",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{},
 					sitesMap:     map[string]ServerSite{},
@@ -222,7 +222,7 @@ func TestServerInit(t *testing.T) {
 		{
 			name: "error no site",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{},
 					sitesMap:     map[string]ServerSite{},
@@ -243,7 +243,7 @@ func TestServerInit(t *testing.T) {
 		{
 			name: "error check listener",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{},
 					sitesMap:     map[string]ServerSite{},
@@ -278,7 +278,7 @@ func TestServerInit(t *testing.T) {
 		{
 			name: "error check site",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{},
 					sitesMap:     map[string]ServerSite{},
@@ -331,7 +331,7 @@ func TestServerInit(t *testing.T) {
 func TestServerRegister(t *testing.T) {
 	type fields struct {
 		config  *serverConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverState
 		store   Store
 		fetcher Fetcher
@@ -349,7 +349,8 @@ func TestServerRegister(t *testing.T) {
 		{
 			name: "no descriptors",
 			fields: fields{
-				state: &serverState{},
+				logger: slog.Default(),
+				state:  &serverState{},
 			},
 			args: args{
 				descriptors: nil,
@@ -358,6 +359,7 @@ func TestServerRegister(t *testing.T) {
 		{
 			name: "descriptors",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{},
@@ -371,6 +373,7 @@ func TestServerRegister(t *testing.T) {
 		{
 			name: "error listener register",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{
@@ -409,6 +412,7 @@ func TestServerRegister(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"default": testServerServerListener{},
@@ -446,7 +450,7 @@ func TestServerRegister(t *testing.T) {
 func TestServerStart(t *testing.T) {
 	type fields struct {
 		config  *serverConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverState
 		store   Store
 		fetcher Fetcher
@@ -482,6 +486,7 @@ func TestServerStart(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"default": testServerServerListener{},
@@ -520,6 +525,7 @@ func TestServerStart(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"default": testServerServerListener{
@@ -561,6 +567,7 @@ func TestServerStart(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"default": testServerServerListener{},
@@ -598,7 +605,7 @@ func TestServerStart(t *testing.T) {
 func TestServerStop(t *testing.T) {
 	type fields struct {
 		config  *serverConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverState
 		store   Store
 		fetcher Fetcher
@@ -612,6 +619,7 @@ func TestServerStop(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{},
@@ -625,6 +633,7 @@ func TestServerStop(t *testing.T) {
 		{
 			name: "error stop site",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{},
@@ -641,6 +650,7 @@ func TestServerStop(t *testing.T) {
 		{
 			name: "error close listener",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{
@@ -675,7 +685,7 @@ func TestServerStop(t *testing.T) {
 func TestServerShutdown(t *testing.T) {
 	type fields struct {
 		config  *serverConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverState
 		store   Store
 		fetcher Fetcher
@@ -715,6 +725,7 @@ func TestServerShutdown(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{},
@@ -755,6 +766,7 @@ func TestServerShutdown(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{
@@ -798,6 +810,7 @@ func TestServerShutdown(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{},
@@ -840,6 +853,7 @@ func TestServerShutdown(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{
@@ -883,6 +897,7 @@ func TestServerShutdown(t *testing.T) {
 						},
 					},
 				},
+				logger: slog.Default(),
 				state: &serverState{
 					listenersMap: map[string]ServerListener{
 						"test": testServerServerListener{

@@ -6,7 +6,7 @@ package header
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"testing"
@@ -66,7 +66,7 @@ var _ core.ServerSite = (*testHeaderMiddlewareServerSite)(nil)
 func TestHeaderMiddlewareModuleInfo(t *testing.T) {
 	type fields struct {
 		config  *headerMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	tests := []struct {
@@ -103,12 +103,12 @@ func TestHeaderMiddlewareModuleInfo(t *testing.T) {
 func TestHeaderMiddlewareInit(t *testing.T) {
 	type fields struct {
 		config  *headerMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -120,7 +120,7 @@ func TestHeaderMiddlewareInit(t *testing.T) {
 			name: "minimal",
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -136,7 +136,7 @@ func TestHeaderMiddlewareInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -153,7 +153,7 @@ func TestHeaderMiddlewareInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -170,7 +170,7 @@ func TestHeaderMiddlewareInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -192,7 +192,7 @@ func TestHeaderMiddlewareInit(t *testing.T) {
 func TestHeaderMiddlewareRegister(t *testing.T) {
 	type fields struct {
 		config  *headerMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	type args struct {
@@ -237,7 +237,7 @@ func TestHeaderMiddlewareRegister(t *testing.T) {
 func TestHeaderMiddlewareStart(t *testing.T) {
 	type fields struct {
 		config  *headerMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	tests := []struct {
@@ -266,7 +266,7 @@ func TestHeaderMiddlewareStart(t *testing.T) {
 func TestHeaderMiddlewareStop(t *testing.T) {
 	type fields struct {
 		config  *headerMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	tests := []struct {
@@ -292,7 +292,7 @@ func TestHeaderMiddlewareStop(t *testing.T) {
 func TestHeaderMiddlewareHandler(t *testing.T) {
 	type fields struct {
 		config  *headerMiddlewareConfig
-		logger  *log.Logger
+		logger  *slog.Logger
 		regexps []*regexp.Regexp
 	}
 	type args struct {

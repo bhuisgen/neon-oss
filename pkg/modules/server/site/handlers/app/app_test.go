@@ -7,7 +7,7 @@ package app
 import (
 	"errors"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -139,7 +139,7 @@ var _ http.ResponseWriter = (*testAppHandlerResponseWriter)(nil)
 func TestAppHandlerModuleInfo(t *testing.T) {
 	type fields struct {
 		config      *appHandlerConfig
-		logger      *log.Logger
+		logger      *slog.Logger
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
@@ -208,7 +208,7 @@ func TestAppHandlerModuleInfo(t *testing.T) {
 func TestAppHandlerInit(t *testing.T) {
 	type fields struct {
 		config      *appHandlerConfig
-		logger      *log.Logger
+		logger      *slog.Logger
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
@@ -229,7 +229,7 @@ func TestAppHandlerInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -255,7 +255,7 @@ func TestAppHandlerInit(t *testing.T) {
 					"Index":  "index.html",
 					"Bundle": "bundle.js",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -296,7 +296,7 @@ func TestAppHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -314,7 +314,7 @@ func TestAppHandlerInit(t *testing.T) {
 			},
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -354,7 +354,7 @@ func TestAppHandlerInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -376,7 +376,7 @@ func TestAppHandlerInit(t *testing.T) {
 					"Index":  "file1",
 					"Bundle": "file2",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -398,7 +398,7 @@ func TestAppHandlerInit(t *testing.T) {
 					"Index":  "file1",
 					"Bundle": "file2",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -422,7 +422,7 @@ func TestAppHandlerInit(t *testing.T) {
 					"Index":  "dir1",
 					"Bundle": "dir2",
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -460,7 +460,7 @@ func TestAppHandlerInit(t *testing.T) {
 func TestAppHandlerRegister(t *testing.T) {
 	type fields struct {
 		config      *appHandlerConfig
-		logger      *log.Logger
+		logger      *slog.Logger
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
@@ -537,7 +537,7 @@ func TestAppHandlerRegister(t *testing.T) {
 func TestAppHandlerStart(t *testing.T) {
 	type fields struct {
 		config      *appHandlerConfig
-		logger      *log.Logger
+		logger      *slog.Logger
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
@@ -569,7 +569,7 @@ func TestAppHandlerStart(t *testing.T) {
 					Bundle: "test/default/bundle.js",
 					MaxVMs: intPtr(1),
 				},
-				logger:   log.Default(),
+				logger:   slog.Default(),
 				muIndex:  &sync.RWMutex{},
 				muBundle: &sync.RWMutex{},
 				vmPool:   newVMPool(1),
@@ -615,7 +615,7 @@ func TestAppHandlerStart(t *testing.T) {
 func TestAppHandlerStop(t *testing.T) {
 	type fields struct {
 		config      *appHandlerConfig
-		logger      *log.Logger
+		logger      *slog.Logger
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
@@ -678,7 +678,7 @@ func TestAppHandlerStop(t *testing.T) {
 func TestAppHandlerServeHTTP(t *testing.T) {
 	type fields struct {
 		config      *appHandlerConfig
-		logger      *log.Logger
+		logger      *slog.Logger
 		regexps     []*regexp.Regexp
 		index       []byte
 		indexInfo   *time.Time
@@ -721,12 +721,13 @@ func TestAppHandlerServeHTTP(t *testing.T) {
 					CacheTTL:      intPtr(60),
 					CacheMaxItems: intPtr(100),
 				},
-				logger:   log.Default(),
+				logger:   slog.Default(),
 				muIndex:  &sync.RWMutex{},
 				muBundle: &sync.RWMutex{},
 				rwPool:   render.NewRenderWriterPool(),
 				vmPool:   newVMPool(1),
 				cache:    newCache(1),
+				site:     testAppHandlerServerSite{},
 				osReadFile: func(name string) ([]byte, error) {
 					return os.ReadFile(name)
 				},

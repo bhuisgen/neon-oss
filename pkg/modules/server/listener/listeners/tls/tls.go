@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -26,7 +26,7 @@ import (
 // tlsListener implements the tls listener.
 type tlsListener struct {
 	config                         *tlsListenerConfig
-	logger                         *log.Logger
+	logger                         *slog.Logger
 	listener                       net.Listener
 	server                         *http.Server
 	osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
@@ -150,11 +150,11 @@ func (l tlsListener) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the listener.
-func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) error {
+func (l *tlsListener) Init(config map[string]interface{}, logger *slog.Logger) error {
 	l.logger = logger
 
 	if err := mapstructure.Decode(config, &l.config); err != nil {
-		l.logger.Print("failed to parse configuration")
+		l.logger.Error("Failed to parse configuration")
 		return err
 	}
 
@@ -169,90 +169,90 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 		l.config.ListenPort = &defaultValue
 	}
 	if *l.config.ListenPort < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ListenPort", *l.config.ListenPort)
+		l.logger.Error("Invalid value", "option", "ListenPort", "value", *l.config.ListenPort)
 		errInit = true
 	}
 	if l.config.CAFiles != nil {
 		for _, item := range *l.config.CAFiles {
 			if item == "" {
-				l.logger.Printf("option '%s', invalid value '%s'", "CAFiles", item)
+				l.logger.Error("Invalid value", "option", "CAFiles", "value", item)
 				errInit = true
 				continue
 			}
 			f, err := l.osOpenFile(item, os.O_RDONLY, 0)
 			if err != nil {
-				l.logger.Printf("option '%s', failed to open file '%s'", "CAFiles", item)
+				l.logger.Error("Failed to open file", "option", "CAFiles", "value", item)
 				errInit = true
 				continue
 			}
 			_ = l.osClose(f)
 			fi, err := l.osStat(item)
 			if err != nil {
-				l.logger.Printf("option '%s', failed to stat file '%s'", "CAFiles", item)
+				l.logger.Error("Failed to stat file", "option", "CAFiles", "value", item)
 				errInit = true
 				continue
 			}
 			if err == nil && fi.IsDir() {
-				l.logger.Printf("option '%s', '%s' is a directory", "CAFiles", item)
+				l.logger.Error("File is a directory", "option", "CAFiles", "value", item)
 				errInit = true
 				continue
 			}
 		}
 	}
 	if len(l.config.CertFiles) == 0 {
-		l.logger.Printf("option '%s', invalid value", "CertFiles")
+		l.logger.Error("Missing value(s)", "option", "CertFiles")
 		errInit = true
 	}
 	for _, item := range l.config.CertFiles {
 		if item == "" {
-			l.logger.Printf("option '%s', invalid value '%s'", "CertFiles", item)
+			l.logger.Error("Invalid value", "option", "CertFiles", "value", item)
 			errInit = true
 			continue
 		}
 		f, err := l.osOpenFile(item, os.O_RDONLY, 0)
 		if err != nil {
-			l.logger.Printf("option '%s', failed to open file '%s'", "CertFiles", item)
+			l.logger.Error("Failed to open file", "option", "CertFiles", "value", item)
 			errInit = true
 			continue
 		}
 		_ = l.osClose(f)
 		fi, err := l.osStat(item)
 		if err != nil {
-			l.logger.Printf("option '%s', failed to stat file '%s'", "CertFiles", item)
+			l.logger.Error("Failed to stat file", "option", "CertFiles", "value", item)
 			errInit = true
 			continue
 		}
 		if err == nil && fi.IsDir() {
-			l.logger.Printf("option '%s', '%s' is a directory", "CertFiles", item)
+			l.logger.Error("File is a directory", "option", "CertFiles", "value", item)
 			errInit = true
 			continue
 		}
 	}
 	if len(l.config.KeyFiles) == 0 || len(l.config.KeyFiles) != len(l.config.CertFiles) {
-		l.logger.Printf("option '%s', missing value(s)", "KeyFiles")
+		l.logger.Error("Missing value(s)", "option", "KeyFiles")
 		errInit = true
 	}
 	for _, item := range l.config.KeyFiles {
 		if item == "" {
-			l.logger.Printf("option '%s', invalid value '%s'", "KeyFiles", item)
+			l.logger.Error("Invalid value", "option", "KeyFiles", "value", item)
 			errInit = true
 			continue
 		}
 		f, err := l.osOpenFile(item, os.O_RDONLY, 0)
 		if err != nil {
-			l.logger.Printf("option '%s', failed to open file '%s'", "KeyFiles", item)
+			l.logger.Error("Failed to open file", "option", "KeyFiles", "value", item)
 			errInit = true
 			continue
 		}
 		_ = l.osClose(f)
 		fi, err := l.osStat(item)
 		if err != nil {
-			l.logger.Printf("option '%s', failed to stat file '%s'", "KeyFiles", item)
+			l.logger.Error("Failed to stat file", "option", "KeyFiles", "value", item)
 			errInit = true
 			continue
 		}
 		if err == nil && fi.IsDir() {
-			l.logger.Printf("option '%s', '%s' is a directory", "KeyFiles", item)
+			l.logger.Error("File is a directory", "option", "KeyFiles", "value", item)
 			errInit = true
 			continue
 		}
@@ -268,7 +268,7 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 	case tlsClientAuthVerify:
 	case tlsClientAuthRequireAndVerify:
 	default:
-		l.logger.Printf("option '%s', invalid value '%s'", "ClientAuth", *l.config.ClientAuth)
+		l.logger.Error("Invalid value", "option", "ClientAuth", "value", *l.config.ClientAuth)
 		errInit = true
 	}
 	if l.config.ReadTimeout == nil {
@@ -276,7 +276,7 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 		l.config.ReadTimeout = &defaultValue
 	}
 	if *l.config.ReadTimeout < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ReadTimeout", *l.config.ReadTimeout)
+		l.logger.Error("Invalid value", "option", "ReadTimeout", "value", *l.config.ReadTimeout)
 		errInit = true
 	}
 	if l.config.ReadHeaderTimeout == nil {
@@ -284,7 +284,7 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 		l.config.ReadHeaderTimeout = &defaultValue
 	}
 	if *l.config.ReadHeaderTimeout < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "ReadHeaderTimeout", *l.config.ReadHeaderTimeout)
+		l.logger.Error("Invalid value", "option", "ReadHeaderTimeout", "value", *l.config.ReadHeaderTimeout)
 		errInit = true
 	}
 	if l.config.WriteTimeout == nil {
@@ -292,7 +292,7 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 		l.config.WriteTimeout = &defaultValue
 	}
 	if *l.config.WriteTimeout < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "WriteTimeout", *l.config.WriteTimeout)
+		l.logger.Error("Invalid value", "option", "WriteTimeout", "value", *l.config.WriteTimeout)
 		errInit = true
 	}
 	if l.config.IdleTimeout == nil {
@@ -300,7 +300,7 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *log.Logger) er
 		l.config.IdleTimeout = &defaultValue
 	}
 	if *l.config.IdleTimeout < 0 {
-		l.logger.Printf("option '%s', invalid value '%d'", "IdleTimeout", *l.config.IdleTimeout)
+		l.logger.Error("Invalid value", "option", "IdleTimeout", "value", *l.config.IdleTimeout)
 		errInit = true
 	}
 
@@ -341,7 +341,6 @@ func (l *tlsListener) Serve(handler http.Handler) error {
 		ReadHeaderTimeout: time.Duration(*l.config.ReadHeaderTimeout) * time.Second,
 		WriteTimeout:      time.Duration(*l.config.WriteTimeout) * time.Second,
 		IdleTimeout:       time.Duration(*l.config.IdleTimeout) * time.Second,
-		ErrorLog:          l.logger,
 	}
 
 	tlsConfig := &tls.Config{
@@ -388,11 +387,12 @@ func (l *tlsListener) Serve(handler http.Handler) error {
 	l.server.TLSConfig = tlsConfig
 
 	go func() {
-		l.logger.Printf("Listening at https://%s", l.server.Addr)
+		l.logger.Info("Starting listener", "addr", l.server.Addr)
 
-		err := l.httpServerServeTLS(l.server, l.listener, "", "")
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			l.logger.Print(err)
+		if err := l.httpServerServeTLS(l.server, l.listener, "", ""); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				l.logger.Error("Service error", "err", err)
+			}
 		}
 	}()
 

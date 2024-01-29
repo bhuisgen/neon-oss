@@ -8,8 +8,6 @@ import (
 	"os"
 	"path"
 	"testing"
-
-	"github.com/bhuisgen/neon/pkg/core"
 )
 
 func TestLoadConfig_YAML(t *testing.T) {
@@ -31,10 +29,9 @@ server:
         handler:
 `
 	if err := os.WriteFile(name, []byte(data), 0600); err != nil {
-		t.Fail()
-		return
+		t.Error(err)
 	}
-	core.CONFIG_FILE = name
+	CONFIG_FILE = name
 
 	tests := []struct {
 		name    string
@@ -99,10 +96,9 @@ listeners = ["default"]
 [server.sites.main.routes.default]
 `
 	if err := os.WriteFile(name, []byte(data), 0600); err != nil {
-		t.Fail()
-		return
+		t.Error(err)
 	}
-	core.CONFIG_FILE = name
+	CONFIG_FILE = name
 
 	tests := []struct {
 		name    string
@@ -184,10 +180,9 @@ func TestLoadConfig_JSON(t *testing.T) {
 }
 `
 	if err := os.WriteFile(name, []byte(data), 0600); err != nil {
-		t.Fail()
-		return
+		t.Error(err)
 	}
-	core.CONFIG_FILE = name
+	CONFIG_FILE = name
 
 	tests := []struct {
 		name    string
@@ -239,7 +234,7 @@ func TestLoadConfig_JSON(t *testing.T) {
 
 func TestGenerateConfig_YAML(t *testing.T) {
 	name := path.Join(t.TempDir(), "test.yaml")
-	core.CONFIG_FILE = name
+	CONFIG_FILE = name
 
 	type args struct {
 		syntax   string
@@ -269,7 +264,7 @@ func TestGenerateConfig_YAML(t *testing.T) {
 
 func TestGenerateConfig_TOML(t *testing.T) {
 	name := path.Join(t.TempDir(), "test.toml")
-	core.CONFIG_FILE = name
+	CONFIG_FILE = name
 
 	type args struct {
 		syntax   string
@@ -299,7 +294,7 @@ func TestGenerateConfig_TOML(t *testing.T) {
 
 func TestGenerateConfig_JSON(t *testing.T) {
 	name := path.Join(t.TempDir(), "test.json")
-	core.CONFIG_FILE = name
+	CONFIG_FILE = name
 
 	type args struct {
 		syntax   string

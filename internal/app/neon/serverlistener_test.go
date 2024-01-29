@@ -7,7 +7,7 @@ package neon
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -52,7 +52,7 @@ var _ http.ResponseWriter = (*testServerListenerHandlerResponseWriter)(nil)
 func TestServerListenerInit(t *testing.T) {
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -60,7 +60,6 @@ func TestServerListenerInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
 	}
 	tests := []struct {
 		name    string
@@ -71,11 +70,11 @@ func TestServerListenerInit(t *testing.T) {
 		{
 			name: "minimal",
 			fields: fields{
-				name:  "default",
-				state: &serverListenerState{},
+				name:   "default",
+				logger: slog.Default(),
+				state:  &serverListenerState{},
 			},
 			args: args{
-				logger: log.Default(),
 				config: map[string]interface{}{
 					"test": map[string]interface{}{
 						"test": "abc",
@@ -86,10 +85,11 @@ func TestServerListenerInit(t *testing.T) {
 		{
 			name: "error unregistered module",
 			fields: fields{
-				name: "default",
+				name:   "default",
+				logger: slog.Default(),
+				state:  &serverListenerState{},
 			},
 			args: args{
-				logger: log.Default(),
 				config: map[string]interface{}{
 					"unknown": map[string]interface{}{},
 				},
@@ -107,7 +107,7 @@ func TestServerListenerInit(t *testing.T) {
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
 			}
-			if err := l.Init(tt.args.config, tt.args.logger); (err != nil) != tt.wantErr {
+			if err := l.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("listener.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -128,7 +128,7 @@ func TestServerListenerRegister(t *testing.T) {
 
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -146,7 +146,7 @@ func TestServerListenerRegister(t *testing.T) {
 		{
 			name: "without descriptors",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{},
 				},
@@ -161,7 +161,7 @@ func TestServerListenerRegister(t *testing.T) {
 		{
 			name: "with descriptors",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{},
 				},
@@ -180,7 +180,7 @@ func TestServerListenerRegister(t *testing.T) {
 		{
 			name: "error register",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{
 						errRegister: true,
@@ -213,7 +213,7 @@ func TestServerListenerRegister(t *testing.T) {
 func TestServerListenerServe(t *testing.T) {
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -227,6 +227,7 @@ func TestServerListenerServe(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{},
 				},
@@ -235,6 +236,7 @@ func TestServerListenerServe(t *testing.T) {
 		{
 			name: "error serve",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{
 						errServe: true,
@@ -264,7 +266,7 @@ func TestServerListenerServe(t *testing.T) {
 func TestServerListenerShutdown(t *testing.T) {
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -282,6 +284,7 @@ func TestServerListenerShutdown(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{},
 				},
@@ -290,6 +293,7 @@ func TestServerListenerShutdown(t *testing.T) {
 		{
 			name: "error shutdown",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{
 						errShutdown: true,
@@ -319,7 +323,7 @@ func TestServerListenerShutdown(t *testing.T) {
 func TestServerListenerClose(t *testing.T) {
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -333,6 +337,7 @@ func TestServerListenerClose(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{},
 				},
@@ -341,6 +346,7 @@ func TestServerListenerClose(t *testing.T) {
 		{
 			name: "error close",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{
 						errClose: true,
@@ -370,7 +376,7 @@ func TestServerListenerClose(t *testing.T) {
 func TestServerListenerRemove(t *testing.T) {
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -384,6 +390,7 @@ func TestServerListenerRemove(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					listener: &testServerListenerModule{},
 				},
@@ -412,7 +419,7 @@ func TestServerListenerRemove(t *testing.T) {
 func TestServerListenerName(t *testing.T) {
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -466,7 +473,7 @@ func TestServerListenerLink(t *testing.T) {
 
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -484,6 +491,7 @@ func TestServerListenerLink(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
@@ -498,6 +506,7 @@ func TestServerListenerLink(t *testing.T) {
 		{
 			name: "error update",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
@@ -546,7 +555,7 @@ func TestServerListenerUnlink(t *testing.T) {
 
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -564,6 +573,7 @@ func TestServerListenerUnlink(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
@@ -578,6 +588,7 @@ func TestServerListenerUnlink(t *testing.T) {
 		{
 			name: "error update",
 			fields: fields{
+				logger: slog.Default(),
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
@@ -611,7 +622,7 @@ func TestServerListenerUnlink(t *testing.T) {
 func TestServerListenerDescriptor(t *testing.T) {
 	type fields struct {
 		name    string
-		logger  *log.Logger
+		logger  *slog.Logger
 		state   *serverListenerState
 		quit    chan struct{}
 		update  chan chan error
@@ -744,11 +755,11 @@ func TestServerListenerRouterServeHTTP(t *testing.T) {
 
 	req, err := http.NewRequest(http.MethodGet, "/test", nil)
 	if err != nil {
-		t.Fail()
+		t.Error(err)
 	}
 
 	type fields struct {
-		logger *log.Logger
+		logger *slog.Logger
 		mux    *http.ServeMux
 	}
 	type args struct {
@@ -763,7 +774,7 @@ func TestServerListenerRouterServeHTTP(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				mux:    http.NewServeMux(),
 			},
 			args: args{
@@ -791,11 +802,11 @@ func TestServerListenerHandlerServeHTTP(t *testing.T) {
 
 	req, err := http.NewRequest(http.MethodGet, "/test", nil)
 	if err != nil {
-		t.Fail()
+		t.Error(err)
 	}
 
 	type fields struct {
-		logger *log.Logger
+		logger *slog.Logger
 		router ServerListenerRouter
 	}
 	type args struct {
@@ -810,7 +821,7 @@ func TestServerListenerHandlerServeHTTP(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				w: testServerListenerHandlerResponseWriter{
@@ -822,7 +833,7 @@ func TestServerListenerHandlerServeHTTP(t *testing.T) {
 		{
 			name: "default with router",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				router: &serverListenerRouter{
 					mux: mux,
 				},

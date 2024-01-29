@@ -7,7 +7,7 @@ package robots
 import (
 	_ "embed"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sync"
@@ -95,7 +95,7 @@ var _ http.ResponseWriter = (*testRobotsHandlerResponseWriter)(nil)
 func TestRobotsHandlerModuleInfo(t *testing.T) {
 	type fields struct {
 		config   *robotsHandlerConfig
-		logger   *log.Logger
+		logger   *slog.Logger
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
@@ -138,7 +138,7 @@ func TestRobotsHandlerModuleInfo(t *testing.T) {
 func TestRobotsHandlerInit(t *testing.T) {
 	type fields struct {
 		config   *robotsHandlerConfig
-		logger   *log.Logger
+		logger   *slog.Logger
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
@@ -146,7 +146,7 @@ func TestRobotsHandlerInit(t *testing.T) {
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -158,7 +158,7 @@ func TestRobotsHandlerInit(t *testing.T) {
 			name: "minimal",
 			args: args{
 				config: map[string]interface{}{},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -170,7 +170,7 @@ func TestRobotsHandlerInit(t *testing.T) {
 					"CacheTTL": 60,
 					"Sitemaps": []string{"http://test/sitemap.xml"},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 		{
@@ -181,7 +181,7 @@ func TestRobotsHandlerInit(t *testing.T) {
 					"CacheTTL": -1,
 					"Sitemaps": []string{""},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			wantErr: true,
 		},
@@ -206,7 +206,7 @@ func TestRobotsHandlerInit(t *testing.T) {
 func TestRobotsHandlerRegister(t *testing.T) {
 	type fields struct {
 		config   *robotsHandlerConfig
-		logger   *log.Logger
+		logger   *slog.Logger
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
@@ -257,7 +257,7 @@ func TestRobotsHandlerRegister(t *testing.T) {
 func TestRobotsHandlerStart(t *testing.T) {
 	type fields struct {
 		config   *robotsHandlerConfig
-		logger   *log.Logger
+		logger   *slog.Logger
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
@@ -292,7 +292,7 @@ func TestRobotsHandlerStart(t *testing.T) {
 func TestRobotsHandlerStop(t *testing.T) {
 	type fields struct {
 		config   *robotsHandlerConfig
-		logger   *log.Logger
+		logger   *slog.Logger
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
@@ -332,7 +332,7 @@ func TestRobotsHandlerServeHTTP(t *testing.T) {
 
 	type fields struct {
 		config   *robotsHandlerConfig
-		logger   *log.Logger
+		logger   *slog.Logger
 		template *template.Template
 		rwPool   render.RenderWriterPool
 		cache    *robotsHandlerCache
@@ -354,7 +354,7 @@ func TestRobotsHandlerServeHTTP(t *testing.T) {
 					Cache:    boolPtr(true),
 					CacheTTL: intPtr(60),
 				},
-				logger:   log.Default(),
+				logger:   slog.Default(),
 				template: tmpl,
 				rwPool:   render.NewRenderWriterPool(),
 				cache:    &robotsHandlerCache{},

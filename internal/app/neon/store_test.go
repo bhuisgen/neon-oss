@@ -5,7 +5,7 @@
 package neon
 
 import (
-	"log"
+	"log/slog"
 	"reflect"
 	"testing"
 
@@ -15,7 +15,7 @@ import (
 func TestStoreInit(t *testing.T) {
 	type fields struct {
 		config *storeConfig
-		logger *log.Logger
+		logger *slog.Logger
 		state  *storeState
 	}
 	type args struct {
@@ -30,14 +30,14 @@ func TestStoreInit(t *testing.T) {
 		{
 			name: "no configuration",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &storeState{},
 			},
 		},
 		{
 			name: "empty configuration",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &storeState{},
 			},
 			args: args{
@@ -51,7 +51,7 @@ func TestStoreInit(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &storeState{},
 			},
 			args: args{
@@ -65,7 +65,7 @@ func TestStoreInit(t *testing.T) {
 		{
 			name: "error no storage",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &storeState{},
 			},
 			args: args{
@@ -76,7 +76,7 @@ func TestStoreInit(t *testing.T) {
 		{
 			name: "error unregistered storage module",
 			fields: fields{
-				logger: log.Default(),
+				logger: slog.Default(),
 				state:  &storeState{},
 			},
 			args: args{
@@ -106,7 +106,7 @@ func TestStoreInit(t *testing.T) {
 func TestStoreLoadResource(t *testing.T) {
 	type fields struct {
 		config *storeConfig
-		logger *log.Logger
+		logger *slog.Logger
 		state  *storeState
 	}
 	type args struct {
@@ -171,7 +171,7 @@ func TestStoreLoadResource(t *testing.T) {
 func TestStoreStoreResource(t *testing.T) {
 	type fields struct {
 		config *storeConfig
-		logger *log.Logger
+		logger *slog.Logger
 		state  *storeState
 	}
 	type args struct {

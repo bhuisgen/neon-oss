@@ -6,7 +6,7 @@ package memory
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 
 	"github.com/bhuisgen/neon/pkg/core"
 	"github.com/bhuisgen/neon/pkg/module"
@@ -15,7 +15,7 @@ import (
 // memoryStorage implements the memory storage.
 type memoryStorage struct {
 	config  *memoryStorageConfig
-	logger  *log.Logger
+	logger  *slog.Logger
 	storage Cache
 }
 
@@ -43,7 +43,7 @@ func (s memoryStorage) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initialize the storage.
-func (s *memoryStorage) Init(config map[string]interface{}, logger *log.Logger) error {
+func (s *memoryStorage) Init(config map[string]interface{}, logger *slog.Logger) error {
 	s.logger = logger
 	s.storage = newCache()
 

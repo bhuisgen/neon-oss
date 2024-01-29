@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -30,7 +30,7 @@ import (
 // restProvider implements the rest provider.
 type restProvider struct {
 	config                         *restProviderConfig
-	logger                         *log.Logger
+	logger                         *slog.Logger
 	client                         http.Client
 	osOpenFile                     func(name string, flag int, perm fs.FileMode) (*os.File, error)
 	osReadFile                     func(name string) ([]byte, error)
@@ -159,11 +159,11 @@ func (p restProvider) ModuleInfo() module.ModuleInfo {
 }
 
 // Init initializes the provider.
-func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) error {
+func (p *restProvider) Init(config map[string]interface{}, logger *slog.Logger) error {
 	p.logger = logger
 
 	if err := mapstructure.Decode(config, &p.config); err != nil {
-		p.logger.Print("failed to parse configuration")
+		p.logger.Error("Failed to parse configuration")
 		return err
 	}
 
@@ -172,25 +172,25 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 	if p.config.TLSCAFiles != nil {
 		for _, item := range *p.config.TLSCAFiles {
 			if item == "" {
-				p.logger.Printf("option '%s', invalid value '%s'", "TLSCAFiles", item)
+				p.logger.Error("Invalid value", "option", "TLSCAFiles", "value", item)
 				errInit = true
 				continue
 			}
 			file, err := p.osOpenFile(item, os.O_RDONLY, 0)
 			if err != nil {
-				p.logger.Printf("option '%s', failed to open file '%s'", "TLSCAFiles", item)
+				p.logger.Error("Failed to open file", "option", "TLSCAFiles", "value", item)
 				errInit = true
 				continue
 			}
 			_ = p.osClose(file)
 			fi, err := p.osStat(item)
 			if err != nil {
-				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSCAFiles", item)
+				p.logger.Error("Failed to stat file", "option", "TLSCAFiles", "value", item)
 				errInit = true
 				continue
 			}
 			if err == nil && fi.IsDir() {
-				p.logger.Printf("option '%s', '%s' is a directory", "TLSCAFiles", item)
+				p.logger.Error("File is a directory", "option", "TLSCAFiles", "value", item)
 				errInit = true
 				continue
 			}
@@ -199,25 +199,25 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 	if p.config.TLSCertFiles != nil {
 		for _, item := range *p.config.TLSCertFiles {
 			if item == "" {
-				p.logger.Printf("option '%s', invalid value '%s'", "TLSCertFiles", item)
+				p.logger.Error("Invalid value", "option", "TLSCertFiles", "value", item)
 				errInit = true
 				continue
 			}
 			file, err := p.osOpenFile(item, os.O_RDONLY, 0)
 			if err != nil {
-				p.logger.Printf("option '%s', failed to open file '%s'", "TLSCertFiles", item)
+				p.logger.Error("Failed to open file", "option", "TLSCertFiles", "value", item)
 				errInit = true
 				continue
 			}
 			_ = p.osClose(file)
 			fi, err := p.osStat(item)
 			if err != nil {
-				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSCertFiles", item)
+				p.logger.Error("Failed to stat file '%s'", "option", "TLSCertFiles", "value", item)
 				errInit = true
 				continue
 			}
 			if err == nil && fi.IsDir() {
-				p.logger.Printf("option '%s', '%s' is a directory", "TLSCertFiles", item)
+				p.logger.Error("File is a directory", "option", "TLSCertFiles", "value", item)
 				errInit = true
 				continue
 			}
@@ -225,30 +225,30 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 	}
 	if p.config.TLSKeyFiles != nil {
 		if p.config.TLSCertFiles == nil || len(*p.config.TLSKeyFiles) != len(*p.config.TLSCertFiles) {
-			p.logger.Printf("option '%s', missing value(s)", "TLSKeyFiles")
+			p.logger.Error("Missing value(s)", "option", "TLSKeyFiles")
 			errInit = true
 		}
 		for _, item := range *p.config.TLSKeyFiles {
 			if item == "" {
-				p.logger.Printf("option '%s', invalid value '%s'", "TLSKeyFiles", item)
+				p.logger.Error("Invalid value", "option", "TLSKeyFiles", "value", item)
 				errInit = true
 				continue
 			}
 			file, err := p.osOpenFile(item, os.O_RDONLY, 0)
 			if err != nil {
-				p.logger.Printf("option '%s', failed to open file '%s'", "TLSKeyFiles", item)
+				p.logger.Error("Failed to open file", "option", "TLSKeyFiles", "value", item)
 				errInit = true
 				continue
 			}
 			_ = p.osClose(file)
 			fi, err := p.osStat(item)
 			if err != nil {
-				p.logger.Printf("option '%s', failed to stat file '%s'", "TLSKeyFiles", item)
+				p.logger.Error("Failed to stat file", "option", "TLSKeyFiles", "value", item)
 				errInit = true
 				continue
 			}
 			if err == nil && fi.IsDir() {
-				p.logger.Printf("option '%s', '%s' is a directory", "TLSKeyFiles", item)
+				p.logger.Error("File is a directory", "option", "TLSKeyFiles", "value", item)
 				errInit = true
 				continue
 			}
@@ -259,7 +259,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 		p.config.Timeout = &defaultValue
 	}
 	if *p.config.Timeout < 0 {
-		p.logger.Printf("option '%s', invalid value '%d'", "Timeout", *p.config.Timeout)
+		p.logger.Error("Invalid value", "option", "Timeout", "value", *p.config.Timeout)
 		errInit = true
 	}
 	if p.config.MaxConnsPerHost == nil {
@@ -267,7 +267,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 		p.config.MaxConnsPerHost = &defaultValue
 	}
 	if *p.config.MaxConnsPerHost < 0 {
-		p.logger.Printf("option '%s', invalid value '%d'", "MaxConnsPerHost", *p.config.MaxConnsPerHost)
+		p.logger.Error("Invalid value", "option", "MaxConnsPerHost", "value", *p.config.MaxConnsPerHost)
 		errInit = true
 	}
 	if p.config.MaxIdleConns == nil {
@@ -275,7 +275,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 		p.config.MaxIdleConns = &defaultValue
 	}
 	if *p.config.MaxIdleConns < 0 {
-		p.logger.Printf("option '%s', invalid value '%d'", "MaxIdleConns", *p.config.MaxIdleConns)
+		p.logger.Error("Invalid value", "option", "MaxIdleConns", "value", *p.config.MaxIdleConns)
 		errInit = true
 	}
 	if p.config.MaxIdleConnsPerHost == nil {
@@ -283,7 +283,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 		p.config.MaxIdleConnsPerHost = &defaultValue
 	}
 	if *p.config.MaxIdleConnsPerHost < 0 {
-		p.logger.Printf("option '%s', invalid value '%d'", "MaxIdleConnsPerHost", *p.config.MaxIdleConnsPerHost)
+		p.logger.Error("Invalid value", "option", "MaxIdleConnsPerHost", "value", *p.config.MaxIdleConnsPerHost)
 		errInit = true
 	}
 	if p.config.IdleConnTimeout == nil {
@@ -291,7 +291,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 		p.config.IdleConnTimeout = &defaultValue
 	}
 	if *p.config.IdleConnTimeout < 0 {
-		p.logger.Printf("option '%s', invalid value '%d'", "IdleConnTimeout", *p.config.IdleConnTimeout)
+		p.logger.Error("Invalid value", "option", "IdleConnTimeout", "value", *p.config.IdleConnTimeout)
 		errInit = true
 	}
 	if p.config.Retry == nil {
@@ -299,7 +299,7 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 		p.config.Retry = &defaultValue
 	}
 	if *p.config.Retry < 0 {
-		p.logger.Printf("option '%s', invalid value '%d'", "Retry", *p.config.Retry)
+		p.logger.Error("Invalid value", "option", "Retry", "value", *p.config.Retry)
 		errInit = true
 	}
 	if p.config.RetryDelay == nil {
@@ -307,18 +307,18 @@ func (p *restProvider) Init(config map[string]interface{}, logger *log.Logger) e
 		p.config.RetryDelay = &defaultValue
 	}
 	if *p.config.RetryDelay < 0 {
-		p.logger.Printf("option '%s', invalid value '%d'", "RetryDelay", *p.config.RetryDelay)
+		p.logger.Error("Invalid value", "option", "RetryDelay", "value", *p.config.RetryDelay)
 		errInit = true
 	}
 	for k := range p.config.Headers {
 		if k == "" {
-			p.logger.Printf("option '%s', invalid key '%s'", "Headers", k)
+			p.logger.Error("Invalid key", "option", "Headers", "key", k)
 			errInit = true
 		}
 	}
 	for k := range p.config.Params {
 		if k == "" {
-			p.logger.Printf("option '%s', invalid key '%s'", "Params", k)
+			p.logger.Error("Invalid key", "option", "Params", "key", k)
 			errInit = true
 		}
 	}
@@ -465,8 +465,7 @@ func parseLinkNextFromBody(body []byte, filter string) string {
 func (p *restProvider) fetchResource(ctx context.Context, config *restResourceConfig) ([]byte, http.Header, error) {
 	req, err := p.httpNewRequestWithContext(ctx, *config.Method, config.URL, nil)
 	if err != nil {
-		p.logger.Printf("Failed to create request: %s", err)
-
+		p.logger.Error("Failed to create request", "err", err)
 		return nil, nil, err
 	}
 
@@ -495,40 +494,35 @@ func (p *restProvider) fetchResource(ctx context.Context, config *restResourceCo
 			defer response.Body.Close()
 		}
 		if err != nil {
-			p.logger.Printf("Failed to send request: %s", err)
-
+			p.logger.Error("Failed to send request", "err", err)
 			return nil, nil, err
 		}
 		responseBody, err := p.ioReadAll(response.Body)
 		if err != nil {
-			p.logger.Printf("Failed to read response: %s", err)
-
+			p.logger.Error("Failed to read response", "err", err)
 			return nil, nil, err
 		}
 
-		if core.DEBUG {
-			p.logger.Printf("Fetch completed (method=%s, url=%s, code=%d)", req.Method, req.URL.String(), response.StatusCode)
-		}
+		p.logger.Debug("Request processed", "method", req.Method, "url", req.URL.String(),
+			"code", response.StatusCode)
 
 		switch response.StatusCode {
 		case 429, 500, 502, 503, 504:
 			if attempt >= *p.config.Retry {
+				p.logger.Error("Request error", "method", req.Method, "url", req.URL.String(), "code", response.StatusCode)
 				return nil, nil, fmt.Errorf("request error %d", response.StatusCode)
 			}
 
-			if *p.config.RetryDelay > 0 {
-				p.logger.Printf("Retrying request attempt %d/%d, delaying for %d seconds", attempt, *p.config.Retry,
-					*p.config.RetryDelay)
+			p.logger.Warn("Retrying request", "method", req.Method, "url", req.URL.String(), "code", response.StatusCode,
+				"attempt", attempt, "retries", *p.config.Retry, "delay", *p.config.RetryDelay)
 
-				time.Sleep(time.Duration(*p.config.RetryDelay) * time.Second)
-			} else {
-				p.logger.Printf("Retrying request attempt %d/%d", attempt, *p.config.Retry)
-			}
+			time.Sleep(time.Duration(*p.config.RetryDelay) * time.Second)
 
 			continue
 
 		default:
 			if response.StatusCode < 200 || response.StatusCode > 299 {
+				p.logger.Error("Request error", "method", req.Method, "url", req.URL.String(), "code", response.StatusCode)
 				return nil, nil, fmt.Errorf("request error %d", response.StatusCode)
 			}
 		}

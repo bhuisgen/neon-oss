@@ -7,7 +7,7 @@ package raw
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/core"
@@ -51,11 +51,11 @@ var _ core.Fetcher = (*testRawParserFetcher)(nil)
 func TestRawParserInit(t *testing.T) {
 	type fields struct {
 		config *rawParserConfig
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	type args struct {
 		config map[string]interface{}
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	tests := []struct {
 		name    string
@@ -73,7 +73,7 @@ func TestRawParserInit(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 		},
 	}
@@ -93,7 +93,7 @@ func TestRawParserInit(t *testing.T) {
 func TestRawParserParse(t *testing.T) {
 	type fields struct {
 		config *rawParserConfig
-		logger *log.Logger
+		logger *slog.Logger
 	}
 	type args struct {
 		ctx     context.Context
@@ -116,7 +116,7 @@ func TestRawParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx:     context.Background(),
@@ -134,7 +134,7 @@ func TestRawParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx:     context.Background(),
@@ -153,7 +153,7 @@ func TestRawParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx:     context.Background(),
@@ -172,7 +172,7 @@ func TestRawParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx:   context.Background(),
@@ -193,7 +193,7 @@ func TestRawParserParse(t *testing.T) {
 						},
 					},
 				},
-				logger: log.Default(),
+				logger: slog.Default(),
 			},
 			args: args{
 				ctx: context.Background(),

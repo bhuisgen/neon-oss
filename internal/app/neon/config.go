@@ -16,7 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/BurntSushi/toml"
-	"github.com/bhuisgen/neon/pkg/core"
 )
 
 // config implements the configuration.
@@ -215,8 +214,8 @@ var _ configParser = (*configParserJSON)(nil)
 // LoadConfig loads the configuration.
 func LoadConfig() (*config, error) {
 	name := configDefaultFile
-	if core.CONFIG_FILE != "" {
-		name = core.CONFIG_FILE
+	if CONFIG_FILE != "" {
+		name = CONFIG_FILE
 	}
 
 	var c *config
@@ -257,8 +256,8 @@ func GenerateConfig(syntax string, template string) error {
 		src = "./neon.json"
 	}
 	var dst string
-	if core.CONFIG_FILE != "" {
-		dst = core.CONFIG_FILE
+	if CONFIG_FILE != "" {
+		dst = CONFIG_FILE
 	} else {
 		dst = src
 	}
