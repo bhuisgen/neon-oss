@@ -28,19 +28,12 @@ type vm struct {
 	serverRequestObject         *v8go.ObjectTemplate
 	serverResponseObject        *v8go.ObjectTemplate
 	context                     *v8go.Context
+	status                      vmStatus
 	config                      *vmConfig
 	logger                      *slog.Logger
-	status                      vmStatus
 	data                        *vmData
 	v8NewFunctionTemplate       func(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate
 	v8ObjectTemplateNewInstance func(template *v8go.ObjectTemplate, context *v8go.Context) (*v8go.Object, error)
-}
-
-// vmConfig implements the VM configuration.
-type vmConfig struct {
-	Env     string
-	Request *http.Request
-	State   *string
 }
 
 // vmStatus implements the VM status.
@@ -48,10 +41,17 @@ type vmStatus int
 
 const (
 	vmStatusNew = iota
-	vmStatusReady
+	vmStatusConfigured
 )
 
-// vmData implements the VM data.
+// vmConfig implements the VM execution configuration.
+type vmConfig struct {
+	Env     string
+	Request *http.Request
+	State   *string
+}
+
+// vmData implements the VM execution data.
 type vmData struct {
 	render         *[]byte
 	status         *int
@@ -104,9 +104,11 @@ func (v *vm) Close() {
 	v.isolate.Dispose()
 }
 
-// Reset resets the VM cache and data.
+// Reset resets the VM.
 func (v *vm) Reset() {
-	v.data = &vmData{}
+	v.config = nil
+	v.logger = nil
+	v.data = nil
 }
 
 // Configure configures the VM
@@ -115,7 +117,6 @@ func (v *vm) Configure(config *vmConfig, logger *slog.Logger) error {
 		if err := api(v); err != nil {
 			return vmErrConfigure
 		}
-		v.status = vmStatusReady
 	}
 
 	process, err := v.v8ObjectTemplateNewInstance(v.processObject, v.context)
@@ -167,8 +168,11 @@ func (v *vm) Configure(config *vmConfig, logger *slog.Logger) error {
 		return vmErrConfigure
 	}
 
+	v.status = vmStatusConfigured
+
 	v.config = config
 	v.logger = logger
+	v.data = &vmData{}
 
 	return nil
 }
@@ -185,14 +189,14 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 		}
 		vals <- value
 	}
-	jsVal := make(chan *v8go.Value, 1)
-	jsErr := make(chan error, 1)
+	vals := make(chan *v8go.Value, 1)
+	errs := make(chan error, 1)
 
-	go worker(jsVal, jsErr)
+	go worker(vals, errs)
 	select {
-	case <-jsVal:
+	case <-vals:
 
-	case err := <-jsErr:
+	case err := <-errs:
 		var jsError *v8go.JSError
 		if errors.As(err, &jsError) {
 			v.logger.Debug("Failed to execute script", "name", name, "stackTrace", fmt.Sprintf("%+v", jsError))
@@ -201,7 +205,7 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 
 	case <-time.After(timeout):
 		v.isolate.TerminateExecution()
-		<-jsErr
+		<-errs
 		return nil, vmErrExecutionTimeout
 	}
 

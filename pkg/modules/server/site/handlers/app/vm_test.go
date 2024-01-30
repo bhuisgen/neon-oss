@@ -44,9 +44,9 @@ func TestVMClose(t *testing.T) {
 		serverRequestObject         *v8go.ObjectTemplate
 		serverResponseObject        *v8go.ObjectTemplate
 		context                     *v8go.Context
+		status                      vmStatus
 		config                      *vmConfig
 		logger                      *slog.Logger
-		status                      vmStatus
 		data                        *vmData
 		v8NewFunctionTemplate       func(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate
 		v8ObjectTemplateNewInstance func(template *v8go.ObjectTemplate, context *v8go.Context) (*v8go.Object, error)
@@ -75,9 +75,9 @@ func TestVMClose(t *testing.T) {
 				serverRequestObject:         tt.fields.serverRequestObject,
 				serverResponseObject:        tt.fields.serverResponseObject,
 				context:                     tt.fields.context,
+				status:                      tt.fields.status,
 				config:                      tt.fields.config,
 				logger:                      tt.fields.logger,
-				status:                      tt.fields.status,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       tt.fields.v8NewFunctionTemplate,
 				v8ObjectTemplateNewInstance: tt.fields.v8ObjectTemplateNewInstance,
@@ -97,9 +97,9 @@ func TestVMReset(t *testing.T) {
 		serverRequestObject         *v8go.ObjectTemplate
 		serverResponseObject        *v8go.ObjectTemplate
 		context                     *v8go.Context
+		status                      vmStatus
 		config                      *vmConfig
 		logger                      *slog.Logger
-		status                      vmStatus
 		data                        *vmData
 		v8NewFunctionTemplate       func(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate
 		v8ObjectTemplateNewInstance func(template *v8go.ObjectTemplate, context *v8go.Context) (*v8go.Object, error)
@@ -124,9 +124,9 @@ func TestVMReset(t *testing.T) {
 				serverRequestObject:         tt.fields.serverRequestObject,
 				serverResponseObject:        tt.fields.serverResponseObject,
 				context:                     tt.fields.context,
+				status:                      tt.fields.status,
 				config:                      tt.fields.config,
 				logger:                      tt.fields.logger,
-				status:                      tt.fields.status,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       tt.fields.v8NewFunctionTemplate,
 				v8ObjectTemplateNewInstance: tt.fields.v8ObjectTemplateNewInstance,
@@ -151,9 +151,9 @@ func TestVMConfigure(t *testing.T) {
 		serverRequestObject         *v8go.ObjectTemplate
 		serverResponseObject        *v8go.ObjectTemplate
 		context                     *v8go.Context
+		status                      vmStatus
 		config                      *vmConfig
 		logger                      *slog.Logger
-		status                      vmStatus
 		data                        *vmData
 		v8NewFunctionTemplate       func(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate
 		v8ObjectTemplateNewInstance func(template *v8go.ObjectTemplate, context *v8go.Context) (*v8go.Object, error)
@@ -179,8 +179,8 @@ func TestVMConfigure(t *testing.T) {
 				serverRequestObject:   v8go.NewObjectTemplate(isolate),
 				serverResponseObject:  v8go.NewObjectTemplate(isolate),
 				context:               context,
-				logger:                slog.Default(),
 				status:                vmStatusNew,
+				logger:                slog.Default(),
 				data:                  &vmData{},
 				v8NewFunctionTemplate: vmV8NewFunctionTemplate,
 				v8ObjectTemplateNewInstance: func(template *v8go.ObjectTemplate, context *v8go.Context) (*v8go.Object, error) {
@@ -211,9 +211,9 @@ func TestVMConfigure(t *testing.T) {
 				serverRequestObject:         tt.fields.serverRequestObject,
 				serverResponseObject:        tt.fields.serverResponseObject,
 				context:                     tt.fields.context,
+				status:                      tt.fields.status,
 				config:                      tt.fields.config,
 				logger:                      tt.fields.logger,
-				status:                      tt.fields.status,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       tt.fields.v8NewFunctionTemplate,
 				v8ObjectTemplateNewInstance: tt.fields.v8ObjectTemplateNewInstance,
@@ -240,9 +240,9 @@ func TestVMExecute(t *testing.T) {
 		serverRequestObject         *v8go.ObjectTemplate
 		serverResponseObject        *v8go.ObjectTemplate
 		context                     *v8go.Context
+		status                      vmStatus
 		config                      *vmConfig
 		logger                      *slog.Logger
-		status                      vmStatus
 		data                        *vmData
 		v8NewFunctionTemplate       func(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate
 		v8ObjectTemplateNewInstance func(template *v8go.ObjectTemplate, context *v8go.Context) (*v8go.Object, error)
@@ -342,9 +342,9 @@ func TestVMExecute(t *testing.T) {
 				serverRequestObject:         tt.fields.serverRequestObject,
 				serverResponseObject:        tt.fields.serverResponseObject,
 				context:                     tt.fields.context,
+				status:                      tt.fields.status,
 				config:                      tt.fields.config,
 				logger:                      tt.fields.logger,
-				status:                      tt.fields.status,
 				data:                        tt.fields.data,
 				v8NewFunctionTemplate:       tt.fields.v8NewFunctionTemplate,
 				v8ObjectTemplateNewInstance: tt.fields.v8ObjectTemplateNewInstance,
