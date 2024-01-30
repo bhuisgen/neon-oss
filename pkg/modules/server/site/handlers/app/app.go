@@ -347,7 +347,7 @@ func (h *appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Path
 
 	if *h.config.Cache {
-		if item, ok := h.cache.Get(key).(appCacheItem); ok && item.expire.After(time.Now()) {
+		if item, ok := h.cache.Get(key).(*appCacheItem); ok && item.expire.After(time.Now()) {
 			render := item.render
 
 			if render.Redirect() {
@@ -576,7 +576,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 		}
 	}
 
-	var vm = h.vmPool.Get()
+	vm := h.vmPool.Get()
 	defer h.vmPool.Put(vm)
 
 	if err := vm.Configure(&vmConfig{
