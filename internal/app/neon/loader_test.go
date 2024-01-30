@@ -78,6 +78,18 @@ func TestLoaderInit(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "error invalid number of workers",
+			fields: fields{
+				logger: slog.Default(),
+			},
+			args: args{
+				config: map[string]interface{}{
+					"execWorkers": 0,
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "error unregistered parser module",
 			fields: fields{
 				logger: slog.Default(),
@@ -127,8 +139,9 @@ func TestLoaderStart(t *testing.T) {
 			name: "execution",
 			fields: fields{
 				config: &loaderConfig{
-					ExecInterval: intPtr(loaderConfigDefaultExecInterval),
-					ExecStartup:  intPtr(loaderConfigDefaultExecStartup),
+					ExecStartup:          intPtr(loaderConfigDefaultExecStartup),
+					ExecInterval:         intPtr(loaderConfigDefaultExecInterval),
+					ExecFailsafeInterval: intPtr(loaderConfigDefaultExecFailsafeInterval),
 				},
 				logger: slog.Default(),
 				state:  &loaderState{},
@@ -139,8 +152,9 @@ func TestLoaderStart(t *testing.T) {
 			name: "no execution",
 			fields: fields{
 				config: &loaderConfig{
-					ExecInterval: intPtr(0),
-					ExecStartup:  intPtr(loaderConfigDefaultExecStartup),
+					ExecInterval:         intPtr(0),
+					ExecStartup:          intPtr(loaderConfigDefaultExecStartup),
+					ExecFailsafeInterval: intPtr(loaderConfigDefaultExecFailsafeInterval),
 				},
 				logger: slog.Default(),
 				state:  &loaderState{},
@@ -181,7 +195,9 @@ func TestLoaderStop(t *testing.T) {
 			name: "execution",
 			fields: fields{
 				config: &loaderConfig{
-					ExecInterval: intPtr(loaderConfigDefaultExecInterval),
+					ExecStartup:          intPtr(loaderConfigDefaultExecStartup),
+					ExecInterval:         intPtr(loaderConfigDefaultExecInterval),
+					ExecFailsafeInterval: intPtr(loaderConfigDefaultExecFailsafeInterval),
 				},
 				logger: slog.Default(),
 				state:  &loaderState{},
@@ -192,7 +208,9 @@ func TestLoaderStop(t *testing.T) {
 			name: "no execution",
 			fields: fields{
 				config: &loaderConfig{
-					ExecInterval: intPtr(0),
+					ExecStartup:          intPtr(0),
+					ExecInterval:         intPtr(0),
+					ExecFailsafeInterval: intPtr(0),
 				},
 				logger: slog.Default(),
 				state:  &loaderState{},

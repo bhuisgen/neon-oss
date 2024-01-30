@@ -107,7 +107,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 		defaultValue := loaderConfigDefaultExecWorkers
 		l.config.ExecWorkers = &defaultValue
 	}
-	if *l.config.ExecWorkers < 0 {
+	if *l.config.ExecWorkers <= 0 {
 		l.logger.Error("Invalid value", "option", "ExecWorkers", "value", *l.config.ExecWorkers)
 		errInit = true
 	}
@@ -176,7 +176,17 @@ func (l *loader) Start() error {
 
 	l.logger.Info("Starting loader")
 
-	if *l.config.ExecInterval > 0 {
+	if *l.config.ExecStartup == 0 && *l.config.ExecInterval == 0 {
+		l.logger.Warn("Execution disabled")
+	}
+	if *l.config.ExecStartup > 0 && *l.config.ExecInterval == 0 {
+		l.logger.Warn("One-off execution enabled")
+	}
+	if (*l.config.ExecStartup > 0 || *l.config.ExecInterval > 0) && *l.config.ExecFailsafeInterval == 0 {
+		l.logger.Warn("Failsafe execution disabled")
+	}
+
+	if *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
 		l.execute(l.stop)
 	}
 
@@ -190,7 +200,7 @@ func (l *loader) Stop() error {
 
 	l.logger.Info("Stopping loader")
 
-	if *l.config.ExecInterval > 0 {
+	if *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
 		l.stop <- struct{}{}
 	}
 
@@ -200,7 +210,13 @@ func (l *loader) Stop() error {
 // execute loads all resources data.
 func (l *loader) execute(stop <-chan struct{}) {
 	startup := true
-	ticker := time.NewTicker(time.Duration(*l.config.ExecStartup) * time.Second)
+	var delay time.Duration
+	if *l.config.ExecStartup > 0 {
+		delay = time.Duration(*l.config.ExecStartup) * time.Second
+	} else {
+		delay = time.Duration(*l.config.ExecInterval) * time.Second
+	}
+	ticker := time.NewTicker(delay)
 
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -233,9 +249,11 @@ func (l *loader) execute(stop <-chan struct{}) {
 			case <-ticker.C:
 				if startup {
 					startup = false
-
-					ticker.Stop()
-					ticker = time.NewTicker(time.Duration(*l.config.ExecInterval) * time.Second)
+					if *l.config.ExecInterval > 0 {
+						ticker.Reset(time.Duration(*l.config.ExecInterval) * time.Second)
+					} else {
+						ticker.Stop()
+					}
 				}
 
 				l.logger.Info("Starting execution")
@@ -288,19 +306,18 @@ func (l *loader) execute(stop <-chan struct{}) {
 				if failure > 0 && !l.state.failsafe && *l.config.ExecFailsafeInterval > 0 {
 					l.logger.Warn("Last execution failed, enabling failsafe mode")
 
-					ticker.Stop()
-					ticker = time.NewTicker(time.Duration(*l.config.ExecFailsafeInterval) * time.Second)
+					ticker.Reset(time.Duration(*l.config.ExecFailsafeInterval) * time.Second)
+					l.state.failsafe = true
 				}
 				if failure == 0 && l.state.failsafe {
 					l.logger.Warn("Last execution succeeded, disabling failsafe mode")
 
-					ticker.Stop()
-					ticker = time.NewTicker(time.Duration(*l.config.ExecInterval) * time.Second)
-				}
-				if failure == 0 {
+					if *l.config.ExecInterval > 0 {
+						ticker.Reset(time.Duration(*l.config.ExecInterval) * time.Second)
+					} else {
+						ticker.Stop()
+					}
 					l.state.failsafe = false
-				} else {
-					l.state.failsafe = true
 				}
 			}
 		}
