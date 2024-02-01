@@ -179,17 +179,21 @@ func (l *loader) Start() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if *l.config.ExecStartup == 0 && *l.config.ExecInterval == 0 {
-		l.logger.Warn("Execution disabled")
-	}
-	if *l.config.ExecStartup > 0 && *l.config.ExecInterval == 0 {
-		l.logger.Warn("One-off execution enabled")
-	}
-	if (*l.config.ExecStartup > 0 || *l.config.ExecInterval > 0) && *l.config.ExecFailsafeInterval == 0 {
-		l.logger.Warn("Failsafe execution disabled")
+	if len(l.config.Rules) == 0 {
+		l.logger.Warn("Execution disabled, no rules defined")
+	} else {
+		if *l.config.ExecStartup == 0 && *l.config.ExecInterval == 0 {
+			l.logger.Warn("Periodic execution disabled")
+		}
+		if *l.config.ExecStartup > 0 && *l.config.ExecInterval == 0 {
+			l.logger.Warn("One-off execution enabled")
+		}
+		if (*l.config.ExecStartup > 0 || *l.config.ExecInterval > 0) && *l.config.ExecFailsafeInterval == 0 {
+			l.logger.Warn("Failsafe execution disabled")
+		}
 	}
 
-	if *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
+	if len(l.config.Rules) > 0 && *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
 		l.execute(l.stop)
 	}
 
@@ -203,7 +207,7 @@ func (l *loader) Stop() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
+	if len(l.config.Rules) > 0 && (*l.config.ExecStartup > 0 || *l.config.ExecInterval > 0) {
 		l.stop <- struct{}{}
 	}
 
@@ -308,7 +312,7 @@ func (l *loader) execute(stop <-chan struct{}) {
 				}
 
 				l.logger.Info("Execution done", "duration", time.Since(startTime).Round(time.Second),
-					"success", success, "failure", failure, "total", rulesCount)
+					"total", rulesCount, "success", success, "failure", failure)
 
 				if failure > 0 && !l.state.failsafe && *l.config.ExecFailsafeInterval > 0 {
 					l.logger.Warn("Last execution failed, enabling failsafe mode")
