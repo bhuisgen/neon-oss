@@ -27,7 +27,7 @@ server:
 	if err := os.WriteFile(name, []byte(data), 0600); err != nil {
 		t.Error(err)
 	}
-	CONFIG_FILE = name
+	t.Setenv("CONFIG_FILE", name)
 
 	tests := []struct {
 		name    string
@@ -94,7 +94,7 @@ listeners = ["default"]
 	if err := os.WriteFile(name, []byte(data), 0600); err != nil {
 		t.Error(err)
 	}
-	CONFIG_FILE = name
+	t.Setenv("CONFIG_FILE", name)
 
 	tests := []struct {
 		name    string
@@ -178,7 +178,7 @@ func TestLoadConfig_JSON(t *testing.T) {
 	if err := os.WriteFile(name, []byte(data), 0600); err != nil {
 		t.Error(err)
 	}
-	CONFIG_FILE = name
+	t.Setenv("CONFIG_FILE", name)
 
 	tests := []struct {
 		name    string
@@ -230,7 +230,7 @@ func TestLoadConfig_JSON(t *testing.T) {
 
 func TestGenerateConfig_YAML(t *testing.T) {
 	name := path.Join(t.TempDir(), "test.yaml")
-	CONFIG_FILE = name
+	t.Setenv("CONFIG_FILE", name)
 
 	type args struct {
 		syntax   string
@@ -260,7 +260,7 @@ func TestGenerateConfig_YAML(t *testing.T) {
 
 func TestGenerateConfig_TOML(t *testing.T) {
 	name := path.Join(t.TempDir(), "test.toml")
-	CONFIG_FILE = name
+	t.Setenv("CONFIG_FILE", name)
 
 	type args struct {
 		syntax   string
@@ -290,7 +290,7 @@ func TestGenerateConfig_TOML(t *testing.T) {
 
 func TestGenerateConfig_JSON(t *testing.T) {
 	name := path.Join(t.TempDir(), "test.json")
-	CONFIG_FILE = name
+	t.Setenv("CONFIG_FILE", name)
 
 	type args struct {
 		syntax   string

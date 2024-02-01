@@ -210,8 +210,8 @@ var _ configParser = (*configParserJSON)(nil)
 // LoadConfig loads the configuration.
 func LoadConfig() (*config, error) {
 	name := configDefaultFile
-	if CONFIG_FILE != "" {
-		name = CONFIG_FILE
+	if v, ok := os.LookupEnv("CONFIG_FILE"); ok && v != "" {
+		name = v
 	}
 
 	var c *config
@@ -252,8 +252,8 @@ func GenerateConfig(syntax string, template string) error {
 		src = "neon.json"
 	}
 	var dst string
-	if CONFIG_FILE != "" {
-		dst = CONFIG_FILE
+	if v, ok := os.LookupEnv("CONFIG_FILE"); ok && v != "" {
+		dst = v
 	} else {
 		dst = src
 	}

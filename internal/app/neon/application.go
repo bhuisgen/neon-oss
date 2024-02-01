@@ -37,9 +37,6 @@ const (
 
 // NewApplication creates a new application.
 func NewApplication(config *config) *application {
-	if v, ok := os.LookupEnv("CONFIG_FILE"); ok {
-		CONFIG_FILE = v
-	}
 	if _, ok := os.LookupEnv("DEBUG"); ok {
 		DEBUG = true
 	}
