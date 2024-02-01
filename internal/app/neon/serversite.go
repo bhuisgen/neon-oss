@@ -51,10 +51,10 @@ type serverSiteState struct {
 	defaultSite bool
 	routes      []string
 	routesMap   map[string]serverSiteRouteState
-	mediator    *serverSiteMediator
-	router      *serverSiteRouter
 	middleware  *serverSiteMiddleware
 	handler     *serverSiteHandler
+	mediator    *serverSiteMediator
+	router      *serverSiteRouter
 }
 
 // serverSiteRouteState implements a server site route state.
@@ -193,7 +193,6 @@ func (s *serverSite) Register() error {
 	defer s.mu.Unlock()
 
 	mediator := newServerSiteMediator(s)
-
 	for _, route := range s.state.routes {
 		mediator.currentRoute = route
 
@@ -208,17 +207,15 @@ func (s *serverSite) Register() error {
 			}
 		}
 	}
-
+	s.state.middleware = newServerSiteMiddleware(s)
+	s.state.handler = newServerSiteHandler(s)
 	s.state.mediator = mediator
 
 	router, err := s.buildRouter()
 	if err != nil {
 		return fmt.Errorf("build router: %w", err)
 	}
-
 	s.state.router = router
-	s.state.middleware = newServerSiteMiddleware(s)
-	s.state.handler = newServerSiteHandler(s)
 
 	return nil
 }
