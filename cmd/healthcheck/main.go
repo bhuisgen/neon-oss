@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -26,11 +25,13 @@ func main() {
 func run() error {
 	var cacert, cert, key string
 	var timeout, status int
+	var verbose bool
 	flag.StringVar(&cacert, "cacert", "", "TLS CA file")
 	flag.StringVar(&cert, "cert", "", "TLS certificate file")
 	flag.StringVar(&key, "key", "", "TLS key file")
 	flag.IntVar(&status, "status", 0, "Status code")
 	flag.IntVar(&timeout, "timeout", 5, "Timeout in seconds")
+	flag.BoolVar(&verbose, "verbose", false, "Use verbose output")
 	flag.Usage = func() {
 		fmt.Println()
 		fmt.Println("Usage: healthcheck [OPTIONS] [url]")
@@ -42,14 +43,17 @@ func run() error {
 		fmt.Println()
 	}
 	flag.Parse()
+
 	if len(flag.Args()) == 0 {
 		flag.Usage()
 		return nil
 	}
 
-	err := healthcheck(flag.Arg(0), cacert, cert, key, status, timeout)
-	if err != nil {
-		return err
+	if err := healthcheck(flag.Arg(0), cacert, cert, key, status, timeout); err != nil {
+		if verbose {
+			fmt.Println("Error: ", err)
+		}
+		return fmt.Errorf("healthcheck: %v", err)
 	}
 
 	return nil
@@ -64,9 +68,7 @@ func healthcheck(url string, cacert string, cert string, key string, status int,
 	if cacert != "" {
 		ca, err := os.ReadFile(cacert)
 		if err != nil {
-			fmt.Printf("Failed to read TLS CA file: %s\n", err)
-
-			return err
+			return fmt.Errorf("read ca file: %v", err)
 		}
 
 		caCertPool := x509.NewCertPool()
@@ -77,9 +79,7 @@ func healthcheck(url string, cacert string, cert string, key string, status int,
 		if cert != "" && key != "" {
 			c, err := tls.LoadX509KeyPair(cert, key)
 			if err != nil {
-				fmt.Printf("Failed to parse TLS certificate: %s\n", err)
-
-				return err
+				return fmt.Errorf("load keypair: %v", err)
 			}
 
 			tlsConfig.Certificates = []tls.Certificate{c}
@@ -102,19 +102,20 @@ func healthcheck(url string, cacert string, cert string, key string, status int,
 
 	request, err := http.NewRequestWithContext(context.Background(), http.MethodHead, url, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("create request: %v", err)
 	}
 	response, err := client.Do(request)
 	if response != nil {
 		defer response.Body.Close()
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("send request: %v", err)
 	}
 	_, _ = io.Copy(io.Discard, response.Body)
+
 	if status > 0 {
 		if response.StatusCode != status {
-			return errors.New("invalid status")
+			return fmt.Errorf("status code: %d", response.StatusCode)
 		}
 	}
 

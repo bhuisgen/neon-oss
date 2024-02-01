@@ -118,6 +118,7 @@ func TestStoreLoadResource(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &storeState{
 					storage: &testStoreStorageModule{},
 				},
@@ -133,6 +134,7 @@ func TestStoreLoadResource(t *testing.T) {
 		{
 			name: "error module",
 			fields: fields{
+				logger: slog.Default(),
 				state: &storeState{
 					storage: &testStoreStorageModule{
 						errLoadResource: true,
@@ -183,6 +185,7 @@ func TestStoreStoreResource(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &storeState{
 					storage: &testStoreStorageModule{},
 				},
@@ -198,6 +201,7 @@ func TestStoreStoreResource(t *testing.T) {
 		{
 			name: "error module",
 			fields: fields{
+				logger: slog.Default(),
 				state: &storeState{
 					storage: &testStoreStorageModule{
 						errStoreResource: true,

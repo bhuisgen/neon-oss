@@ -2,22 +2,23 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"rogchap.com/v8go"
 )
 
-// api injects all JS APIs to the given VM.
+// api configures the APIs into the VM.
 func api(v *vm) error {
 	if err := apiHandler(v); err != nil {
-		return err
+		return fmt.Errorf("api handler: %v", err)
 	}
 	if err := apiRequest(v); err != nil {
-		return err
+		return fmt.Errorf("api request: %v", err)
 	}
 	if err := apiResponse(v); err != nil {
-		return err
+		return fmt.Errorf("api response: %v", err)
 	}
 	return nil
 }
@@ -34,7 +35,7 @@ func apiHandler(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	return nil
@@ -53,7 +54,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverRequestObject.Set("proto", v.v8NewFunctionTemplate(v.isolate,
@@ -65,7 +66,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverRequestObject.Set("protoMajor", v.v8NewFunctionTemplate(v.isolate,
@@ -77,7 +78,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverRequestObject.Set("protoMinor", v.v8NewFunctionTemplate(v.isolate,
@@ -89,7 +90,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverRequestObject.Set("remoteAddr", v.v8NewFunctionTemplate(v.isolate,
@@ -101,7 +102,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverRequestObject.Set("host", v.v8NewFunctionTemplate(v.isolate,
@@ -113,7 +114,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverRequestObject.Set("path", v.v8NewFunctionTemplate(v.isolate,
@@ -125,7 +126,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverRequestObject.Set("query", v.v8NewFunctionTemplate(v.isolate,
@@ -143,7 +144,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverRequestObject.Set("headers", v.v8NewFunctionTemplate(v.isolate,
@@ -161,7 +162,7 @@ func apiRequest(v *vm) error {
 			return value
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	return nil
@@ -194,7 +195,7 @@ func apiResponse(v *vm) error {
 			return nil
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverResponseObject.Set("redirect", v.v8NewFunctionTemplate(v.isolate,
@@ -222,7 +223,7 @@ func apiResponse(v *vm) error {
 			return nil
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverResponseObject.Set("setHeader", v.v8NewFunctionTemplate(v.isolate,
@@ -243,7 +244,7 @@ func apiResponse(v *vm) error {
 			return nil
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverResponseObject.Set("setTitle", v.v8NewFunctionTemplate(v.isolate,
@@ -259,7 +260,7 @@ func apiResponse(v *vm) error {
 			return nil
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverResponseObject.Set("setMeta", v.v8NewFunctionTemplate(v.isolate,
@@ -328,7 +329,7 @@ func apiResponse(v *vm) error {
 			return nil
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverResponseObject.Set("setLink", v.v8NewFunctionTemplate(v.isolate,
@@ -397,7 +398,7 @@ func apiResponse(v *vm) error {
 			return nil
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	err = v.serverResponseObject.Set("setScript", v.v8NewFunctionTemplate(v.isolate,
@@ -466,7 +467,7 @@ func apiResponse(v *vm) error {
 			return nil
 		}))
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	return nil

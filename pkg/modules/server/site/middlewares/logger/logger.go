@@ -2,6 +2,7 @@ package logger
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"log/slog"
@@ -76,38 +77,38 @@ func (m *loggerMiddleware) Init(config map[string]interface{}, logger *slog.Logg
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Error("Failed to parse configuration")
-		return err
+		m.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if m.config.File != nil {
 		if *m.config.File == "" {
 			m.logger.Error("Invalid value", "option", "File", "value", *m.config.File)
-			errInit = true
+			errConfig = true
 		} else {
 			f, err := m.osOpenFile(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 			if err != nil {
-				m.logger.Error("failed to open file", "option", "File", "value", *m.config.File)
-				errInit = true
+				m.logger.Error("Failed to open file", "option", "File", "value", *m.config.File)
+				errConfig = true
 			} else {
 				_ = m.osClose(f)
 				fi, err := m.osStat(*m.config.File)
 				if err != nil {
-					m.logger.Error("failed to stat file", "option", "File", "value", *m.config.File)
-					errInit = true
+					m.logger.Error("Failed to stat file", "option", "File", "value", *m.config.File)
+					errConfig = true
 				}
 				if err == nil && fi.IsDir() {
 					m.logger.Error("File is a directory", "option", "File", "value", *m.config.File)
-					errInit = true
+					errConfig = true
 				}
 			}
 		}
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -117,7 +118,7 @@ func (m *loggerMiddleware) Init(config map[string]interface{}, logger *slog.Logg
 func (m *loggerMiddleware) Register(site core.ServerSite) error {
 	err := site.RegisterMiddleware(m.Handler)
 	if err != nil {
-		return err
+		return fmt.Errorf("register middleware: %v", err)
 	}
 
 	return nil
@@ -129,7 +130,7 @@ func (m *loggerMiddleware) Start() error {
 	if m.config.File != nil {
 		w, err := CreateLogFileWriter(*m.config.File, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 		if err != nil {
-			return err
+			return fmt.Errorf("create logfile writer: %v", err)
 		}
 
 		logFileWriter = w
@@ -158,10 +159,12 @@ func (m *loggerMiddleware) Start() error {
 }
 
 // Stop stops the middleware.
-func (m *loggerMiddleware) Stop() {
+func (m *loggerMiddleware) Stop() error {
 	if m.config.File != nil {
 		signal.Stop(m.reopen)
 	}
+
+	return nil
 }
 
 // Handler implements the middleware handler.

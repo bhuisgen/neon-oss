@@ -65,13 +65,12 @@ func run() error {
 		if c.Name() != flag.Arg(0) {
 			continue
 		}
-		err := c.Parse(flag.Args()[1:])
-		if err != nil {
-			return err
+		if err := c.Parse(flag.Args()[1:]); err != nil {
+			flag.Usage()
+			return errors.New("parse command")
 		}
-		err = c.Execute()
-		if err != nil {
-			return err
+		if err := c.Execute(); err != nil {
+			return errors.New("execute command")
 		}
 		return nil
 	}

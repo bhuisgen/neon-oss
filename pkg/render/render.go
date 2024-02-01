@@ -2,12 +2,17 @@ package render
 
 import "net/http"
 
-// Render
+// Render is the interface of a render.
 type Render interface {
+	// Body returns the HTTP response body.
 	Body() []byte
+	// Header returns the HTTP response headers.
 	Header() http.Header
+	// StatusCode returns the HTTP response status code.
 	StatusCode() int
+	// Redirect returns the redirect flag.
 	Redirect() bool
+	// RedirectURL returns the redirect URL.
 	RedirectURL() string
 }
 

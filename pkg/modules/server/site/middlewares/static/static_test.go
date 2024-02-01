@@ -381,8 +381,9 @@ func TestStaticMiddlewareStop(t *testing.T) {
 		osStat        func(name string) (fs.FileInfo, error)
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		{
 			name: "default",
@@ -399,7 +400,9 @@ func TestStaticMiddlewareStop(t *testing.T) {
 				osClose:       tt.fields.osClose,
 				osStat:        tt.fields.osStat,
 			}
-			m.Stop()
+			if err := m.Stop(); (err != nil) != tt.wantErr {
+				t.Errorf("staticMiddleware.Stop() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

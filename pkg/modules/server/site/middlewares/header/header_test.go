@@ -145,7 +145,6 @@ func TestHeaderMiddlewareInit(t *testing.T) {
 							"Set": map[string]string{
 								"": "",
 							},
-							"Remove": []string{""},
 						},
 					},
 				},
@@ -266,8 +265,9 @@ func TestHeaderMiddlewareStop(t *testing.T) {
 		regexps []*regexp.Regexp
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		{
 			name: "default",
@@ -280,7 +280,9 @@ func TestHeaderMiddlewareStop(t *testing.T) {
 				logger:  tt.fields.logger,
 				regexps: tt.fields.regexps,
 			}
-			m.Stop()
+			if err := m.Stop(); (err != nil) != tt.wantErr {
+				t.Errorf("headerMiddleware.Stop() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

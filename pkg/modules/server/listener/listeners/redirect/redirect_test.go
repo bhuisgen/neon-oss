@@ -28,7 +28,7 @@ func (l testRedirectListener) Name() string {
 	return "test"
 }
 
-func (l testRedirectListener) Listeners() []net.Listener {
+func (l testRedirectListener) Descriptors() []net.Listener {
 	return nil
 }
 

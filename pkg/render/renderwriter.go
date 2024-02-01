@@ -2,20 +2,29 @@ package render
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 )
 
-// RenderWriter
+// RenderWriter is the interface of a render writer.
 type RenderWriter interface {
-	http.ResponseWriter
+	// Reset resets the buffer.
 	Reset()
+	// Write writes bytes into the response body.
 	Write(p []byte) (n int, err error)
+	// WriteHeader writes the HTTP response header.
 	WriteHeader(statusCode int)
-	Header() http.Header
-	StatusCode() int
+	// WriteRedirect writes a HTTP redirect.
 	WriteRedirect(url string, statusCode int)
+	// Header returns the HTTP response headers.
+	Header() http.Header
+	// StatusCode returns the HTTP response status code.
+	StatusCode() int
+	// Redirect returns the redirect flag.
 	Redirect() bool
+	// RedirectURL returns the redirect URL.
 	RedirectURL() string
+	// Render returns a render.
 	Render() Render
 }
 
@@ -49,7 +58,11 @@ func (w *renderWriter) Reset() {
 
 // Write writes bytes into the response body.
 func (w *renderWriter) Write(p []byte) (int, error) {
-	return w.buf.Write(p)
+	n, err := w.buf.Write(p)
+	if err != nil {
+		return n, fmt.Errorf("write buffer: %w", err)
+	}
+	return n, nil
 }
 
 // WriteHeader writes the HTTP response header.
@@ -82,15 +95,6 @@ func (w *renderWriter) Redirect() bool {
 // RedirectURL returns the redirect URL.
 func (w *renderWriter) RedirectURL() string {
 	return w.redirectURL
-}
-
-// Load loads a render.
-func (w *renderWriter) Load(r Render) {
-	w.buf = bytes.NewBuffer(r.Body())
-	w.header = r.Header().Clone()
-	w.statusCode = r.StatusCode()
-	w.redirect = r.Redirect()
-	w.redirectURL = r.RedirectURL()
 }
 
 // Render returns a render.

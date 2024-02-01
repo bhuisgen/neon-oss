@@ -6,18 +6,21 @@ import (
 	"sync"
 )
 
+// Module is the interface of module.
+type Module interface {
+	// ModuleInfo returns the module information.
+	ModuleInfo() ModuleInfo
+}
+
 // ModuleID is the module id.
 type ModuleID string
 
 // ModuleInfo implements the module information.
 type ModuleInfo struct {
-	ID          ModuleID
+	// ID is the module ID.
+	ID ModuleID
+	// NewInstance returns a new module instance.
 	NewInstance func() Module
-}
-
-// Module
-type Module interface {
-	ModuleInfo() ModuleInfo
 }
 
 var (

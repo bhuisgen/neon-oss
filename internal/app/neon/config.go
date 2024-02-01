@@ -92,7 +92,7 @@ func newConfigParserYAML() *configParserYAML {
 func (p *configParserYAML) parse(data []byte, c *config) error {
 	var y yamlConfig
 	if err := p.yamlUnmarshal(data, &y); err != nil {
-		return err
+		return fmt.Errorf("parse yaml: %v", err)
 	}
 
 	c.Store = &configStore{
@@ -139,7 +139,7 @@ func newConfigParserTOML() *configParserTOML {
 func (p *configParserTOML) parse(data []byte, c *config) error {
 	var t tomlConfig
 	if err := p.tomlUnmarshal(data, &t); err != nil {
-		return err
+		return fmt.Errorf("parse toml: %v", err)
 	}
 
 	c.Store = &configStore{
@@ -186,7 +186,7 @@ func newConfigParserJSON() *configParserJSON {
 func (p *configParserJSON) parse(data []byte, c *config) error {
 	var j jsonConfig
 	if err := p.jsonUnmarshal(data, &j); err != nil {
-		return err
+		return fmt.Errorf("parse json: %v", err)
 	}
 
 	c.Store = &configStore{
@@ -227,11 +227,11 @@ func LoadConfig() (*config, error) {
 	}
 	data, err := c.osReadFile(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read file %s: %v", name, err)
 	}
 
 	if err := c.parser.parse(data, c); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse config: %v", err)
 	}
 
 	return c, nil
@@ -245,11 +245,11 @@ func GenerateConfig(syntax string, template string) error {
 	var src string
 	switch syntax {
 	case "yaml":
-		src = "./neon.yaml"
+		src = "neon.yaml"
 	case "toml":
-		src = "./neon.toml"
+		src = "neon.toml"
 	case "json":
-		src = "./neon.json"
+		src = "neon.json"
 	}
 	var dst string
 	if CONFIG_FILE != "" {
@@ -260,15 +260,15 @@ func GenerateConfig(syntax string, template string) error {
 
 	_, err := os.Stat(dst)
 	if err == nil {
-		return fmt.Errorf("file '%s' already exists", dst)
+		return fmt.Errorf("file %s already exists", dst)
 	}
 
 	data, err := configTemplates.ReadFile(path.Join("templates", "config", template, src))
 	if err != nil {
-		return errors.New("failed to generate config")
+		return fmt.Errorf("read file %s: %v", src, err)
 	}
 	if err := os.WriteFile(dst, data, 0600); err != nil {
-		return errors.New("failed to generate config")
+		return fmt.Errorf("write file %s: %v", dst, err)
 	}
 
 	return nil

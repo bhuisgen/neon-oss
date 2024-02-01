@@ -95,7 +95,8 @@ func (a *application) Serve() error {
 
 	if _, ok := os.LookupEnv(childEnvKey); ok {
 		if err := a.child(); err != nil {
-			return err
+			a.logger.Error("Failed to execute child", "err", err)
+			return fmt.Errorf("execute child: %v", err)
 		}
 	}
 
@@ -105,16 +106,20 @@ func (a *application) Serve() error {
 	a.server = newServer(a.store, a.fetcher, a.loader)
 
 	if err := a.startStore(a.store, a.config.Store.Config); err != nil {
-		return err
+		a.logger.Error("Failed to start store", "err", err)
+		return fmt.Errorf("start store: %v", err)
 	}
 	if err := a.startFetcher(a.fetcher, a.config.Fetcher.Config); err != nil {
-		return err
+		a.logger.Error("Failed to start fetcher", "err", err)
+		return fmt.Errorf("start fetcher: %v", err)
 	}
 	if err := a.startLoader(a.loader, a.config.Loader.Config); err != nil {
-		return err
+		a.logger.Error("Failed to start loader", "err", err)
+		return fmt.Errorf("start loader: %v", err)
 	}
 	if err := a.startServer(a.server, a.config.Server.Config); err != nil {
-		return err
+		a.logger.Error("Failed to start server", "err", err)
+		return fmt.Errorf("start server: %v", err)
 	}
 
 	a.logger.Info("Instance ready")
@@ -131,19 +136,21 @@ func (a *application) Serve() error {
 		case <-exit:
 			a.logger.Info("Signal SIGTERM received, stopping instance")
 			if err := a.stop(); err != nil {
-				a.logger.Error("Failed to stop the instance", "err", err)
+				a.logger.Error("stop instance", "err", err)
+				continue
 			}
 
 		case <-shutdown:
 			a.logger.Info("Signal SIGQUIT received, shutting down instance gracefully")
 			if err := a.shutdown(); err != nil {
-				a.logger.Error("Failed to shutdown the instance", "err", err)
+				a.logger.Error("shutdown instance", "err", err)
+				continue
 			}
 
 		case <-reload:
 			a.logger.Info("Signal SIGHUP received, reloading instance")
 			if err := a.reload(); err != nil {
-				a.logger.Error("Failed to reload instance", "err", err)
+				a.logger.Error("reload instance", "err", err)
 				continue
 			}
 		}
@@ -160,44 +167,52 @@ func (a *application) Serve() error {
 	return nil
 }
 
-// stop stops the application.
+// stop stops the instance.
 func (a *application) stop() error {
 	if err := a.stopServer(a.server); err != nil {
-		return err
+		a.logger.Error("Failed to stop server", "err", err)
+		return fmt.Errorf("stop server: %v", err)
 	}
 	if a.loader != nil {
 		if err := a.stopLoader(a.loader); err != nil {
-			return err
+			a.logger.Error("Failed to stop loader", "err", err)
+			return fmt.Errorf("stop loader: %v", err)
 		}
 	}
 	if err := a.stopFetcher(a.fetcher); err != nil {
-		return err
+		a.logger.Error("Failed to stop fetcher", "err", err)
+		return fmt.Errorf("stop fetcher: %v", err)
 	}
 	if err := a.stopStore(a.store); err != nil {
-		return err
+		a.logger.Error("Failed to stop store", "err", err)
+		return fmt.Errorf("stop store: %v", err)
 	}
 
 	return nil
 }
 
-// shutdown stops the application gracefully.
+// shutdown stops the instance gracefully.
 func (a *application) shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	if err := a.shutdownServer(ctx, a.server); err != nil {
-		return err
+		a.logger.Error("Failed to shutdown server", "err", err)
+		return fmt.Errorf("shutdown server: %v", err)
 	}
 	if a.loader != nil {
 		if err := a.stopLoader(a.loader); err != nil {
-			return err
+			a.logger.Error("Failed to stop loader", "err", err)
+			return fmt.Errorf("stop loader: %v", err)
 		}
 	}
 	if err := a.stopFetcher(a.fetcher); err != nil {
-		return err
+		a.logger.Error("Failed to stop fetcher", "err", err)
+		return fmt.Errorf("stop fetcher: %v", err)
 	}
 	if err := a.stopStore(a.store); err != nil {
-		return err
+		a.logger.Error("Failed to stop store", "err", err)
+		return fmt.Errorf("stop store: %v", err)
 	}
 
 	return nil
@@ -218,7 +233,7 @@ func (a *application) reload() error {
 			case "init":
 				exe, err := os.Executable()
 				if err != nil {
-					return err
+					return fmt.Errorf("get executable: %w", err)
 				}
 				env := os.Environ()
 				env = append(env, childEnvKey+"=1")
@@ -230,7 +245,7 @@ func (a *application) reload() error {
 				for _, listener := range a.server.state.listenersMap {
 					descriptor, err := listener.Descriptor()
 					if err != nil {
-						return err
+						return fmt.Errorf("get listener descriptor: %w", err)
 					}
 					files = append(files, descriptor.Files()...)
 				}
@@ -241,7 +256,7 @@ func (a *application) reload() error {
 					Files: files,
 					Sys:   &syscall.SysProcAttr{},
 				}); err != nil {
-					return err
+					return fmt.Errorf("start process: %w", err)
 				}
 
 				a.logger.Info("Child process started, waiting for connection")
@@ -253,7 +268,8 @@ func (a *application) reload() error {
 			}
 
 		case err := <-errCh:
-			return err
+			a.logger.Info("Child error", "err", err)
+			return fmt.Errorf("child: %w", err)
 		}
 	}
 }
@@ -261,7 +277,7 @@ func (a *application) reload() error {
 // checkStore checks the store configuration.
 func (a *application) checkStore(store Store, config map[string]interface{}) error {
 	if err := store.Init(config); err != nil {
-		return err
+		return fmt.Errorf("init store: %w", err)
 	}
 
 	return nil
@@ -270,7 +286,7 @@ func (a *application) checkStore(store Store, config map[string]interface{}) err
 // startStore starts the store.
 func (a *application) startStore(store Store, config map[string]interface{}) error {
 	if err := store.Init(config); err != nil {
-		return err
+		return fmt.Errorf("init store: %w", err)
 	}
 
 	return nil
@@ -284,7 +300,7 @@ func (a *application) stopStore(store Store) error {
 // checkFetcher checks the fetcher configuration.
 func (a *application) checkFetcher(fetcher Fetcher, config map[string]interface{}) error {
 	if err := fetcher.Init(config); err != nil {
-		return err
+		return fmt.Errorf("init fetcher: %w", err)
 	}
 
 	return nil
@@ -293,7 +309,7 @@ func (a *application) checkFetcher(fetcher Fetcher, config map[string]interface{
 // startFetcher starts the fetcher.
 func (a *application) startFetcher(fetcher Fetcher, config map[string]interface{}) error {
 	if err := fetcher.Init(config); err != nil {
-		return err
+		return fmt.Errorf("init fetcher: %w", err)
 	}
 
 	return nil
@@ -307,7 +323,7 @@ func (a *application) stopFetcher(fetcher Fetcher) error {
 // checkLoader checks the loader configuration.
 func (a *application) checkLoader(loader Loader, config map[string]interface{}) error {
 	if err := loader.Init(config); err != nil {
-		return err
+		return fmt.Errorf("init loader: %w", err)
 	}
 
 	return nil
@@ -316,10 +332,10 @@ func (a *application) checkLoader(loader Loader, config map[string]interface{}) 
 // startLoader starts the loader.
 func (a *application) startLoader(loader Loader, config map[string]interface{}) error {
 	if err := loader.Init(config); err != nil {
-		return err
+		return fmt.Errorf("init loader: %w", err)
 	}
 	if err := loader.Start(); err != nil {
-		return err
+		return fmt.Errorf("start loader: %w", err)
 	}
 
 	return nil
@@ -328,7 +344,7 @@ func (a *application) startLoader(loader Loader, config map[string]interface{}) 
 // stopLoader stops the loader.
 func (a *application) stopLoader(loader Loader) error {
 	if err := loader.Stop(); err != nil {
-		return err
+		return fmt.Errorf("stop loader: %w", err)
 	}
 
 	return nil
@@ -337,7 +353,7 @@ func (a *application) stopLoader(loader Loader) error {
 // checkServer checks the server configuration.
 func (a *application) checkServer(server Server, config map[string]interface{}) error {
 	if err := server.Init(config); err != nil {
-		return err
+		return fmt.Errorf("init server: %w", err)
 	}
 
 	return nil
@@ -346,13 +362,13 @@ func (a *application) checkServer(server Server, config map[string]interface{}) 
 // startServer starts the server.
 func (a *application) startServer(server Server, config map[string]interface{}) error {
 	if err := server.Init(config); err != nil {
-		return err
+		return fmt.Errorf("init server: %w", err)
 	}
 	if err := server.Register(a.state.serverListenersDescriptors); err != nil {
-		return err
+		return fmt.Errorf("register server: %w", err)
 	}
 	if err := server.Start(); err != nil {
-		return err
+		return fmt.Errorf("start server: %w", err)
 	}
 
 	return nil
@@ -361,7 +377,7 @@ func (a *application) startServer(server Server, config map[string]interface{}) 
 // stopServer stops the server.
 func (a *application) stopServer(server Server) error {
 	if err := server.Stop(); err != nil {
-		return err
+		return fmt.Errorf("stop server: %w", err)
 	}
 
 	return nil
@@ -370,7 +386,7 @@ func (a *application) stopServer(server Server) error {
 // shutdownServer shutdowns the server gracefully.
 func (a *application) shutdownServer(ctx context.Context, server Server) error {
 	if err := server.Shutdown(ctx); err != nil {
-		return err
+		return fmt.Errorf("shutdown server: %w", err)
 	}
 
 	return nil
@@ -503,14 +519,14 @@ func (a *application) acceptChild(l net.Listener) (net.Conn, error) {
 		return nil, errors.New("accept timeout")
 	}
 
-	return c, err
+	return c, nil
 }
 
 // child connects and send messages to the parent process.
 func (a *application) child() error {
 	c, err := net.Dial("unix", childSocketFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("connect to child: %w", err)
 	}
 	defer c.Close()
 
@@ -531,7 +547,7 @@ func (a *application) child() error {
 	go readResponse()
 
 	if _, err := c.Write([]byte(childMessageHello)); err != nil {
-		return err
+		return fmt.Errorf("send hello message: %w", err)
 	}
 
 	wg.Wait()
@@ -542,7 +558,7 @@ func (a *application) child() error {
 
 	var response childHelloResponse
 	if err := json.Unmarshal(data, &response); err != nil {
-		return err
+		return fmt.Errorf("parse message response: %w", err)
 	}
 
 	var fdsIndex int = 3
@@ -560,7 +576,7 @@ func (a *application) child() error {
 	go readResponse()
 
 	if _, err := c.Write([]byte(childMessageReady)); err != nil {
-		return err
+		return fmt.Errorf("send ready message: %w", err)
 	}
 
 	wg.Wait()

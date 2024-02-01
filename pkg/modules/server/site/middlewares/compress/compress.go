@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -60,11 +61,11 @@ func (m *compressMiddleware) Init(config map[string]interface{}, logger *slog.Lo
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Error("Failed to parse configuration")
-		return err
+		m.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if m.config.Level == nil {
 		defaultValue := compressConfigDefaultLevel
@@ -72,11 +73,11 @@ func (m *compressMiddleware) Init(config map[string]interface{}, logger *slog.Lo
 	}
 	if *m.config.Level < -2 || *m.config.Level > 9 {
 		m.logger.Error("Invalid value", "option", "Level", "value", *m.config.Level)
-		errInit = true
+		errConfig = true
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	m.pool = newGzipPool(&GzipPoolConfig{
@@ -90,7 +91,7 @@ func (m *compressMiddleware) Init(config map[string]interface{}, logger *slog.Lo
 func (m *compressMiddleware) Register(site core.ServerSite) error {
 	err := site.RegisterMiddleware(m.Handler)
 	if err != nil {
-		return err
+		return fmt.Errorf("register middleware: %v", err)
 	}
 
 	return nil
@@ -102,7 +103,8 @@ func (m *compressMiddleware) Start() error {
 }
 
 // Stop stops the middleware.
-func (m *compressMiddleware) Stop() {
+func (m *compressMiddleware) Stop() error {
+	return nil
 }
 
 // Handler implements the middleware handler.
@@ -158,7 +160,12 @@ func (w *compressResponseWriter) Write(b []byte) (int, error) {
 		w.Header().Set(compressHeaderContentType, http.DetectContentType(b))
 	}
 	w.wroteBody = true
-	return w.Writer.Write(b)
+	n, err := w.Writer.Write(b)
+	if err != nil {
+		return n, fmt.Errorf("write: %w", err)
+	}
+
+	return n, nil
 }
 
 // Flush sends the buffered data.
@@ -171,13 +178,20 @@ func (w *compressResponseWriter) Flush() {
 
 // Hijack lets the client take over the connection.
 func (w *compressResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return w.ResponseWriter.(http.Hijacker).Hijack()
+	c, rw, err := w.ResponseWriter.(http.Hijacker).Hijack()
+	if err != nil {
+		return c, rw, fmt.Errorf("hijack: %w", err)
+
+	}
+	return c, rw, nil
 }
 
 // Push initiates an HTTP/2 server push.
 func (w *compressResponseWriter) Push(target string, opts *http.PushOptions) error {
 	if p, ok := w.ResponseWriter.(http.Pusher); ok {
-		return p.Push(target, opts)
+		if err := p.Push(target, opts); err != nil {
+			return fmt.Errorf("push: %w", err)
+		}
 	}
 	return http.ErrNotSupported
 }

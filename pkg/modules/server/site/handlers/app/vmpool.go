@@ -3,7 +3,6 @@ package app
 import (
 	"runtime"
 	"sync"
-	"sync/atomic"
 )
 
 // VMPool
@@ -14,11 +13,8 @@ type VMPool interface {
 
 // vmPool implements a VM pool.
 type vmPool struct {
-	pool        sync.Pool
-	count       int32
-	minSpareVMs int32
-	maxSpareVMs int32
-	vms         chan struct{}
+	pool sync.Pool
+	vms  chan struct{}
 }
 
 // newVMPool creates a new VM pool.
@@ -33,8 +29,7 @@ func newVMPool(max int) *vmPool {
 				return newVM()
 			},
 		},
-		count: 0,
-		vms:   make(chan struct{}, max),
+		vms: make(chan struct{}, max),
 	}
 
 	return p
@@ -44,7 +39,6 @@ func newVMPool(max int) *vmPool {
 func (p *vmPool) Get() VM {
 	p.vms <- struct{}{}
 
-	atomic.AddInt32(&p.count, 1)
 	vm := p.pool.Get().(VM)
 
 	return vm

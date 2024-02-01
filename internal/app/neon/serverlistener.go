@@ -3,6 +3,7 @@ package neon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -57,29 +58,31 @@ func newServerListener(name string) *serverListener {
 
 // Init initializes the listener.
 func (l *serverListener) Init(config map[string]interface{}) error {
+	l.logger.Debug("Initializing listener")
+
 	if config == nil {
-		err := errors.New("missing configuration")
 		l.logger.Error("Missing configuration")
-		return err
+
+		return errors.New("missing configuration")
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if len(config) == 0 {
 		l.logger.Error("Missing listener configuration")
-		errInit = true
+		errConfig = true
 	}
 	for listener, listenerConfig := range config {
 		moduleInfo, err := module.Lookup(module.ModuleID("server.listener." + listener))
 		if err != nil {
 			l.logger.Error("Unregistered module", "module", listener)
-			errInit = true
+			errConfig = true
 			break
 		}
 		module, ok := moduleInfo.NewInstance().(core.ServerListenerModule)
 		if !ok {
 			l.logger.Error("Invalid module", "module", listener)
-			errInit = true
+			errConfig = true
 			break
 		}
 
@@ -89,7 +92,7 @@ func (l *serverListener) Init(config map[string]interface{}) error {
 		}
 		if err := module.Init(moduleConfig, l.logger); err != nil {
 			l.logger.Error("Failed to init module", "module", listener)
-			errInit = true
+			errConfig = true
 			break
 		}
 
@@ -98,8 +101,8 @@ func (l *serverListener) Init(config map[string]interface{}) error {
 		break
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -116,14 +119,14 @@ func (l *serverListener) Register(descriptor ServerListenerDescriptor) error {
 			ln, err := net.FileListener(file)
 			_ = l.osClose(file)
 			if err != nil {
-				return err
+				return fmt.Errorf("create file listener: %w", err)
 			}
-			mediator.listeners = append(mediator.listeners, ln)
+			mediator.descriptors = append(mediator.descriptors, ln)
 		}
 	}
 
 	if err := l.state.listener.Register(mediator); err != nil {
-		return err
+		return fmt.Errorf("register listener: %w", err)
 	}
 
 	l.state.mediator = mediator
@@ -139,7 +142,7 @@ func (l *serverListener) Serve() error {
 	l.logger.Debug("Accepting connections")
 
 	if err := l.state.listener.Serve(l.state.handler); err != nil {
-		return err
+		return fmt.Errorf("serve listener: %w", err)
 	}
 
 	return nil
@@ -150,7 +153,7 @@ func (l *serverListener) Shutdown(ctx context.Context) error {
 	l.logger.Debug("Shutting down listener")
 
 	if err := l.state.listener.Shutdown(ctx); err != nil {
-		return err
+		return fmt.Errorf("shutdown listener: %w", err)
 	}
 
 	return nil
@@ -161,7 +164,7 @@ func (l *serverListener) Close() error {
 	l.logger.Debug("Closing listener")
 
 	if err := l.state.listener.Close(); err != nil {
-		return err
+		return fmt.Errorf("close listener: %w", err)
 	}
 
 	return nil
@@ -196,7 +199,9 @@ func (l *serverListener) Link(site ServerSite) error {
 	l.update <- errChan
 	err := <-errChan
 	if err != nil {
-		return err
+		l.logger.Error("Failed to link site", "err", err)
+
+		return fmt.Errorf("link site: %w", err)
 	}
 
 	return nil
@@ -214,7 +219,9 @@ func (l *serverListener) Unlink(site ServerSite) error {
 	l.update <- errChan
 	err := <-errChan
 	if err != nil {
-		return err
+		l.logger.Error("Failed to unlink site", "err", err)
+
+		return fmt.Errorf("unlink site: %w", err)
 	}
 
 	return nil
@@ -231,8 +238,7 @@ func (l *serverListener) waitForEvents() {
 			l.logger.Debug("New update event received, updating router")
 
 			if err := l.updateRouter(); err != nil {
-				l.logger.Error("Failed to update router", "err", err)
-				errChan <- err
+				errChan <- fmt.Errorf("update router: %w", err)
 			} else {
 				errChan <- nil
 			}
@@ -248,7 +254,7 @@ func (l *serverListener) updateRouter() error {
 	for _, server := range l.state.sites {
 		serverRouter, err := server.Router()
 		if err != nil {
-			return err
+			return fmt.Errorf("get router: %w", err)
 		}
 		serverRouters = append(serverRouters, serverRouter)
 	}
@@ -276,24 +282,24 @@ func (l *serverListener) Descriptor() (ServerListenerDescriptor, error) {
 func (l *serverListener) buildDescriptor() (ServerListenerDescriptor, error) {
 	descriptor := newServerListenerDescriptor()
 
-	for _, listener := range l.state.mediator.listeners {
+	for _, listener := range l.state.mediator.descriptors {
 		switch v := listener.(type) {
 		case *net.TCPListener:
 			file, err := v.File()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("get listener file: %w", err)
 			}
 			descriptor.addFile(file)
 
 		case *net.UnixListener:
 			file, err := v.File()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("get listener file: %w", err)
 			}
 			descriptor.addFile(file)
 
 		default:
-			return nil, errors.New("unsupported listener")
+			return nil, errors.New("invalid listener file")
 		}
 	}
 
@@ -304,9 +310,9 @@ var _ ServerListener = (*serverListener)(nil)
 
 // serverListenerMediator implements the server listener mediator.
 type serverListenerMediator struct {
-	listener  *serverListener
-	listeners []net.Listener
-	mu        sync.RWMutex
+	listener    *serverListener
+	descriptors []net.Listener
+	mu          sync.RWMutex
 }
 
 // newServerListenerMediator creates a new server listener mediator.
@@ -321,12 +327,12 @@ func (m *serverListenerMediator) Name() string {
 	return m.listener.Name()
 }
 
-// Listeners returns the registered listeners.
-func (m *serverListenerMediator) Listeners() []net.Listener {
+// Descriptors returns the listener descriptors.
+func (m *serverListenerMediator) Descriptors() []net.Listener {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return m.listeners
+	return m.descriptors
 }
 
 // RegisterListener registers a listener.
@@ -334,7 +340,7 @@ func (m *serverListenerMediator) RegisterListener(listener net.Listener) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.listeners = append(m.listeners, listener)
+	m.descriptors = append(m.descriptors, listener)
 
 	return nil
 }

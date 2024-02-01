@@ -2,6 +2,7 @@ package rewrite
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -60,28 +61,28 @@ func (m *rewriteMiddleware) Init(config map[string]interface{}, logger *slog.Log
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Error("Failed to parse configuration")
-		return err
+		m.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	for index, rule := range m.config.Rules {
 		if rule.Path == "" {
 			m.logger.Error("Missing option or value", "rule", index+1, "option", "Path")
-			errInit = true
+			errConfig = true
 		} else {
 			re, err := regexp.Compile(rule.Path)
 			if err != nil {
 				m.logger.Error("Invalid regular expression", "rule", index+1, "option", "Path", "value", rule.Path)
-				errInit = true
+				errConfig = true
 			} else {
 				m.regexps = append(m.regexps, re)
 			}
 		}
 		if rule.Replacement == "" {
 			m.logger.Error("Missing option or value", "rule", index+1, "option", "Replacement")
-			errInit = true
+			errConfig = true
 		}
 		if rule.Flag != nil {
 			switch *rule.Flag {
@@ -89,13 +90,13 @@ func (m *rewriteMiddleware) Init(config map[string]interface{}, logger *slog.Log
 			case rewriteRuleFlagRedirect:
 			default:
 				m.logger.Error("Invalid value '%s'", "rule", index+1, "option", "Flag", "value", *rule.Flag)
-				errInit = true
+				errConfig = true
 			}
 		}
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -105,7 +106,7 @@ func (m *rewriteMiddleware) Init(config map[string]interface{}, logger *slog.Log
 func (m *rewriteMiddleware) Register(site core.ServerSite) error {
 	err := site.RegisterMiddleware(m.Handler)
 	if err != nil {
-		return err
+		return fmt.Errorf("register middleware: %v", err)
 	}
 
 	return nil
@@ -117,7 +118,8 @@ func (m *rewriteMiddleware) Start() error {
 }
 
 // Stop stops the middleware.
-func (m *rewriteMiddleware) Stop() {
+func (m *rewriteMiddleware) Stop() error {
+	return nil
 }
 
 // Handler implements the middleware handler.

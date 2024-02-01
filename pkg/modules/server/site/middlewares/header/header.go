@@ -2,6 +2,7 @@ package header
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -55,22 +56,22 @@ func (m *headerMiddleware) Init(config map[string]interface{}, logger *slog.Logg
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Error("Failed to parse configuration")
-		return err
+		m.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	for index, rule := range m.config.Rules {
 		if rule.Path == "" {
 			m.logger.Error("Missing option or value", "rule", index+1, "option", "Path")
-			errInit = true
+			errConfig = true
 			continue
 		}
 		re, err := regexp.Compile(rule.Path)
 		if err != nil {
 			m.logger.Error("Invalid regular expression", "rule", index+1, "option", "Path", "value", rule.Path)
-			errInit = true
+			errConfig = true
 			continue
 		} else {
 			m.regexps = append(m.regexps, re)
@@ -78,14 +79,14 @@ func (m *headerMiddleware) Init(config map[string]interface{}, logger *slog.Logg
 		for key := range rule.Set {
 			if key == "" {
 				m.logger.Error("Invalid key", "rule", index+1, "option", "Set", "value", key)
-				errInit = true
+				errConfig = true
 				continue
 			}
 		}
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -95,7 +96,7 @@ func (m *headerMiddleware) Init(config map[string]interface{}, logger *slog.Logg
 func (m *headerMiddleware) Register(site core.ServerSite) error {
 	err := site.RegisterMiddleware(m.Handler)
 	if err != nil {
-		return err
+		return fmt.Errorf("register middleware: %v", err)
 	}
 
 	return nil
@@ -107,7 +108,8 @@ func (m *headerMiddleware) Start() error {
 }
 
 // Stop stops the middleware.
-func (m *headerMiddleware) Stop() {
+func (m *headerMiddleware) Stop() error {
+	return nil
 }
 
 // Handler implements the middleware handler.

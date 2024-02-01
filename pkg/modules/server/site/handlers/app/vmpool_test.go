@@ -60,10 +60,7 @@ func TestVMPoolGet(t *testing.T) {
 						return newVM()
 					},
 				},
-				count:       0,
-				minSpareVMs: tt.fields.minSpareVMs,
-				maxSpareVMs: tt.fields.maxSpareVMs,
-				vms:         make(chan struct{}, tt.fields.maxVMs),
+				vms: make(chan struct{}, tt.fields.maxVMs),
 			}
 			got := p.Get()
 			if (got == nil) != tt.wantNil {
@@ -107,10 +104,7 @@ func TestVMPoolPut(t *testing.T) {
 						return newVM()
 					},
 				},
-				count:       0,
-				minSpareVMs: tt.fields.minSpareVMs,
-				maxSpareVMs: tt.fields.maxSpareVMs,
-				vms:         make(chan struct{}, 1),
+				vms: make(chan struct{}, 1),
 			}
 			p.vms <- struct{}{}
 			p.Put(tt.args.v)

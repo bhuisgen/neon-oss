@@ -482,8 +482,9 @@ func TestSitemapHandlerStop(t *testing.T) {
 		site                 core.ServerSite
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		{
 			name: "default",
@@ -504,7 +505,9 @@ func TestSitemapHandlerStop(t *testing.T) {
 				muCache:              tt.fields.muCache,
 				site:                 tt.fields.site,
 			}
-			h.Stop()
+			if err := h.Stop(); (err != nil) != tt.wantErr {
+				t.Errorf("sitemapHandler.Stop() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

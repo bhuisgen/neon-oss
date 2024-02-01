@@ -326,59 +326,6 @@ func TestRenderWriterRedirectURL(t *testing.T) {
 	}
 }
 
-func TestRenderWriterLoad(t *testing.T) {
-	type fields struct {
-		buf         *bytes.Buffer
-		header      http.Header
-		statusCode  int
-		redirect    bool
-		redirectURL string
-	}
-	type args struct {
-		r Render
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		{
-			name: "render",
-			args: args{
-				r: &render{
-					body: []byte("test"),
-					header: http.Header{
-						"test": []string{"test"},
-					},
-					statusCode: http.StatusOK,
-				},
-			},
-		},
-		{
-			name: "redirect",
-			args: args{
-				r: &render{
-					statusCode:  http.StatusTemporaryRedirect,
-					redirect:    true,
-					redirectURL: "/redirect",
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := &renderWriter{
-				buf:         tt.fields.buf,
-				header:      tt.fields.header,
-				statusCode:  tt.fields.statusCode,
-				redirect:    tt.fields.redirect,
-				redirectURL: tt.fields.redirectURL,
-			}
-			w.Load(tt.args.r)
-		})
-	}
-}
-
 func TestRenderWriterRender(t *testing.T) {
 	type fields struct {
 		buf         *bytes.Buffer

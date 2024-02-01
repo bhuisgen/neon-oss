@@ -10,13 +10,8 @@ import (
 
 // memoryStorage implements the memory storage.
 type memoryStorage struct {
-	config  *memoryStorageConfig
 	logger  *slog.Logger
 	storage Cache
-}
-
-// memoryStorageConfig implements the memory storage configuration.
-type memoryStorageConfig struct {
 }
 
 const (

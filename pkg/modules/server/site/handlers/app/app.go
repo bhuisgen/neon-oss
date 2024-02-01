@@ -163,51 +163,51 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 	h.logger = logger
 
 	if err := mapstructure.Decode(config, &h.config); err != nil {
-		h.logger.Error("Failed to parse configuration")
-		return err
+		h.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if h.config.Index == "" {
 		h.logger.Error("Missing option or value", "option", "Index")
-		errInit = true
+		errConfig = true
 	} else {
 		f, err := h.osOpenFile(h.config.Index, os.O_RDONLY, 0)
 		if err != nil {
 			h.logger.Error("Failed to open file", "option", "Index", "value", h.config.Index)
-			errInit = true
+			errConfig = true
 		} else {
 			_ = h.osClose(f)
 			fi, err := h.osStat(h.config.Index)
 			if err != nil {
 				h.logger.Error("Failed to stat file", "option", "Index", "value", h.config.Index)
-				errInit = true
+				errConfig = true
 			}
 			if err == nil && fi.IsDir() {
 				h.logger.Error("File is a directory", "option", "Index", "value", h.config.Index)
-				errInit = true
+				errConfig = true
 			}
 		}
 	}
 	if h.config.Bundle == "" {
 		h.logger.Error("Missing option or value", "option", "Bundle")
-		errInit = true
+		errConfig = true
 	} else {
 		f, err := h.osOpenFile(h.config.Bundle, os.O_RDONLY, 0)
 		if err != nil {
 			h.logger.Error("Failed to open file", "option", "Bundle", "value", h.config.Bundle)
-			errInit = true
+			errConfig = true
 		} else {
 			_ = h.osClose(f)
 			fi, err := h.osStat(h.config.Bundle)
 			if err != nil {
 				h.logger.Error("Failed to stat file", "option", "Bundle", "value", h.config.Bundle)
-				errInit = true
+				errConfig = true
 			}
 			if err == nil && fi.IsDir() {
 				h.logger.Error("'File is a directory", "option", "Bundle", "value", h.config.Bundle)
-				errInit = true
+				errConfig = true
 			}
 		}
 	}
@@ -217,7 +217,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 	}
 	if *h.config.Env == "" {
 		h.logger.Error("Invalid value", "option", "Env", "name", *h.config.Env)
-		errInit = true
+		errConfig = true
 	}
 	if h.config.Container == nil {
 		defaultValue := appConfigDefaultContainer
@@ -225,7 +225,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 	}
 	if *h.config.Container == "" {
 		h.logger.Error("Invalid value", "option", "Container", "name", *h.config.Container)
-		errInit = true
+		errConfig = true
 	}
 	if h.config.State == nil {
 		defaultValue := appConfigDefaultState
@@ -233,7 +233,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 	}
 	if *h.config.State == "" {
 		h.logger.Error("Invalid value", "option", "State", "name", *h.config.State)
-		errInit = true
+		errConfig = true
 	}
 	if h.config.Timeout == nil {
 		defaultValue := appConfigDefaultTimeout
@@ -241,7 +241,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 	}
 	if *h.config.Timeout < 0 {
 		h.logger.Error("Invalid value", "option", "Timeout", "name", *h.config.Timeout)
-		errInit = true
+		errConfig = true
 	}
 	if h.config.MaxVMs == nil {
 		defaultValue := runtime.GOMAXPROCS(0)
@@ -249,7 +249,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 	}
 	if *h.config.MaxVMs < 0 {
 		h.logger.Error("Invalid value", "option", "MaxVMs", "name", *h.config.MaxVMs)
-		errInit = true
+		errConfig = true
 	}
 	if h.config.Cache == nil {
 		defaultValue := appConfigDefaultCache
@@ -261,7 +261,7 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 	}
 	if *h.config.CacheTTL < 0 {
 		h.logger.Error("Invalid value", "option", "CacheTTL", "name", *h.config.CacheTTL)
-		errInit = true
+		errConfig = true
 	}
 	if h.config.CacheMaxItems == nil {
 		defaultValue := appConfigDefaultCacheMaxItems
@@ -269,17 +269,17 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 	}
 	if *h.config.CacheMaxItems < 0 {
 		h.logger.Error("Invalid value", "option", "CacheMaxCapacity", "name", *h.config.CacheMaxItems)
-		errInit = true
+		errConfig = true
 	}
 	for index, rule := range h.config.Rules {
 		if rule.Path == "" {
 			h.logger.Error("Missing option or value", "rule", index+1, "option", "Path")
-			errInit = true
+			errConfig = true
 		} else {
 			re, err := regexp.Compile(rule.Path)
 			if err != nil {
 				h.logger.Error("Invalid regular expression", "rule", index+1, "option", "Path", "value", rule.Path)
-				errInit = true
+				errConfig = true
 			} else {
 				h.regexps = append(h.regexps, re)
 			}
@@ -287,17 +287,17 @@ func (h *appHandler) Init(config map[string]interface{}, logger *slog.Logger) er
 		for _, state := range rule.State {
 			if state.Key == "" {
 				h.logger.Error("Missing option or value", "rule", index+1, "option", "Key")
-				errInit = true
+				errConfig = true
 			}
 			if state.Resource == "" {
 				h.logger.Error("Missing option or value", "rule", index+1, "option", "Resource")
-				errInit = true
+				errConfig = true
 			}
 		}
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
@@ -313,7 +313,7 @@ func (h *appHandler) Register(site core.ServerSite) error {
 
 	err := site.RegisterHandler(h)
 	if err != nil {
-		return err
+		return fmt.Errorf("register handler: %v", err)
 	}
 
 	return nil
@@ -323,14 +323,14 @@ func (h *appHandler) Register(site core.ServerSite) error {
 func (h *appHandler) Start() error {
 	err := h.read()
 	if err != nil {
-		return err
+		return fmt.Errorf("read: %v", err)
 	}
 
 	return nil
 }
 
 // Stop stops the handler.
-func (h *appHandler) Stop() {
+func (h *appHandler) Stop() error {
 	h.muIndex.Lock()
 	h.indexInfo = nil
 	h.muIndex.Unlock()
@@ -340,6 +340,8 @@ func (h *appHandler) Stop() {
 	h.muBundle.Unlock()
 
 	h.cache.Clear()
+
+	return nil
 }
 
 // ServeHTTP implements the http handler.
@@ -432,9 +434,8 @@ func (h *appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *appHandler) read() error {
 	htmlInfo, err := h.osStat(h.config.Index)
 	if err != nil {
-		h.logger.Debug("Failed to stat index file", "file", h.config.Index, "err", err)
-
-		return err
+		h.logger.Error("Failed to stat index file", "file", h.config.Index, "err", err)
+		return fmt.Errorf("stat file %s: %v", h.config.Index, err)
 	}
 
 	h.muIndex.RLock()
@@ -443,9 +444,8 @@ func (h *appHandler) read() error {
 
 		buf, err := h.osReadFile(h.config.Index)
 		if err != nil {
-			h.logger.Debug("Failed to read index file", "file", h.config.Index, "err", err)
-
-			return err
+			h.logger.Error("Failed to read index file", "file", h.config.Index, "err", err)
+			return fmt.Errorf("read file %s: %v", h.config.Index, err)
 		}
 
 		h.muIndex.Lock()
@@ -459,9 +459,8 @@ func (h *appHandler) read() error {
 
 	bundleInfo, err := h.osStat(h.config.Bundle)
 	if err != nil {
-		h.logger.Debug("Failed to stat bundle file", "file", h.config.Bundle, "err", err)
-
-		return err
+		h.logger.Error("Failed to stat bundle file", "file", h.config.Bundle, "err", err)
+		return fmt.Errorf("stat file %s: %v", h.config.Bundle, err)
 	}
 
 	h.muBundle.RLock()
@@ -470,9 +469,8 @@ func (h *appHandler) read() error {
 
 		buf, err := h.osReadFile(h.config.Bundle)
 		if err != nil {
-			h.logger.Debug("Failed to read bundle file", "file", h.config.Bundle, "err", err)
-
-			return err
+			h.logger.Error("Failed to read bundle file", "file", h.config.Bundle, "err", err)
+			return fmt.Errorf("read file %s: %v", h.config.Bundle, err)
 		}
 
 		h.muBundle.Lock()
@@ -554,7 +552,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 		if mServerState != nil {
 			buf, err := h.jsonMarshal(mServerState)
 			if err != nil {
-				return err
+				return fmt.Errorf("marshal server state: %v", err)
 			}
 
 			s := string(buf)
@@ -564,7 +562,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 		if mClientState != nil {
 			buf, err := h.jsonMarshal(mClientState)
 			if err != nil {
-				return err
+				return fmt.Errorf("marshal client state: %v", err)
 			}
 
 			s := string(buf)
@@ -586,8 +584,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 	}, slog.New(slog.NewTextHandler(os.Stderr, nil)).With("site", h.site.Name()),
 	); err != nil {
 		h.logger.Debug("Failed to configure VM", "err", err)
-
-		return err
+		return fmt.Errorf("configure VM: %v", err)
 	}
 
 	var err error
@@ -596,8 +593,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 	h.muBundle.RUnlock()
 	if err != nil {
 		h.logger.Debug("Failed to execute VM", "err", err)
-
-		return err
+		return fmt.Errorf("execute VM: %v", err)
 	}
 
 	vmResult = result
@@ -627,9 +623,8 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 	}
 	h.muIndex.RUnlock()
 	if err != nil {
-		h.logger.Debug("Failed to render", "err", err)
-
-		return err
+		h.logger.Debug("Failed to process render", "err", err)
+		return fmt.Errorf("process render: %v", err)
 	}
 
 	return nil
@@ -639,7 +634,7 @@ func (h *appHandler) render(w render.RenderWriter, r *http.Request) error {
 func (h *appHandler) app(w render.RenderWriter, r *http.Request, b io.Reader, state *string, result *vmResult) error {
 	doc, err := html.Parse(b)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse html: %v", err)
 	}
 
 	if result.Render != nil {
@@ -860,7 +855,7 @@ func (h *appHandler) app(w render.RenderWriter, r *http.Request, b io.Reader, st
 
 	err = html.Render(w, doc)
 	if err != nil {
-		return err
+		return fmt.Errorf("render html: %v", err)
 	}
 
 	return nil

@@ -398,8 +398,9 @@ func TestLoggerMiddlewareStop(t *testing.T) {
 		osStat     func(name string) (fs.FileInfo, error)
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		{
 			name: "default",
@@ -418,7 +419,9 @@ func TestLoggerMiddlewareStop(t *testing.T) {
 				osClose:    tt.fields.osClose,
 				osStat:     tt.fields.osStat,
 			}
-			m.Stop()
+			if err := m.Stop(); (err != nil) != tt.wantErr {
+				t.Errorf("loggerMiddleware.Stop() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

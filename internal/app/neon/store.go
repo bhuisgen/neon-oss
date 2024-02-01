@@ -2,6 +2,7 @@ package neon
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -42,6 +43,8 @@ func newStore() *store {
 
 // Init initializes the store.
 func (s *store) Init(config map[string]interface{}) error {
+	s.logger.Debug("Initializing store")
+
 	if config == nil {
 		s.config = &storeConfig{
 			Storage: map[string]map[string]interface{}{
@@ -51,28 +54,28 @@ func (s *store) Init(config map[string]interface{}) error {
 	} else {
 		if err := mapstructure.Decode(config, &s.config); err != nil {
 			s.logger.Error("Failed to parse configuration", "err", err)
-			return err
+			return fmt.Errorf("parse config: %w", err)
 		}
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if len(s.config.Storage) == 0 {
 		s.logger.Error("No storage defined")
-		errInit = true
+		errConfig = true
 	}
 	for storage, storageConfig := range s.config.Storage {
 		moduleInfo, err := module.Lookup(module.ModuleID("store.storage." + storage))
 		if err != nil {
 			s.logger.Error("Unregistered storage module", "module", storage, "err", err)
-			errInit = true
+			errConfig = true
 			break
 		}
 		module, ok := moduleInfo.NewInstance().(core.StoreStorageModule)
 		if !ok {
 			err := errors.New("module instance not valid")
 			s.logger.Error("Invalid storage module", "module", storage, "err", err)
-			errInit = true
+			errConfig = true
 			break
 		}
 
@@ -84,7 +87,7 @@ func (s *store) Init(config map[string]interface{}) error {
 			slog.New(NewLogHandler(os.Stderr, storeLogger, nil)).With("storage", storage),
 		); err != nil {
 			s.logger.Error("Failed to init storage module", "module", storage, "err", err)
-			errInit = true
+			errConfig = true
 			break
 		}
 
@@ -93,8 +96,8 @@ func (s *store) Init(config map[string]interface{}) error {
 		break
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -102,9 +105,11 @@ func (s *store) Init(config map[string]interface{}) error {
 
 // LoadResource loads a resource.
 func (s *store) LoadResource(name string) (*core.Resource, error) {
+	s.logger.Debug("Loading resource", "name", name)
+
 	resource, err := s.state.storage.LoadResource(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load resource: %w", err)
 	}
 
 	return resource, nil
@@ -112,8 +117,10 @@ func (s *store) LoadResource(name string) (*core.Resource, error) {
 
 // StoreResource stores a resource.
 func (s *store) StoreResource(name string, resource *core.Resource) error {
+	s.logger.Debug("Storing resource", "name", name)
+
 	if err := s.state.storage.StoreResource(name, resource); err != nil {
-		return err
+		return fmt.Errorf("store resource: %w", err)
 	}
 
 	return nil

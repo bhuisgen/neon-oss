@@ -54,22 +54,23 @@ func newServer(store Store, fetcher Fetcher, loader Loader) *server {
 
 // Init initializes the server.
 func (s *server) Init(config map[string]interface{}) error {
+	s.logger.Debug("Initializing server")
+
 	if config == nil {
-		err := errors.New("missing configuration")
 		s.logger.Error("Missing configuration")
-		return err
+		return errors.New("missing configuration")
 	}
 
 	if err := mapstructure.Decode(config, &s.config); err != nil {
 		s.logger.Error("Failed to parse configuration", "err", err)
-		return err
+		return fmt.Errorf("parse config: %w", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if len(s.config.Listeners) == 0 {
 		s.logger.Error("No listener defined")
-		errInit = true
+		errConfig = true
 	}
 	for listenerName, listenerConfig := range s.config.Listeners {
 		listener := newServerListener(listenerName)
@@ -81,7 +82,7 @@ func (s *server) Init(config map[string]interface{}) error {
 			listenerConfig,
 		); err != nil {
 			s.logger.Error("Failed to init listener", "name", listenerName, "err", err)
-			errInit = true
+			errConfig = true
 			continue
 		}
 
@@ -90,7 +91,7 @@ func (s *server) Init(config map[string]interface{}) error {
 
 	if len(s.config.Sites) == 0 {
 		s.logger.Error("No site defined")
-		errInit = true
+		errConfig = true
 	}
 	var defaultSiteName string
 	for siteName, siteConfig := range s.config.Sites {
@@ -104,21 +105,21 @@ func (s *server) Init(config map[string]interface{}) error {
 			siteConfig,
 		); err != nil {
 			s.logger.Error("Failed to init site", "site", siteName, "err", err)
-			errInit = true
+			errConfig = true
 			continue
 		}
 		if site.Default() && defaultSiteName != "" {
 			err := fmt.Errorf("default site already defined (%s)", defaultSiteName)
 			s.logger.Error("Failed to init site", "site", siteName, "err", err)
-			errInit = true
+			errConfig = true
 		}
 		defaultSiteName = site.Name()
 
 		s.state.sitesMap[siteName] = site
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -130,13 +131,13 @@ func (s *server) Register(descriptors map[string]ServerListenerDescriptor) error
 
 	for listenerName, listener := range s.state.listenersMap {
 		if err := listener.Register(descriptors[listenerName]); err != nil {
-			return err
+			return fmt.Errorf("register listener: %w", err)
 		}
 	}
 
 	for _, site := range s.state.sitesMap {
 		if err := site.Register(); err != nil {
-			return err
+			return fmt.Errorf("register site: %w", err)
 		}
 	}
 
@@ -149,18 +150,18 @@ func (s *server) Start() error {
 
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Serve(); err != nil {
-			return err
+			return fmt.Errorf("serve listener: %w", err)
 		}
 	}
 
 	for _, site := range s.state.sitesMap {
 		if err := site.Start(); err != nil {
-			return err
+			return fmt.Errorf("start site: %w", err)
 		}
 
 		for listenerName, listener := range s.state.listenersMap {
 			if err := listener.Link(site); err != nil {
-				return err
+				return fmt.Errorf("link site: %w", err)
 			}
 			s.state.sitesListeners[site.Name()] = append(s.state.sitesListeners[site.Name()],
 				s.state.listenersMap[listenerName])
@@ -176,13 +177,13 @@ func (s *server) Stop() error {
 
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Close(); err != nil {
-			return err
+			return fmt.Errorf("close listener: %w", err)
 		}
 	}
 
 	for _, site := range s.state.sitesMap {
 		if err := site.Stop(); err != nil {
-			return err
+			return fmt.Errorf("stop site: %w", err)
 		}
 	}
 
@@ -195,7 +196,7 @@ func (s *server) Shutdown(ctx context.Context) error {
 
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Shutdown(ctx); err != nil {
-			return err
+			return fmt.Errorf("shutdown listener: %w", err)
 		}
 	}
 
@@ -207,7 +208,7 @@ func (s *server) Shutdown(ctx context.Context) error {
 		}
 		for _, listener := range listeners {
 			if err := listener.Unlink(site); err != nil {
-				return err
+				return fmt.Errorf("unlink listener: %w", err)
 			}
 		}
 		delete(s.state.sitesListeners, site.Name())
@@ -215,16 +216,16 @@ func (s *server) Shutdown(ctx context.Context) error {
 
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Close(); err != nil {
-			return err
+			return fmt.Errorf("close listener: %w", err)
 		}
 		if err := listener.Remove(); err != nil {
-			return err
+			return fmt.Errorf("remove listener: %w", err)
 		}
 	}
 
 	for _, site := range s.state.sitesMap {
 		if err := site.Stop(); err != nil {
-			return err
+			return fmt.Errorf("stop site: %w", err)
 		}
 	}
 

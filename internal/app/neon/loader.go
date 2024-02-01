@@ -3,6 +3,7 @@ package neon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -68,16 +69,18 @@ func newLoader(store Store, fetcher Fetcher) *loader {
 
 // Init initializes the loader.
 func (l *loader) Init(config map[string]interface{}) error {
+	l.logger.Debug("Initializing loader")
+
 	if config == nil {
 		l.config = &loaderConfig{}
 	} else {
 		if err := mapstructure.Decode(config, &l.config); err != nil {
 			l.logger.Error("Failed to parse configuration", "err", err)
-			return err
+			return fmt.Errorf("parse config: %w", err)
 		}
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if l.config.ExecStartup == nil {
 		defaultValue := loaderConfigDefaultExecStartup
@@ -85,7 +88,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 	}
 	if *l.config.ExecStartup < 0 {
 		l.logger.Error("Invalid value", "option", "ExecStartup", "value", *l.config.ExecStartup)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.ExecInterval == nil {
 		defaultValue := loaderConfigDefaultExecInterval
@@ -93,7 +96,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 	}
 	if *l.config.ExecInterval < 0 {
 		l.logger.Error("Invalid value", "option", "ExecInterval", "value", *l.config.ExecInterval)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.ExecFailsafeInterval == nil {
 		defaultValue := loaderConfigDefaultExecFailsafeInterval
@@ -101,7 +104,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 	}
 	if *l.config.ExecFailsafeInterval < 0 {
 		l.logger.Error("Invalid value", "option", "ExecFailsafeInterval", "value", *l.config.ExecFailsafeInterval)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.ExecWorkers == nil {
 		defaultValue := loaderConfigDefaultExecWorkers
@@ -109,7 +112,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 	}
 	if *l.config.ExecWorkers <= 0 {
 		l.logger.Error("Invalid value", "option", "ExecWorkers", "value", *l.config.ExecWorkers)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.ExecMaxOps == nil {
 		defaultValue := loaderConfigDefaultExecMaxOps
@@ -117,7 +120,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 	}
 	if *l.config.ExecMaxOps < 0 {
 		l.logger.Error("Invalid value", "option", "ExecMaxOps", "value", *l.config.ExecMaxOps)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.ExecMaxDelay == nil {
 		defaultValue := loaderConfigDefaultExecMaxDelay
@@ -125,7 +128,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 	}
 	if *l.config.ExecMaxDelay < 0 {
 		l.logger.Error("Invalid value", "option", "ExecMaxDelay", "value", *l.config.ExecMaxDelay)
-		errInit = true
+		errConfig = true
 	}
 
 	for ruleName, ruleConfig := range l.config.Rules {
@@ -133,14 +136,14 @@ func (l *loader) Init(config map[string]interface{}) error {
 			moduleInfo, err := module.Lookup(module.ModuleID("loader.parser." + moduleName))
 			if err != nil {
 				l.logger.Error("Unregistered parser module", "rule", ruleName, "module", moduleName, "err", err)
-				errInit = true
+				errConfig = true
 				continue
 			}
 			module, ok := moduleInfo.NewInstance().(core.LoaderParserModule)
 			if !ok {
 				err := errors.New("module instance not valid")
 				l.logger.Error("Invalid parser module", "rule", ruleName, "module", moduleName, "err", err)
-				errInit = true
+				errConfig = true
 				continue
 			}
 
@@ -152,7 +155,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 				slog.New(NewLogHandler(os.Stderr, loaderLogger, nil)).With("parser", moduleName),
 			); err != nil {
 				l.logger.Error("Failed to init parser module", "rule", ruleName, "module", moduleName, "err", err)
-				errInit = true
+				errConfig = true
 				continue
 			}
 
@@ -162,8 +165,8 @@ func (l *loader) Init(config map[string]interface{}) error {
 		}
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -171,10 +174,10 @@ func (l *loader) Init(config map[string]interface{}) error {
 
 // Start starts the loader.
 func (l *loader) Start() error {
+	l.logger.Info("Starting loader")
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	l.logger.Info("Starting loader")
 
 	if *l.config.ExecStartup == 0 && *l.config.ExecInterval == 0 {
 		l.logger.Warn("Execution disabled")
@@ -195,10 +198,10 @@ func (l *loader) Start() error {
 
 // Stop stops the loader.
 func (l *loader) Stop() error {
+	l.logger.Info("Stopping loader")
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	l.logger.Info("Stopping loader")
 
 	if *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
 		l.stop <- struct{}{}
@@ -244,9 +247,14 @@ func (l *loader) execute(stop <-chan struct{}) {
 		for {
 			select {
 			case <-stop:
+				l.logger.Debug("New stop event received, exiting")
 				break loop
 
 			case <-ticker.C:
+				startTime := time.Now()
+
+				l.logger.Debug("Starting new execution")
+
 				if startup {
 					startup = false
 					if *l.config.ExecInterval > 0 {
@@ -255,8 +263,6 @@ func (l *loader) execute(stop <-chan struct{}) {
 						ticker.Stop()
 					}
 				}
-
-				l.logger.Info("Starting execution")
 
 				rulesCount := len(l.config.Rules)
 				jobs := make(chan string, rulesCount)
@@ -301,7 +307,8 @@ func (l *loader) execute(stop <-chan struct{}) {
 					}
 				}
 
-				l.logger.Info("Execution finished", "success", success, "failure", failure, "total", rulesCount)
+				l.logger.Info("Execution done", "duration", time.Since(startTime).Round(time.Second),
+					"success", success, "failure", failure, "total", rulesCount)
 
 				if failure > 0 && !l.state.failsafe && *l.config.ExecFailsafeInterval > 0 {
 					l.logger.Warn("Last execution failed, enabling failsafe mode")

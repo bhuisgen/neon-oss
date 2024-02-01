@@ -46,12 +46,10 @@ func (c *serveCommand) Description() string {
 func (c *serveCommand) Parse(args []string) error {
 	err := c.flagset.Parse(args)
 	if err != nil {
-		return err
+		return errors.New("parse arguments")
 	}
-
 	if len(c.flagset.Args()) > 0 {
-		fmt.Println("The command accepts no arguments")
-		return errors.New("invalid arguments")
+		return errors.New("check arguments")
 	}
 
 	return nil
@@ -61,14 +59,13 @@ func (c *serveCommand) Parse(args []string) error {
 func (c *serveCommand) Execute() error {
 	config, err := neon.LoadConfig()
 	if err != nil {
-		fmt.Printf("Failed to load configuration: %s\n", err)
-		return err
+		fmt.Printf("Failed to load configuration: %v\n", err)
+		return fmt.Errorf("load config: %v", err)
 	}
 
 	err = neon.NewApplication(config).Serve()
 	if err != nil {
-		fmt.Printf("Failed to run instance: %s\n", err)
-		return err
+		return fmt.Errorf("serve: %v", err)
 	}
 
 	return nil

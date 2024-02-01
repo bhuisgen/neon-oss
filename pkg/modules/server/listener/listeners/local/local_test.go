@@ -28,7 +28,7 @@ func (l testLocalListener) Name() string {
 	return "test"
 }
 
-func (l testLocalListener) Listeners() []net.Listener {
+func (l testLocalListener) Descriptors() []net.Listener {
 	return nil
 }
 

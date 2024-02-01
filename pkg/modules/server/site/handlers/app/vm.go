@@ -65,10 +65,6 @@ type vmData struct {
 	scripts        *domElementList
 }
 
-const (
-	vmLogger string = "vm"
-)
-
 // vmV8NewFunctionTemplate redirects to v8go.NewFunctionTemplate.
 func vmV8NewFunctionTemplate(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate {
 	return v8go.NewFunctionTemplate(isolate, callback)
@@ -115,57 +111,57 @@ func (v *vm) Reset() {
 func (v *vm) Configure(config *vmConfig, logger *slog.Logger) error {
 	if v.status == vmStatusNew {
 		if err := api(v); err != nil {
-			return vmErrConfigure
+			return errVMConfigure
 		}
 	}
 
 	process, err := v.v8ObjectTemplateNewInstance(v.processObject, v.context)
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	env, err := v.v8ObjectTemplateNewInstance(v.envObject, v.context)
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	server, err := v.v8ObjectTemplateNewInstance(v.serverObject, v.context)
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	serverHandler, err := v.v8ObjectTemplateNewInstance(v.serverHandlerObject, v.context)
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	serverRequest, err := v.v8ObjectTemplateNewInstance(v.serverRequestObject, v.context)
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	serverResponse, err := v.v8ObjectTemplateNewInstance(v.serverResponseObject, v.context)
 	if err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	if err := env.Set("ENV", config.Env); err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	if err := process.Set("env", env); err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	if err := server.Set("handler", serverHandler); err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	if err := server.Set("request", serverRequest); err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	if err := server.Set("response", serverResponse); err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	global := v.context.Global()
 	if err := global.Set("process", process); err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 	if err := global.Set("server", server); err != nil {
-		return vmErrConfigure
+		return errVMConfigure
 	}
 
 	v.status = vmStatusConfigured
@@ -201,12 +197,12 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 		if errors.As(err, &jsError) {
 			v.logger.Debug("Failed to execute script", "name", name, "stackTrace", fmt.Sprintf("%+v", jsError))
 		}
-		return nil, vmErrExecute
+		return nil, errVMExecute
 
 	case <-time.After(timeout):
 		v.isolate.TerminateExecution()
 		<-errs
-		return nil, vmErrExecutionTimeout
+		return nil, errVMExecutionTimeout
 	}
 
 	return newVMResult(v.data), nil
@@ -238,9 +234,9 @@ func (e vmError) Error() string {
 }
 
 var (
-	vmErrConfigure        = newVMError("configuration error")
-	vmErrExecute          = newVMError("execution error")
-	vmErrExecutionTimeout = newVMError("execution timeout")
+	errVMConfigure        = newVMError("configuration error")
+	errVMExecute          = newVMError("execution error")
+	errVMExecutionTimeout = newVMError("execution timeout")
 )
 
 var _ error = (*vmError)(nil)

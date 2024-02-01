@@ -3,6 +3,7 @@ package robots
 import (
 	_ "embed"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -80,16 +81,16 @@ func (h *robotsHandler) Init(config map[string]interface{}, logger *slog.Logger)
 	h.logger = logger
 
 	if err := mapstructure.Decode(config, &h.config); err != nil {
-		h.logger.Error("Failed to parse configuration")
-		return err
+		h.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	for _, item := range h.config.Hosts {
 		if item == "" {
 			h.logger.Error("Mmissing option or value", "option", "Hosts")
-			errInit = true
+			errConfig = true
 		}
 	}
 	if h.config.Cache == nil {
@@ -102,23 +103,23 @@ func (h *robotsHandler) Init(config map[string]interface{}, logger *slog.Logger)
 	}
 	if *h.config.CacheTTL < 0 {
 		h.logger.Error("Invalid value", "option", "CacheTTL", "value", *h.config.CacheTTL)
-		errInit = true
+		errConfig = true
 	}
 	for _, item := range h.config.Sitemaps {
 		if item == "" {
 			h.logger.Error("Invalid value", "option", "Sitemaps", "value", item)
-			errInit = true
+			errConfig = true
 		}
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	var err error
 	h.template, err = template.New("robots").Parse(robotsTemplate)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse template: %v", err)
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
@@ -130,7 +131,7 @@ func (h *robotsHandler) Init(config map[string]interface{}, logger *slog.Logger)
 func (h *robotsHandler) Register(site core.ServerSite) error {
 	err := site.RegisterHandler(h)
 	if err != nil {
-		return err
+		return fmt.Errorf("register handler: %v", err)
 	}
 
 	return nil
@@ -142,10 +143,12 @@ func (h *robotsHandler) Start() error {
 }
 
 // Stop stops the handler.
-func (h *robotsHandler) Stop() {
+func (h *robotsHandler) Stop() error {
 	h.muCache.Lock()
 	h.cache = nil
 	h.muCache.Unlock()
+
+	return nil
 }
 
 // ServeHTTP implements the http handler.
@@ -159,7 +162,6 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(render.StatusCode())
 			if _, err := w.Write(render.Body()); err != nil {
 				h.logger.Error("Failed to write render", "err", err)
-
 				return
 			}
 
@@ -197,7 +199,6 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(render.StatusCode())
 	if _, err := w.Write(render.Body()); err != nil {
 		h.logger.Error("Failed to write render", "err", err)
-
 		return
 	}
 
@@ -220,8 +221,8 @@ func (h *robotsHandler) render(w render.RenderWriter, r *http.Request) error {
 		Sitemaps: h.config.Sitemaps,
 	})
 	if err != nil {
-		h.logger.Debug("Failed to render template", "err", err)
-		return err
+		h.logger.Error("Failed to execute template", "err", err)
+		return fmt.Errorf("execute template: %v", err)
 	}
 
 	return nil

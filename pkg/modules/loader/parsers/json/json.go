@@ -62,27 +62,27 @@ func (p *jsonParser) Init(config map[string]interface{}, logger *slog.Logger) er
 	p.logger = logger
 
 	if err := mapstructure.Decode(config, &p.config); err != nil {
-		p.logger.Error("Failed to parse configuration")
-		return err
+		p.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if p.config.Resource == nil {
 		p.logger.Error("Invalid value", "option", "Resource", "value", p.config.Resource)
-		errInit = true
+		errConfig = true
 	}
 	if p.config.Filter == "" {
 		p.logger.Error("Invalid value", "option", "Filter", "value", p.config.Filter)
-		errInit = true
+		errConfig = true
 	}
 	if p.config.ItemResource == nil {
 		p.logger.Error("Invalid value", "option", "ItemResource", "value", p.config.ItemResource)
-		errInit = true
+		errConfig = true
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -96,43 +96,43 @@ func (p *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 		break
 	}
 	if resourceName == "" {
-		return errors.New("failed to parse resource name")
+		return errors.New("invalid resource name")
 	}
 	for k := range p.config.Resource[resourceName] {
 		resourceProvider = k
 		break
 	}
 	if resourceProvider == "" {
-		return errors.New("failed to parse resource provider")
+		return errors.New("invalid resource provider")
 	}
 
 	var resourceConfig map[string]interface{}
 	resourceConfig, _ = p.config.Resource[resourceName][resourceProvider].(map[string]interface{})
 	resource, err := fetcher.Fetch(ctx, resourceName, resourceProvider, resourceConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetch resource %s: %v", resourceName, err)
 	}
 
 	for _, data := range resource.Data {
 		var jsonData interface{}
 		err = p.jsonUnmarshal(data, &jsonData)
 		if err != nil {
-			return err
+			return fmt.Errorf("parse resource %s data: %v", resourceName, err)
 		}
 		result, err := jsonpath.Get(p.config.Filter, jsonData)
 		if err != nil {
-			return err
+			return fmt.Errorf("filter resource %s data: %v", resourceName, err)
 		}
 		switch v := result.(type) {
 		case []interface{}:
 			for _, item := range v {
 				mItem, ok := item.(map[string]interface{})
 				if !ok {
-					return errors.New("failed to parse item")
+					return fmt.Errorf("parse resource %s item: %v", resourceName, err)
 				}
 				err := p.executeResourceFromItem(ctx, store, fetcher, mItem)
 				if err != nil {
-					return err
+					return fmt.Errorf("execute resource %s subresource: %v", resourceName, err)
 				}
 			}
 		}
@@ -140,7 +140,7 @@ func (p *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 
 	err = store.StoreResource(resourceName, resource)
 	if err != nil {
-		return err
+		return fmt.Errorf("store resource %s: %v", resourceName, err)
 	}
 
 	return nil
@@ -153,6 +153,7 @@ func (p *jsonParser) executeResourceFromItem(ctx context.Context, store core.Sto
 	for k, v := range p.config.ItemParams {
 		data, err := jsonpath.Get(v, item)
 		if err != nil || data == nil {
+			p.logger.Warn("Failed to extract parameter from item", "name", k)
 			continue
 		}
 		if params == nil {
@@ -168,14 +169,14 @@ func (p *jsonParser) executeResourceFromItem(ctx context.Context, store core.Sto
 		break
 	}
 	if itemResourceName == "" {
-		return errors.New("failed to parse item resource name")
+		return errors.New("invalid item resource name")
 	}
 	for k := range p.config.ItemResource[itemResourceName] {
 		itemResourceProvider = k
 		break
 	}
 	if itemResourceProvider == "" {
-		return errors.New("failed to parse item resource provider")
+		return errors.New("invalid item resource provider")
 	}
 	itemResourceConfig, _ = p.config.ItemResource[itemResourceName][itemResourceProvider].(map[string]interface{})
 
@@ -185,12 +186,12 @@ func (p *jsonParser) executeResourceFromItem(ctx context.Context, store core.Sto
 
 	resource, err := fetcher.Fetch(ctx, itemResourceName, itemResourceProvider, itemResourceConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetch item resource: %v", err)
 	}
 
 	err = store.StoreResource(itemResourceName, resource)
 	if err != nil {
-		return err
+		return fmt.Errorf("store item resource: %v", err)
 	}
 
 	return nil

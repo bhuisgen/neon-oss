@@ -121,10 +121,14 @@ func (h *LogHandler) Handle(ctx context.Context, r slog.Record) error {
 		return true
 	})
 	buf = append(buf, '\n')
+
 	h.mu.Lock()
-	_, err := h.w.Write(buf)
-	h.mu.Unlock()
-	return err
+	defer h.mu.Unlock()
+	if _, err := h.w.Write(buf); err != nil {
+		return fmt.Errorf("write record: %w", err)
+	}
+
+	return nil
 }
 
 // withGroupOrAttrs creates a new handler with the given group or attributes.

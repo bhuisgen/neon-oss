@@ -511,8 +511,9 @@ func TestFileHandlerStop(t *testing.T) {
 		osStat     func(name string) (fs.FileInfo, error)
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		{
 			name: "default",
@@ -538,7 +539,9 @@ func TestFileHandlerStop(t *testing.T) {
 				osClose:    tt.fields.osClose,
 				osStat:     tt.fields.osStat,
 			}
-			h.Stop()
+			if err := h.Stop(); (err != nil) != tt.wantErr {
+				t.Errorf("fileHandler.Stop() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

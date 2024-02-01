@@ -61,7 +61,6 @@ var _ Cache = (*testMemoryStorageCache)(nil)
 
 func TestMemoryStorageModuleInfo(t *testing.T) {
 	type fields struct {
-		config  *memoryStorageConfig
 		logger  *slog.Logger
 		storage Cache
 	}
@@ -81,7 +80,6 @@ func TestMemoryStorageModuleInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := memoryStorage{
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				storage: tt.fields.storage,
 			}
@@ -98,7 +96,6 @@ func TestMemoryStorageModuleInfo(t *testing.T) {
 
 func TestMemoryStorageInit(t *testing.T) {
 	type fields struct {
-		config  *memoryStorageConfig
 		logger  *slog.Logger
 		storage Cache
 	}
@@ -120,7 +117,6 @@ func TestMemoryStorageInit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &memoryStorage{
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				storage: tt.fields.storage,
 			}
@@ -134,7 +130,6 @@ func TestMemoryStorageInit(t *testing.T) {
 
 func TestMemoryStorageLoadResource(t *testing.T) {
 	type fields struct {
-		config  *memoryStorageConfig
 		logger  *slog.Logger
 		storage Cache
 	}
@@ -151,7 +146,6 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				config:  &memoryStorageConfig{},
 				storage: testMemoryStorageCache{},
 			},
 			args: args{
@@ -161,7 +155,6 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 		{
 			name: "invalid resource name",
 			fields: fields{
-				config: &memoryStorageConfig{},
 				storage: testMemoryStorageCache{
 					errGet: true,
 				},
@@ -175,7 +168,6 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &memoryStorage{
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				storage: tt.fields.storage,
 			}
@@ -190,7 +182,6 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 
 func TestMemoryStorageStoreResource(t *testing.T) {
 	type fields struct {
-		config  *memoryStorageConfig
 		logger  *slog.Logger
 		storage Cache
 	}
@@ -207,7 +198,6 @@ func TestMemoryStorageStoreResource(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
-				config:  &memoryStorageConfig{},
 				storage: testMemoryStorageCache{},
 			},
 			args: args{
@@ -222,7 +212,6 @@ func TestMemoryStorageStoreResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &memoryStorage{
-				config:  tt.fields.config,
 				logger:  tt.fields.logger,
 				storage: tt.fields.storage,
 			}

@@ -2,6 +2,7 @@ package static
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -78,30 +79,30 @@ func (m *staticMiddleware) Init(config map[string]interface{}, logger *slog.Logg
 	m.logger = logger
 
 	if err := mapstructure.Decode(config, &m.config); err != nil {
-		m.logger.Error("Failed to parse configuration")
-		return err
+		m.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if m.config.Path == "" {
 		m.logger.Error("Missing option or value", "option", "Path")
-		errInit = true
+		errConfig = true
 	} else {
 		f, err := m.osOpenFile(m.config.Path, os.O_RDONLY, 0)
 		if err != nil {
 			m.logger.Error("Failed to open file", "option", "Path", "value", m.config.Path)
-			errInit = true
+			errConfig = true
 		} else {
 			_ = m.osClose(f)
 			fi, err := m.osStat(m.config.Path)
 			if err != nil {
 				m.logger.Error("Failed to stat file", "option", "Path", "value", m.config.Path)
-				errInit = true
+				errConfig = true
 			}
 			if err == nil && !fi.IsDir() {
 				m.logger.Error("File is not a directory", "option", "Path", "value", m.config.Path)
-				errInit = true
+				errConfig = true
 			}
 		}
 	}
@@ -110,8 +111,8 @@ func (m *staticMiddleware) Init(config map[string]interface{}, logger *slog.Logg
 		m.config.Index = &defaultValue
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -121,7 +122,7 @@ func (m *staticMiddleware) Init(config map[string]interface{}, logger *slog.Logg
 func (m *staticMiddleware) Register(site core.ServerSite) error {
 	err := site.RegisterMiddleware(m.Handler)
 	if err != nil {
-		return err
+		return fmt.Errorf("register middleware: %v", err)
 	}
 
 	return nil
@@ -131,7 +132,7 @@ func (m *staticMiddleware) Register(site core.ServerSite) error {
 func (m *staticMiddleware) Start() error {
 	path, err := filepath.Abs(m.config.Path)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve absolute path: %v", err)
 	}
 
 	m.staticFS = &staticFileSystem{
@@ -146,7 +147,8 @@ func (m *staticMiddleware) Start() error {
 }
 
 // Stop stops the middleware.
-func (m *staticMiddleware) Stop() {
+func (m *staticMiddleware) Stop() error {
+	return nil
 }
 
 // Handler implements the middleware handler.

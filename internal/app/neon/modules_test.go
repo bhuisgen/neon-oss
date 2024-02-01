@@ -191,6 +191,7 @@ type testServerSiteMiddlewareModule struct {
 	errInit     bool
 	errRegister bool
 	errStart    bool
+	errStop     bool
 }
 
 const (
@@ -227,7 +228,11 @@ func (m testServerSiteMiddlewareModule) Start() error {
 	return nil
 }
 
-func (m testServerSiteMiddlewareModule) Stop() {
+func (m testServerSiteMiddlewareModule) Stop() error {
+	if m.errStop {
+		return errors.New("test error")
+	}
+	return nil
 }
 
 var _ core.ServerSiteHandlerModule = (*testServerSiteMiddlewareModule)(nil)
@@ -236,6 +241,7 @@ type testServerSiteHandlerModule struct {
 	errInit     bool
 	errRegister bool
 	errStart    bool
+	errStop     bool
 }
 
 const (
@@ -272,7 +278,11 @@ func (m testServerSiteHandlerModule) Start() error {
 	return nil
 }
 
-func (m testServerSiteHandlerModule) Stop() {
+func (m testServerSiteHandlerModule) Stop() error {
+	if m.errStop {
+		return errors.New("test error")
+	}
+	return nil
 }
 
 var _ core.ServerSiteHandlerModule = (*testServerSiteHandlerModule)(nil)

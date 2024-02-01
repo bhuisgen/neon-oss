@@ -50,12 +50,10 @@ func (c *initCommand) Description() string {
 func (c *initCommand) Parse(args []string) error {
 	err := c.flagset.Parse(args)
 	if err != nil {
-		return err
+		return errors.New("parse arguments")
 	}
-
 	if len(c.flagset.Args()) > 0 {
-		fmt.Println("The command accepts no arguments")
-		return errors.New("invalid arguments")
+		return errors.New("check arguments")
 	}
 
 	return nil
@@ -65,8 +63,7 @@ func (c *initCommand) Parse(args []string) error {
 func (c *initCommand) Execute() error {
 	err := neon.GenerateConfig(c.syntax, c.template)
 	if err != nil {
-		fmt.Printf("Failed to init: %s\n", err)
-		return err
+		return fmt.Errorf("generate config: %v", err)
 	}
 
 	return nil

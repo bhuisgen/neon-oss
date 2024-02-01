@@ -2,9 +2,11 @@ package render
 
 import "sync"
 
-// RenderWriterPool
+// RenderWriterPool is the interface of a render writer pool.
 type RenderWriterPool interface {
+	// Get selects a render writer from the pool.
 	Get() RenderWriter
+	// Put adds a render writer to the pool.
 	Put(w RenderWriter)
 }
 

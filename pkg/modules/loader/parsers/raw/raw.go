@@ -3,6 +3,7 @@ package raw
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/mitchellh/mapstructure"
@@ -46,19 +47,19 @@ func (p *rawParser) Init(config map[string]interface{}, logger *slog.Logger) err
 	p.logger = logger
 
 	if err := mapstructure.Decode(config, &p.config); err != nil {
-		p.logger.Error("Failed to parse configuration")
-		return err
+		p.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if p.config.Resource == nil {
 		p.logger.Error("Invalid value", "option", "Resource", "value", p.config.Resource)
-		errInit = true
+		errConfig = true
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -73,25 +74,25 @@ func (p *rawParser) Parse(ctx context.Context, store core.Store, fetcher core.Fe
 		break
 	}
 	if resourceName == "" {
-		return errors.New("failed to parse resource name")
+		return errors.New("invalid resource name")
 	}
 	for k := range p.config.Resource[resourceName] {
 		resourceProvider = k
 		break
 	}
 	if resourceProvider == "" {
-		return errors.New("failed to parse resource provider")
+		return errors.New("invalid resource provider")
 	}
 	resourceConfig, _ = p.config.Resource[resourceName][resourceProvider].(map[string]interface{})
 
 	resource, err := fetcher.Fetch(ctx, resourceName, resourceProvider, resourceConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetch resource %s: %v", resourceName, err)
 	}
 
 	err = store.StoreResource(resourceName, resource)
 	if err != nil {
-		return err
+		return fmt.Errorf("store resource %s: %v", resourceName, err)
 	}
 
 	return nil

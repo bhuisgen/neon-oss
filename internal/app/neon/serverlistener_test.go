@@ -666,7 +666,7 @@ func TestServerListenerDescriptor(t *testing.T) {
 	}
 }
 
-func TestServerListenerMediatorListeners(t *testing.T) {
+func TestServerListenerMediatorDescriptors(t *testing.T) {
 	type fields struct {
 		listeners []net.Listener
 	}
@@ -682,10 +682,10 @@ func TestServerListenerMediatorListeners(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &serverListenerMediator{
-				listeners: tt.fields.listeners,
+				descriptors: tt.fields.listeners,
 			}
-			if got := m.Listeners(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("listenerMediator.Listeners() = %v, want %v", got, tt.want)
+			if got := m.Descriptors(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("listenerMediator.Descriptors() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -714,7 +714,7 @@ func TestServerListenerMediatorRegisterListener(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &serverListenerMediator{
-				listeners: tt.fields.listeners,
+				descriptors: tt.fields.listeners,
 			}
 			if err := m.RegisterListener(tt.args.listener); (err != nil) != tt.wantErr {
 				t.Errorf("listenerMediator.RegisterListener() error = %v, wantErr %v", err, tt.wantErr)

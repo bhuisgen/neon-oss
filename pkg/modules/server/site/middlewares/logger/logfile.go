@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -40,26 +41,26 @@ func CreateLogFileWriter(name string, flag int, perm fs.FileMode) (*logFileWrite
 	return &w, nil
 }
 
-// Reopen reopens the file writer.
+// Reopen reopens the log file.
 func (w *logFileWriter) Reopen() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	if w.f != nil {
-		w.f.Close()
+		_ = w.f.Close()
 		w.f = nil
 	}
 
 	f, err := os.OpenFile(w.name, w.flag, w.perm)
 	if err != nil {
-		return err
+		return fmt.Errorf("open file %s: %w", w.name, err)
 	}
 	w.f = f
 
 	return nil
 }
 
-// Close closes the file writer.
+// Close closes the writer.
 func (w *logFileWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -68,25 +69,34 @@ func (w *logFileWriter) Close() error {
 		err := w.f.Close()
 		w.f = nil
 		if err != nil {
-			return err
+			return fmt.Errorf("close file %s: %w", w.name, err)
 		}
 	}
 
 	return nil
 }
 
-// Write writes the given data to the file writer.
+// Write writes the given data.
 func (w *logFileWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	return w.f.Write(p)
+	n, err := w.f.Write(p)
+	if err != nil {
+		return n, fmt.Errorf("write file: %w", err)
+	}
+
+	return n, nil
 }
 
-// Sync commits the log file writer.
+// Sync commits the content.
 func (w *logFileWriter) Sync() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	return w.f.Sync()
+	if err := w.f.Sync(); err != nil {
+		return fmt.Errorf("sync file: %w", err)
+	}
+
+	return nil
 }

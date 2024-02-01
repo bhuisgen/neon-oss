@@ -44,14 +44,11 @@ func (c *checkCommand) Description() string {
 
 // Parse parses the command arguments.
 func (c *checkCommand) Parse(args []string) error {
-	err := c.flagset.Parse(args)
-	if err != nil {
-		return err
+	if err := c.flagset.Parse(args); err != nil {
+		return errors.New("parse arguments")
 	}
-
 	if len(c.flagset.Args()) > 0 {
-		fmt.Println("The command accepts no arguments")
-		return errors.New("invalid arguments")
+		return errors.New("check arguments")
 	}
 
 	return nil
@@ -61,17 +58,17 @@ func (c *checkCommand) Parse(args []string) error {
 func (c *checkCommand) Execute() error {
 	config, err := neon.LoadConfig()
 	if err != nil {
-		fmt.Printf("Failed to load configuration: %s\n", err)
-		return err
+		fmt.Printf("Failed to load configuration: %v\n", err)
+		return fmt.Errorf("load config: %v", err)
 	}
 
-	err = neon.NewApplication(config).Check()
-	if err != nil {
+	if err := neon.NewApplication(config).Check(); err != nil {
 		fmt.Println("Configuration is not valid")
-		return err
+		return fmt.Errorf("check: %v", err)
 	}
 
 	fmt.Println("Configuration is valid")
+
 	return nil
 }
 

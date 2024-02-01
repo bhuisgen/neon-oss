@@ -631,8 +631,9 @@ func TestAppHandlerStop(t *testing.T) {
 		jsonMarshal func(v any) ([]byte, error)
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		{
 			name: "default",
@@ -666,7 +667,9 @@ func TestAppHandlerStop(t *testing.T) {
 				osStat:      tt.fields.osStat,
 				jsonMarshal: tt.fields.jsonMarshal,
 			}
-			h.Stop()
+			if err := h.Stop(); (err != nil) != tt.wantErr {
+				t.Errorf("appHandler.Stop() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

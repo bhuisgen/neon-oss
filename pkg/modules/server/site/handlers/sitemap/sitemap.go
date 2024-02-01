@@ -161,11 +161,11 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger
 	h.logger = logger
 
 	if err := mapstructure.Decode(config, &h.config); err != nil {
-		h.logger.Error("Failed to parse configuration")
-		return err
+		h.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if h.config.Root == "" {
 		h.logger.Error("Missing option or value", "option", "Root")
@@ -180,47 +180,47 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger
 	}
 	if *h.config.CacheTTL < 0 {
 		h.logger.Error("Invalid value", "option", "CacheTTL", "value", *h.config.CacheTTL)
-		errInit = true
+		errConfig = true
 	}
 	var sitemapIndex, sitemap bool
 	switch h.config.Kind {
 	case "":
 		h.logger.Error("Missing option or value", "option", "Kind")
-		errInit = true
+		errConfig = true
 	case sitemapKindSitemapIndex:
 		sitemapIndex = true
 	case sitemapKindSitemap:
 		sitemap = true
 	default:
 		h.logger.Error("Invalid value", "option", "Kind", "value", h.config.Kind)
-		errInit = true
+		errConfig = true
 	}
 
 	if sitemapIndex {
 		if len(h.config.SitemapIndex) == 0 {
 			h.logger.Error("Entry is missing", "kind", "sitemapIndex")
-			errInit = true
+			errConfig = true
 		}
 		for index, entry := range h.config.SitemapIndex {
 			if entry.Name == "" {
 				h.logger.Error("Missing option or value", "kind", "sitemapIndex", "entry", index+1, "option", "Name")
-				errInit = true
+				errConfig = true
 			}
 			switch entry.Type {
 			case "":
 				h.logger.Error("Missing option or value", "kind", "sitemapIndex", "entry", index+1, "option", "Type")
-				errInit = true
+				errConfig = true
 			case sitemapEntrySitemapIndexTypeStatic:
 			default:
 				h.logger.Error("Invalid value", "kind", "sitemapIndex", "entry", index+1, "option", "Type", "value", entry.Type)
-				errInit = true
+				errConfig = true
 			}
 
 			if entry.Type == sitemapEntrySitemapIndexTypeStatic {
 				if entry.Static.Loc == "" {
 					h.logger.Error("Missing option or value", "kind", "sitemapIndex", "entry", index+1, "type", "static",
 						"option", "Loc")
-					errInit = true
+					errConfig = true
 				}
 			}
 		}
@@ -229,7 +229,7 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger
 	if sitemap {
 		if len(h.config.Sitemap) == 0 {
 			h.logger.Error("Entry is missing", "kind", "sitemap")
-			errInit = true
+			errConfig = true
 		}
 		for index, entry := range h.config.Sitemap {
 			if entry.Name == "" {
@@ -248,12 +248,12 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger
 				if entry.Static.Loc == "" {
 					h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "type", "static",
 						"option", "Loc")
-					errInit = true
+					errConfig = true
 				}
 				if entry.Static.Lastmod != nil && *entry.Static.Lastmod == "" {
 					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "static", "option", "Lastmod",
 						"value", *entry.Static.Lastmod)
-					errInit = true
+					errConfig = true
 				}
 				if entry.Static.Changefreq != nil {
 					switch *entry.Static.Changefreq {
@@ -267,13 +267,13 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger
 					default:
 						h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "static",
 							"option", "Changefreq", "value", *entry.Static.Changefreq)
-						errInit = true
+						errConfig = true
 					}
 				}
 				if entry.Static.Priority != nil && (*entry.Static.Priority < 0 || *entry.Static.Priority > 1) {
 					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "static", "option", "Priority",
 						"value", *entry.Static.Priority)
-					errInit = true
+					errConfig = true
 				}
 			}
 
@@ -281,27 +281,27 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger
 				if entry.List.Resource == "" {
 					h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "type", "list",
 						"option", "Resource")
-					errInit = true
+					errConfig = true
 				}
 				if entry.List.Filter == "" {
 					h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "type", "list",
 						"option", "Filter")
-					errInit = true
+					errConfig = true
 				}
 				if entry.List.ItemLoc == "" {
 					h.logger.Error("Missing option or value", "kind", "sitemap", "entry", index+1, "type", "list",
 						"option", "ItemLoc")
-					errInit = true
+					errConfig = true
 				}
 				if entry.List.ItemLastmod != nil && *entry.List.ItemLastmod == "" {
 					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "option", "type", "list",
 						"ItemLastmod", "value", *entry.List.ItemLastmod)
-					errInit = true
+					errConfig = true
 				}
 				if entry.List.ItemIgnore != nil && *entry.List.ItemIgnore == "" {
 					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "option", "type", "list",
 						"ItemIgnore", "value", *entry.List.ItemIgnore)
-					errInit = true
+					errConfig = true
 				}
 				if entry.List.Changefreq != nil {
 					switch *entry.List.Changefreq {
@@ -315,30 +315,31 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger
 					default:
 						h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "list", "option", "Changefreq",
 							"value", *entry.List.Changefreq)
-						errInit = true
+						errConfig = true
 					}
 				}
 				if entry.List.Priority != nil && (*entry.List.Priority < 0 || *entry.List.Priority > 1) {
 					h.logger.Error("Invalid value", "kind", "sitemap", "entry", index+1, "type", "list", "option", "Priority",
 						"value", *entry.List.Priority)
-					errInit = true
+					errConfig = true
 				}
 			}
 		}
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	var err error
-	h.templateSitemapIndex, err = template.New("sitemapIndex").Parse(sitemapTemplateSitemapIndex)
-	if err != nil {
-		return err
+	if h.config.Kind == sitemapKindSitemapIndex {
+		h.templateSitemapIndex, err = template.New("sitemapIndex").Parse(sitemapTemplateSitemapIndex)
 	}
-	h.templateSitemap, err = template.New("sitemap").Parse(sitemapTemplateSitemap)
+	if h.config.Kind == sitemapKindSitemap {
+		h.templateSitemap, err = template.New("sitemap").Parse(sitemapTemplateSitemap)
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("parse template: %v", err)
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
@@ -352,7 +353,7 @@ func (h *sitemapHandler) Register(site core.ServerSite) error {
 
 	err := site.RegisterHandler(h)
 	if err != nil {
-		return err
+		return fmt.Errorf("register handler: %v", err)
 	}
 
 	return nil
@@ -364,10 +365,12 @@ func (h *sitemapHandler) Start() error {
 }
 
 // Stop stops the handler.
-func (h *sitemapHandler) Stop() {
+func (h *sitemapHandler) Stop() error {
 	h.muCache.Lock()
 	h.cache = nil
 	h.muCache.Unlock()
+
+	return nil
 }
 
 // ServeHTTP implements the http handler.
@@ -436,8 +439,8 @@ func (h *sitemapHandler) render(w render.RenderWriter, r *http.Request) error {
 		err = h.sitemap(h.config.Sitemap, w, r)
 	}
 	if err != nil {
-		h.logger.Debug("Failed to render", "err", err)
-		return err
+		h.logger.Error("Failed to generate sitemap", "err", err)
+		return fmt.Errorf("generate sitemap: %v", err)
 	}
 
 	return nil
@@ -452,11 +455,10 @@ func (h *sitemapHandler) sitemapIndex(s []SitemapIndexEntry, w io.Writer, r *htt
 		})
 	}
 
-	err := h.templateSitemapIndex.Execute(w, sitemapTemplateSitemapIndexData{
+	if err := h.templateSitemapIndex.Execute(w, sitemapTemplateSitemapIndexData{
 		Items: items,
-	})
-	if err != nil {
-		return err
+	}); err != nil {
+		return fmt.Errorf("execute template: %v", err)
 	}
 
 	return nil
@@ -470,24 +472,23 @@ func (h *sitemapHandler) sitemap(s []SitemapEntry, w io.Writer, r *http.Request)
 		case sitemapEntrySitemapTypeStatic:
 			staticItem, err := h.sitemapTemplateStaticItem(sitemapEntry)
 			if err != nil {
-				return err
+				return fmt.Errorf("write static entry: %v", err)
 			}
 			items = append(items, staticItem)
 
 		case sitemapEntrySitemapTypeList:
 			listItems, err := h.sitemapTemplateListItems(sitemapEntry)
 			if err != nil {
-				return err
+				return fmt.Errorf("write list entry: %v", err)
 			}
 			items = append(items, listItems...)
 		}
 	}
 
-	err := h.templateSitemap.Execute(w, sitemapTemplateSitemapData{
+	if err := h.templateSitemap.Execute(w, sitemapTemplateSitemapData{
 		Items: items,
-	})
-	if err != nil {
-		return err
+	}); err != nil {
+		return fmt.Errorf("execute template: %v", err)
 	}
 
 	return nil
@@ -517,24 +518,24 @@ func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemap
 
 	resource, err := h.site.Store().LoadResource(entry.List.Resource)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load resource %s: %v", entry.List.Resource, err)
 	}
 
 	for _, data := range resource.Data {
 		var jsonData interface{}
 		err = json.Unmarshal(data, &jsonData)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse resource %s data: %v", entry.List.Resource, err)
 		}
 
 		result, err := jsonpath.Get(entry.List.Filter, jsonData)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("filter resource %s data: %v", entry.List.Resource, err)
 		}
 
 		elements, ok := result.([]interface{})
 		if !ok {
-			return nil, nil
+			return nil, fmt.Errorf("parse resource %s result: %v", entry.List.Resource, err)
 		}
 
 		for _, element := range elements {
@@ -542,6 +543,7 @@ func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemap
 
 			itemLoc, err := jsonpath.Get(entry.List.ItemLoc, element)
 			if err != nil {
+				h.logger.Debug("Failed to extract loc from resource item", "resource", entry.List.Resource)
 				continue
 			}
 			if v, ok := itemLoc.(string); ok {
@@ -550,6 +552,7 @@ func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemap
 			if entry.List.ItemLastmod != nil {
 				itemLastmod, err := jsonpath.Get(*entry.List.ItemLastmod, element)
 				if err != nil {
+					h.logger.Debug("Failed to extract lastmod from resource item", "resource", entry.List.Resource)
 					continue
 				}
 				if v, ok := itemLastmod.(string); ok {
@@ -559,6 +562,7 @@ func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemap
 			if entry.List.ItemIgnore != nil {
 				itemIgnore, err := jsonpath.Get(*entry.List.ItemIgnore, element)
 				if err != nil {
+					h.logger.Debug("Failed to extract ignore from resource item", "resource", entry.List.Resource)
 					continue
 				}
 				switch v := itemIgnore.(type) {

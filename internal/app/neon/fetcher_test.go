@@ -119,6 +119,7 @@ func TestFetcherFetch(t *testing.T) {
 		{
 			name: "default",
 			fields: fields{
+				logger: slog.Default(),
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{
 						"test": testFetcherProviderModule{},
@@ -138,7 +139,8 @@ func TestFetcherFetch(t *testing.T) {
 		{
 			name: "error resource not found",
 			fields: fields{
-				state: &fetcherState{},
+				logger: slog.Default(),
+				state:  &fetcherState{},
 			},
 			args: args{
 				ctx:      context.Background(),
@@ -150,6 +152,7 @@ func TestFetcherFetch(t *testing.T) {
 		{
 			name: "error provider not found",
 			fields: fields{
+				logger: slog.Default(),
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{},
 				},
@@ -164,6 +167,7 @@ func TestFetcherFetch(t *testing.T) {
 		{
 			name: "error module not found",
 			fields: fields{
+				logger: slog.Default(),
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{},
 				},
@@ -178,6 +182,7 @@ func TestFetcherFetch(t *testing.T) {
 		{
 			name: "error fetch",
 			fields: fields{
+				logger: slog.Default(),
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{
 						"test": testFetcherProviderModule{

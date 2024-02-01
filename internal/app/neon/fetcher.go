@@ -3,6 +3,7 @@ package neon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -47,30 +48,32 @@ func newFetcher() *fetcher {
 
 // Init initializes the fetcher.
 func (f *fetcher) Init(config map[string]interface{}) error {
+	f.logger.Debug("Initializing fetcher")
+
 	if config == nil {
 		f.config = &fetcherConfig{}
 	} else {
 		if err := mapstructure.Decode(config, &f.config); err != nil {
 			f.logger.Error("Failed to parse configuration", "err", err)
-			return err
+			return fmt.Errorf("parse config: %w", err)
 		}
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	for provider, providerConfig := range f.config.Providers {
 		for moduleName, moduleConfig := range providerConfig {
 			moduleInfo, err := module.Lookup(module.ModuleID("fetcher.provider." + moduleName))
 			if err != nil {
 				f.logger.Error("Unregistered provider module", "provider", provider, "module", moduleName, "err", err)
-				errInit = true
+				errConfig = true
 				continue
 			}
 			module, ok := moduleInfo.NewInstance().(core.FetcherProviderModule)
 			if !ok {
 				err := errors.New("module instance not valid")
 				f.logger.Error("Invalid provider module", "provide", provider, "module", moduleName, "err", err)
-				errInit = true
+				errConfig = true
 				continue
 			}
 
@@ -82,7 +85,7 @@ func (f *fetcher) Init(config map[string]interface{}) error {
 				slog.New(NewLogHandler(os.Stderr, fetcherLogger, nil)).With("provider", provider),
 			); err != nil {
 				f.logger.Error("Failed to init provider module", "provider", provider, "module", moduleName, "err", err)
-				errInit = true
+				errConfig = true
 				continue
 			}
 
@@ -92,16 +95,18 @@ func (f *fetcher) Init(config map[string]interface{}) error {
 		}
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
 }
 
-// Fetch fetches a resource.
+// Fetch fetches a resource from his name, provider and configuration.
 func (f *fetcher) Fetch(ctx context.Context, name string, provider string, config map[string]interface{}) (
 	*core.Resource, error) {
+	f.logger.Debug("Fetching resource", "name", name, "provider", provider)
+
 	f.mu.RLock()
 	module, ok := f.state.providers[provider]
 	f.mu.RUnlock()
@@ -112,7 +117,7 @@ func (f *fetcher) Fetch(ctx context.Context, name string, provider string, confi
 
 	resource, err := module.Fetch(ctx, name, config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetch resource %s: %w", name, err)
 	}
 
 	return resource, nil

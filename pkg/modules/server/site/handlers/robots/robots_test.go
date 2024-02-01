@@ -295,8 +295,9 @@ func TestRobotsHandlerStop(t *testing.T) {
 		muCache  *sync.RWMutex
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		{
 			name: "default",
@@ -315,7 +316,9 @@ func TestRobotsHandlerStop(t *testing.T) {
 				cache:    tt.fields.cache,
 				muCache:  tt.fields.muCache,
 			}
-			h.Stop()
+			if err := h.Stop(); (err != nil) != tt.wantErr {
+				t.Errorf("robotsHandler.Stop() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }

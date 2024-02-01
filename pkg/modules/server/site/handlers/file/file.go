@@ -2,6 +2,7 @@ package file
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -101,30 +102,30 @@ func (h *fileHandler) Init(config map[string]interface{}, logger *slog.Logger) e
 	h.logger = logger
 
 	if err := mapstructure.Decode(config, &h.config); err != nil {
-		h.logger.Error("Failed to parse configuration")
-		return err
+		h.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if h.config.Path == "" {
 		h.logger.Error("Missing option or value", "option", "Path")
-		errInit = true
+		errConfig = true
 	} else {
 		f, err := h.osOpenFile(h.config.Path, os.O_RDONLY, 0)
 		if err != nil {
 			h.logger.Error("Failed to open file", "option", "Path", "value", h.config.Path)
-			errInit = true
+			errConfig = true
 		} else {
 			_ = h.osClose(f)
 			fi, err := h.osStat(h.config.Path)
 			if err != nil {
 				h.logger.Error("Failed to stat file", "option", "Path", "value", h.config.Path)
-				errInit = true
+				errConfig = true
 			}
 			if err == nil && fi.IsDir() {
 				h.logger.Error("File is a directory", "option", "Path", "value", h.config.Path)
-				errInit = true
+				errConfig = true
 			}
 		}
 	}
@@ -134,7 +135,7 @@ func (h *fileHandler) Init(config map[string]interface{}, logger *slog.Logger) e
 	}
 	if *h.config.StatusCode < 100 || *h.config.StatusCode > 599 {
 		h.logger.Error("Invalid value", "option", "StatusCode", "value", *h.config.StatusCode)
-		errInit = true
+		errConfig = true
 	}
 	if h.config.Cache == nil {
 		defaultValue := fileConfigDefaultCache
@@ -148,8 +149,8 @@ func (h *fileHandler) Init(config map[string]interface{}, logger *slog.Logger) e
 		h.logger.Error("Invalid value", "option", "CacheTTL", "value", *h.config.CacheTTL)
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	h.rwPool = render.NewRenderWriterPool()
@@ -161,7 +162,7 @@ func (h *fileHandler) Init(config map[string]interface{}, logger *slog.Logger) e
 func (h *fileHandler) Register(site core.ServerSite) error {
 	err := site.RegisterHandler(h)
 	if err != nil {
-		return err
+		return fmt.Errorf("register handler: %v", err)
 	}
 
 	return nil
@@ -171,14 +172,14 @@ func (h *fileHandler) Register(site core.ServerSite) error {
 func (h *fileHandler) Start() error {
 	err := h.read()
 	if err != nil {
-		return err
+		return fmt.Errorf("read: %v", err)
 	}
 
 	return nil
 }
 
 // Stop stops the handler.
-func (h *fileHandler) Stop() {
+func (h *fileHandler) Stop() error {
 	h.muFile.Lock()
 	h.file = nil
 	h.fileInfo = nil
@@ -187,6 +188,8 @@ func (h *fileHandler) Stop() {
 	h.muCache.Lock()
 	h.cache = nil
 	h.muCache.Unlock()
+
+	return nil
 }
 
 // ServeHTTP implements the http handler.
@@ -255,9 +258,8 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *fileHandler) read() error {
 	fileInfo, err := h.osStat(h.config.Path)
 	if err != nil {
-		h.logger.Debug("Failed to stat file", "file", h.config.Path, "err", err)
-
-		return err
+		h.logger.Error("Failed to stat file", "file", h.config.Path, "err", err)
+		return fmt.Errorf("stat file %s: %v", h.config.Path, err)
 	}
 
 	h.muFile.RLock()
@@ -265,9 +267,8 @@ func (h *fileHandler) read() error {
 		h.muFile.RUnlock()
 		buf, err := h.osReadFile(h.config.Path)
 		if err != nil {
-			h.logger.Debug("Failed to read file", "file", h.config.Path, "err", err)
-
-			return err
+			h.logger.Error("Failed to read file", "file", h.config.Path, "err", err)
+			return fmt.Errorf("read file %s: %v", h.config.Path, err)
 		}
 
 		h.muFile.Lock()
@@ -295,7 +296,8 @@ func (h *fileHandler) render(w render.RenderWriter, r *http.Request) error {
 	}
 	h.muFile.RUnlock()
 	if err != nil {
-		return err
+		h.logger.Error("Failed to process render", "err", err)
+		return fmt.Errorf("process render: %v", err)
 	}
 
 	return nil

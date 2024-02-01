@@ -101,11 +101,11 @@ func (l *localListener) Init(config map[string]interface{}, logger *slog.Logger)
 	l.logger = logger
 
 	if err := mapstructure.Decode(config, &l.config); err != nil {
-		l.logger.Error("Failed to parse configuration")
-		return err
+		l.logger.Error("Failed to parse configuration", "err", err)
+		return fmt.Errorf("parse config: %v", err)
 	}
 
-	var errInit bool
+	var errConfig bool
 
 	if l.config.ListenAddr == nil {
 		defaultValue := localConfigDefaultListenAddr
@@ -117,7 +117,7 @@ func (l *localListener) Init(config map[string]interface{}, logger *slog.Logger)
 	}
 	if *l.config.ListenPort < 0 {
 		l.logger.Error("Invalid value", "option", "ListenPort", "value", *l.config.ListenPort)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.ReadTimeout == nil {
 		defaultValue := localConfigDefaultReadTimeout
@@ -125,7 +125,7 @@ func (l *localListener) Init(config map[string]interface{}, logger *slog.Logger)
 	}
 	if *l.config.ReadTimeout < 0 {
 		l.logger.Error("Invalid value", "option", "ReadTimeout", "value", *l.config.ReadTimeout)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.ReadHeaderTimeout == nil {
 		defaultValue := localConfigDefaultReadHeaderTimeout
@@ -133,7 +133,7 @@ func (l *localListener) Init(config map[string]interface{}, logger *slog.Logger)
 	}
 	if *l.config.ReadHeaderTimeout < 0 {
 		l.logger.Error("Invalid value", "option", "ReadHeaderTimeout", "value", *l.config.ReadHeaderTimeout)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.WriteTimeout == nil {
 		defaultValue := localConfigDefaultWriteTimeout
@@ -141,7 +141,7 @@ func (l *localListener) Init(config map[string]interface{}, logger *slog.Logger)
 	}
 	if *l.config.WriteTimeout < 0 {
 		l.logger.Error("Invalid value", "option", "WriteTimeout", "value", *l.config.WriteTimeout)
-		errInit = true
+		errConfig = true
 	}
 	if l.config.IdleTimeout == nil {
 		defaultValue := localConfigDefaultIdleTimeout
@@ -149,11 +149,11 @@ func (l *localListener) Init(config map[string]interface{}, logger *slog.Logger)
 	}
 	if *l.config.IdleTimeout < 0 {
 		l.logger.Error("Invalid value", "option", "IdleTimeout", "value", *l.config.IdleTimeout)
-		errInit = true
+		errConfig = true
 	}
 
-	if errInit {
-		return errors.New("init error")
+	if errConfig {
+		return errors.New("config")
 	}
 
 	return nil
@@ -161,20 +161,19 @@ func (l *localListener) Init(config map[string]interface{}, logger *slog.Logger)
 
 // Register registers the listener.
 func (l *localListener) Register(listener core.ServerListener) error {
-	if len(listener.Listeners()) == 1 {
-		l.listener = listener.Listeners()[0]
+	if len(listener.Descriptors()) == 1 {
+		l.listener = listener.Descriptors()[0]
 		return nil
 	}
 
 	var err error
 	l.listener, err = l.netListen("tcp", fmt.Sprintf("%s:%d", *l.config.ListenAddr, *l.config.ListenPort))
 	if err != nil {
-		return err
+		return fmt.Errorf("listen: %v", err)
 	}
 
-	err = listener.RegisterListener(l.listener)
-	if err != nil {
-		return err
+	if err = listener.RegisterListener(l.listener); err != nil {
+		return fmt.Errorf("register listener: %v", err)
 	}
 
 	return nil
@@ -192,7 +191,7 @@ func (l *localListener) Serve(handler http.Handler) error {
 	}
 
 	go func() {
-		l.logger.Info("Starting listener", "addr", l.server.Addr)
+		l.logger.Info("Starting accepting connections", "addr", l.server.Addr)
 
 		if err := l.httpServerServe(l.server, l.listener); err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {
@@ -206,9 +205,8 @@ func (l *localListener) Serve(handler http.Handler) error {
 
 // Shutdown shutdowns the listener gracefully.
 func (l *localListener) Shutdown(ctx context.Context) error {
-	err := l.httpServerShutdown(l.server, ctx)
-	if err != nil {
-		return err
+	if err := l.httpServerShutdown(l.server, ctx); err != nil {
+		return fmt.Errorf("shutdown listener: %v", err)
 	}
 
 	return nil
@@ -216,9 +214,8 @@ func (l *localListener) Shutdown(ctx context.Context) error {
 
 // Close closes the listener.
 func (l *localListener) Close() error {
-	err := l.httpServerClose(l.server)
-	if err != nil {
-		return err
+	if err := l.httpServerClose(l.server); err != nil {
+		return fmt.Errorf("close listener: %v", err)
 	}
 
 	return nil

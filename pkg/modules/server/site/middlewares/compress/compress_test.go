@@ -235,8 +235,9 @@ func TestCompressMiddlewareStop(t *testing.T) {
 		pool   *gzipPool
 	}
 	tests := []struct {
-		name   string
-		fields fields
+		name    string
+		fields  fields
+		wantErr bool
 	}{
 		{
 			name: "default",
@@ -249,7 +250,9 @@ func TestCompressMiddlewareStop(t *testing.T) {
 				logger: tt.fields.logger,
 				pool:   tt.fields.pool,
 			}
-			m.Stop()
+			if err := m.Stop(); (err != nil) != tt.wantErr {
+				t.Errorf("compressMiddleware.Stop() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }
