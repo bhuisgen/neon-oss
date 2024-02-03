@@ -1,7 +1,11 @@
 package neon
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sync"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -40,9 +44,14 @@ func NewApplication(config *config) *application {
 	if _, ok := os.LookupEnv("DEBUG"); ok {
 		DEBUG = true
 	}
+	if v, ok := os.LookupEnv("CHILD_SOCKET"); ok {
+		CHILD_SOCKET = v
+	}
+
 	if DEBUG {
 		programLevel.Set(slog.LevelDebug)
 	}
+
 	return &application{
 		config: config,
 		logger: slog.New(NewLogHandler(os.Stderr, applicationLogger, nil)),
@@ -90,8 +99,8 @@ func (a *application) Serve() error {
 
 	a.state = &applicationState{}
 
-	if _, ok := os.LookupEnv(childEnvKey); ok {
-		if err := a.child(); err != nil {
+	if key, ok := os.LookupEnv(childEnvKey); ok {
+		if err := a.child(key); err != nil {
 			a.logger.Error("Failed to execute child", "err", err)
 			return fmt.Errorf("execute child: %v", err)
 		}
@@ -131,7 +140,7 @@ func (a *application) Serve() error {
 	for {
 		select {
 		case <-exit:
-			a.logger.Info("Signal SIGTERM received, stopping instance")
+			a.logger.Info("Signal SIGINT/SIGTERM received, stopping instance")
 			if err := a.stop(); err != nil {
 				a.logger.Error("stop instance", "err", err)
 				continue
@@ -218,11 +227,20 @@ func (a *application) shutdown() error {
 // reload reloads the instance.
 func (a *application) reload() error {
 	ch := make(chan string)
-	defer close(ch)
 	errCh := make(chan error)
-	defer close(errCh)
+	stop := make(chan struct{})
+	defer func() {
+		close(ch)
+		close(errCh)
+		close(stop)
+	}()
 
-	go a.listenChild(ch, errCh)
+	key, err := generateKey()
+	if err != nil {
+		return fmt.Errorf("generate key: %w", err)
+	}
+
+	go a.listenChild(key, ch, errCh, stop)
 	for {
 		select {
 		case event := <-ch:
@@ -233,7 +251,13 @@ func (a *application) reload() error {
 					return fmt.Errorf("get executable: %w", err)
 				}
 				env := os.Environ()
-				env = append(env, childEnvKey+"=1")
+				for index, item := range env {
+					if strings.HasPrefix(item, childEnvKey+"=") {
+						env = append(env[:index], env[index+1:]...)
+						break
+					}
+				}
+				env = append(env, childEnvKey+"="+key)
 				files := []*os.File{
 					os.Stdin,
 					os.Stdout,
@@ -259,14 +283,21 @@ func (a *application) reload() error {
 				a.logger.Info("Child process started, waiting for connection")
 
 			case "done":
-				a.logger.Info("Child process ready, stopping parent process")
+				stop <- struct{}{}
+
+				a.logger.Info("Child process ready, stopping instance")
+
+				if err := a.shutdown(); err != nil {
+					a.logger.Error("Shutdown error", "err", err)
+					return fmt.Errorf("shutdown: %w", err)
+				}
 
 				return nil
 			}
 
 		case err := <-errCh:
-			a.logger.Info("Child error", "err", err)
-			return fmt.Errorf("child: %w", err)
+			a.logger.Error("Child error", "err", err)
+			return fmt.Errorf("reload: %w", err)
 		}
 	}
 }
@@ -389,8 +420,13 @@ func (a *application) shutdownServer(ctx context.Context, server Server) error {
 	return nil
 }
 
-// childHelloResponse implements the hello message response.
-type childHelloResponse struct {
+// childReloadRequest implements the reload request message.
+type childReloadRequest struct {
+	Key string `json:"key"`
+}
+
+// childReloadResponse implements the reload response message.
+type childReloadResponse struct {
 	Listeners []struct {
 		Name  string   `json:"name"`
 		Files []string `json:"files"`
@@ -398,48 +434,91 @@ type childHelloResponse struct {
 }
 
 const (
-	childSocketFile    string = "neon.sock"
-	childSocketTimeout int    = 5
-	childEnvKey        string = "CHILD"
-	childMessageHello  string = "hello"
-	childMessageReady  string = "ready"
+	childTimeout int    = 5
+	childEnvKey  string = "CHILD"
+
+	childCommandHello  string = "HELLO"
+	childCommandReload string = "RELOAD"
+	childCommandReady  string = "READY"
+
+	childResultOK    string = "OK"
+	childResultError string = "ERROR"
 )
 
-// listenChild listens for child connection and messages.
-func (a *application) listenChild(ch chan<- string, errorCh chan<- error) {
-	l, err := net.Listen("unix", childSocketFile)
+// listenChild listens for child connections.
+func (a *application) listenChild(key string, ch chan<- string, errCh chan<- error, stop <-chan struct{}) {
+	ln, err := net.Listen("unix", CHILD_SOCKET)
 	if err != nil {
-		errorCh <- err
+		errCh <- fmt.Errorf("listen: %w", err)
 		return
 	}
 	defer func() {
-		_ = l.Close()
-		_ = os.Remove(childSocketFile)
+		_ = ln.Close()
+		_ = os.Remove(CHILD_SOCKET)
 	}()
 
 	ch <- "init"
 
-	c, err := a.acceptChild(l)
-	if err != nil {
-		errorCh <- err
-		return
-	}
-
-	var done bool
-	b := make([]byte, 1024)
-	for {
-		n, err := c.Read(b)
-		if err != nil {
-			errorCh <- err
-			return
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go a.handleChild(conn, key, ch, errCh)
 		}
+	}()
 
-		msg := string(b[0:n])
+	select {
+	case <-stop:
+		return
+	case <-time.After(time.Duration(childTimeout) * time.Second):
+		errCh <- errors.New("timeout")
+	}
+}
 
-		switch msg {
-		case childMessageHello:
-			response := childHelloResponse{}
+// handleChild handles a child connection.
+func (a *application) handleChild(conn net.Conn, key string, ch chan<- string, errorCh chan<- error) {
+	s := bufio.NewScanner(conn)
 
+	var hello bool
+	var reload bool
+
+	for s.Scan() {
+		cmd, data, _ := bytes.Cut(s.Bytes(), []byte(":"))
+		switch string(cmd) {
+		case childCommandHello:
+			if _, err := fmt.Fprintf(conn, "%s\r\n", childCommandHello); err != nil {
+				errorCh <- fmt.Errorf("write: %w", err)
+				return
+			}
+			hello = true
+
+		case childCommandReload:
+			if !hello {
+				if _, err := fmt.Fprintf(conn, "%s\r\n", childResultError); err != nil {
+					errorCh <- fmt.Errorf("write: %w", err)
+					return
+				}
+				return
+			}
+
+			var msg childReloadRequest
+			if err := json.Unmarshal(data, &msg); err != nil {
+				a.logger.Debug("Failed to unmarshal data", "err", err)
+				continue
+			}
+
+			if msg.Key != key {
+				a.logger.Debug("Invalid key from child", "parent", key, "child", msg.Key)
+				if _, err := fmt.Fprintf(conn, "%s:%s\r\n", childResultError, "invalid key"); err != nil {
+					errorCh <- fmt.Errorf("write: %w", err)
+					return
+				}
+				return
+			}
+
+			response := childReloadResponse{}
 			for _, listener := range a.server.state.listenersMap {
 				helloListener := struct {
 					Name  string   `json:"name"`
@@ -450,135 +529,139 @@ func (a *application) listenChild(ch chan<- string, errorCh chan<- error) {
 
 				descriptor, err := listener.Descriptor()
 				if err != nil {
-					errorCh <- err
+					errorCh <- fmt.Errorf("get descriptor: %w", err)
 					return
 				}
-
 				for _, file := range descriptor.Files() {
 					helloListener.Files = append(helloListener.Files, file.Name())
 				}
-
 				response.Listeners = append(response.Listeners, helloListener)
 			}
-
 			data, err := json.Marshal(response)
 			if err != nil {
-				errorCh <- err
+				errorCh <- fmt.Errorf("marshal reload response: %w", err)
+				return
+			}
+			if _, err := fmt.Fprintf(conn, "%s %s\r\n", childResultOK, data); err != nil {
+				errorCh <- fmt.Errorf("write: %w", err)
+				return
+			}
+			reload = true
+
+		case childCommandReady:
+			if !hello || !reload {
+				if _, err := fmt.Fprintf(conn, "%s\r\n", childResultError); err != nil {
+					errorCh <- fmt.Errorf("write: %w", err)
+					return
+				}
 				return
 			}
 
-			if _, err := c.Write(data); err != nil {
-				errorCh <- err
+			if _, err := fmt.Fprintf(conn, "%s %s\r\n", childResultOK, data); err != nil {
+				errorCh <- fmt.Errorf("write: %w", err)
 				return
 			}
-
-		case childMessageReady:
-			if err := a.shutdown(); err != nil {
-				errorCh <- err
-				return
-			}
-
-			if _, err := c.Write([]byte("ok")); err != nil {
-				errorCh <- err
-				return
-			}
-
-			done = true
-		}
-
-		if done {
 			ch <- "done"
-			break
+
+		default:
+			if _, err := fmt.Fprintf(conn, "%s\r\n", childResultError); err != nil {
+				errorCh <- fmt.Errorf("write: %w", err)
+				return
+			}
 		}
+	}
+	if err := s.Err(); err != nil {
+		errorCh <- fmt.Errorf("read: %w", err)
+		return
 	}
 }
 
-// acceptChild accepts child connection.
-func (a *application) acceptChild(l net.Listener) (net.Conn, error) {
-	var c net.Conn
-	var err error
-	ch := make(chan error, 1)
-
-	go func() {
-		defer close(ch)
-
-		c, err = l.Accept()
-		ch <- err
-	}()
-
-	select {
-	case err := <-ch:
-		if err != nil {
-			return nil, err
-		}
-
-	case <-time.After(time.Duration(childSocketTimeout) * time.Second):
-		return nil, errors.New("accept timeout")
-	}
-
-	return c, nil
-}
-
-// child connects and send messages to the parent process.
-func (a *application) child() error {
-	c, err := net.Dial("unix", childSocketFile)
+// child handles the connection of the child process to the parent process.
+func (a *application) child(key string) error {
+	conn, err := net.Dial("unix", CHILD_SOCKET)
 	if err != nil {
-		return fmt.Errorf("connect to child: %w", err)
+		return fmt.Errorf("connect: %w", err)
 	}
-	defer c.Close()
+	defer conn.Close()
 
-	var data []byte
-	wg := sync.WaitGroup{}
-	readResponse := func() {
-		defer wg.Done()
+	if _, err := fmt.Fprintf(conn, "%s\r\n", childCommandHello); err != nil {
+		return fmt.Errorf("write: %v", err)
+	}
 
-		b := make([]byte, 1024)
-		n, err := c.Read(b[:])
-		if err != nil {
-			return
+	var ready bool
+
+	s := bufio.NewScanner(conn)
+	for s.Scan() {
+		cmd, _, _ := bytes.Cut(s.Bytes(), []byte(":"))
+		switch string(cmd) {
+		case childCommandHello:
+			request, err := json.Marshal(childReloadRequest{
+				Key: os.Getenv(childEnvKey),
+			})
+			if err != nil {
+				return errors.New("encode reload request")
+			}
+			if _, err := fmt.Fprintf(conn, "%s:%s\r\n", childCommandReload, request); err != nil {
+				return fmt.Errorf("send reload: %w", err)
+			}
+			if !s.Scan() {
+				break
+			}
+			reload, reloadData, _ := bytes.Cut(s.Bytes(), []byte(" "))
+			if string(reload) != childResultOK {
+				return errors.New("reload")
+			}
+			var response childReloadResponse
+			if err := json.Unmarshal(reloadData, &response); err != nil {
+				return fmt.Errorf("decode reload response: %w", err)
+			}
+			var fdsIndex int = 3
+			a.state.serverListenersDescriptors = make(map[string]ServerListenerDescriptor, len(response.Listeners))
+			for _, listener := range response.Listeners {
+				descriptor := newServerListenerDescriptor()
+				for _, file := range listener.Files {
+					descriptor.addFile(os.NewFile(uintptr(fdsIndex), file))
+					fdsIndex++
+				}
+				a.state.serverListenersDescriptors[listener.Name] = descriptor
+			}
+
+			if _, err := fmt.Fprintf(conn, "%s\r\n", childCommandReady); err != nil {
+				return fmt.Errorf("send ready: %w", err)
+			}
+
+			if !s.Scan() {
+				break
+			}
+			ready, _, _ := bytes.Cut(s.Bytes(), []byte(" "))
+			if string(ready) != childResultOK {
+				return errors.New("ready")
+			}
+
+			return nil
+
+		default:
 		}
-		data = b[0:n]
+	}
+	if err := s.Err(); err != nil {
+		return fmt.Errorf("read: %w", err)
 	}
 
-	wg.Add(1)
-	go readResponse()
-
-	if _, err := c.Write([]byte(childMessageHello)); err != nil {
-		return fmt.Errorf("send hello message: %w", err)
+	if !ready {
+		return fmt.Errorf("not ready")
 	}
-
-	wg.Wait()
-
-	if len(data) == 0 {
-		return errors.New("no server response")
-	}
-
-	var response childHelloResponse
-	if err := json.Unmarshal(data, &response); err != nil {
-		return fmt.Errorf("parse message response: %w", err)
-	}
-
-	var fdsIndex int = 3
-	a.state.serverListenersDescriptors = make(map[string]ServerListenerDescriptor, len(response.Listeners))
-	for _, listener := range response.Listeners {
-		descriptor := newServerListenerDescriptor()
-		for _, file := range listener.Files {
-			descriptor.addFile(os.NewFile(uintptr(fdsIndex), file))
-			fdsIndex++
-		}
-		a.state.serverListenersDescriptors[listener.Name] = descriptor
-	}
-
-	wg.Add(1)
-	go readResponse()
-
-	if _, err := c.Write([]byte(childMessageReady)); err != nil {
-		return fmt.Errorf("send ready message: %w", err)
-	}
-
-	wg.Wait()
 
 	return nil
+}
+
+// generateKey generates a random secret key for the instance reloading.
+func generateKey() (string, error) {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("rand: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString([]byte(b)), nil
 }
 
 var _ (Application) = (*application)(nil)
