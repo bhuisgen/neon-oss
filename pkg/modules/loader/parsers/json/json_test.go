@@ -146,6 +146,37 @@ func TestJSONParserParse(t *testing.T) {
 			},
 		},
 		{
+			name: "store",
+			fields: fields{
+				config: &jsonParserConfig{
+					Resource: map[string]map[string]interface{}{
+						"test": {
+							"provider": map[string]interface{}{},
+						},
+					},
+					Filter: "$.results",
+					ItemResource: map[string]map[string]interface{}{
+						"resource": {
+							"provider": map[string]interface{}{},
+						},
+					},
+					Store: true,
+				},
+				logger:        slog.Default(),
+				jsonUnmarshal: json.Unmarshal,
+			},
+			args: args{
+				ctx:   context.Background(),
+				store: &testJSONParserStore{},
+				fetcher: &testJSONParserFetcher{
+					resource: &core.Resource{
+						Data: [][]byte{},
+						TTL:  0,
+					},
+				},
+			},
+		},
+		{
 			name: "invalid resource name",
 			fields: fields{
 				config: &jsonParserConfig{
@@ -213,6 +244,7 @@ func TestJSONParserParse(t *testing.T) {
 							"provider": map[string]interface{}{},
 						},
 					},
+					Store: true,
 				},
 				logger: slog.Default(),
 			},

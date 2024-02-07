@@ -29,6 +29,7 @@ type jsonParserConfig struct {
 	Filter       string                            `mapstructure:"filter"`
 	ItemParams   map[string]string                 `mapstructure:"itemParams"`
 	ItemResource map[string]map[string]interface{} `mapstructure:"itemResource"`
+	Store        bool                              `mapstructure:"store"`
 }
 
 const (
@@ -137,8 +138,10 @@ func (p *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 		}
 	}
 
-	if err := store.StoreResource(resourceName, resource); err != nil {
-		return fmt.Errorf("store resource %s: %v", resourceName, err)
+	if p.config.Store {
+		if err := store.StoreResource(resourceName, resource); err != nil {
+			return fmt.Errorf("store resource %s: %v", resourceName, err)
+		}
 	}
 
 	return nil
