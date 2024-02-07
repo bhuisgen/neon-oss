@@ -169,6 +169,7 @@ func (h *sitemapHandler) Init(config map[string]interface{}, logger *slog.Logger
 
 	if h.config.Root == "" {
 		h.logger.Error("Missing option or value", "option", "Root")
+		errConfig = true
 	}
 	if h.config.Cache == nil {
 		defaultValue := sitemapConfigDefaultCache
