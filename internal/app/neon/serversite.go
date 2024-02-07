@@ -526,7 +526,7 @@ func (m *serverSiteMiddleware) Handler(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				m.logger.Error("Error handler", "err", err, "stack", debug.Stack())
+				m.logger.Error("Error handler", "err", err, "stack", string(debug.Stack()))
 			}
 		}()
 
