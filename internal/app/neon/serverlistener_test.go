@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 )
 
@@ -111,17 +110,6 @@ func TestServerListenerInit(t *testing.T) {
 }
 
 func TestServerListenerRegister(t *testing.T) {
-	listener, err := net.Listen("tcp", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer listener.Close()
-
-	file, err := listener.(*net.TCPListener).File()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	type fields struct {
 		name    string
 		logger  *slog.Logger
@@ -131,7 +119,7 @@ func TestServerListenerRegister(t *testing.T) {
 		osClose func(f *os.File) error
 	}
 	type args struct {
-		descriptor ServerListenerDescriptor
+		listeners []net.Listener
 	}
 	tests := []struct {
 		name    string
@@ -140,7 +128,7 @@ func TestServerListenerRegister(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "without descriptors",
+			name: "without listeners",
 			fields: fields{
 				logger: slog.Default(),
 				state: &serverListenerState{
@@ -149,13 +137,10 @@ func TestServerListenerRegister(t *testing.T) {
 				osClose: func(f *os.File) error {
 					return nil
 				},
-			},
-			args: args{
-				descriptor: &serverListenerDescriptor{},
 			},
 		},
 		{
-			name: "with descriptors",
+			name: "with listeners",
 			fields: fields{
 				logger: slog.Default(),
 				state: &serverListenerState{
@@ -166,11 +151,7 @@ func TestServerListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				descriptor: &serverListenerDescriptor{
-					files: []*os.File{
-						file,
-					},
-				},
+				listeners: []net.Listener{&net.TCPListener{}, &net.UnixListener{}},
 			},
 		},
 		{
@@ -182,9 +163,6 @@ func TestServerListenerRegister(t *testing.T) {
 						errRegister: true,
 					},
 				},
-			},
-			args: args{
-				descriptor: &serverListenerDescriptor{},
 			},
 			wantErr: true,
 		},
@@ -199,7 +177,7 @@ func TestServerListenerRegister(t *testing.T) {
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
 			}
-			if err := l.Register(tt.args.descriptor); (err != nil) != tt.wantErr {
+			if err := l.Register(tt.args.listeners); (err != nil) != tt.wantErr {
 				t.Errorf("listener.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -615,7 +593,7 @@ func TestServerListenerUnlink(t *testing.T) {
 	}
 }
 
-func TestServerListenerDescriptor(t *testing.T) {
+func TestServerListenerListeners(t *testing.T) {
 	type fields struct {
 		name    string
 		logger  *slog.Logger
@@ -657,35 +635,10 @@ func TestServerListenerDescriptor(t *testing.T) {
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
 			}
-			_, err := l.Descriptor()
+			_, err := l.Listeners()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("listener.Descriptor() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("listener.Listeners() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-		})
-	}
-}
-
-func TestServerListenerMediatorDescriptors(t *testing.T) {
-	type fields struct {
-		listeners []net.Listener
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   []net.Listener
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &serverListenerMediator{
-				descriptors: tt.fields.listeners,
-			}
-			if got := m.Descriptors(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("listenerMediator.Descriptors() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -714,33 +667,11 @@ func TestServerListenerMediatorRegisterListener(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &serverListenerMediator{
-				descriptors: tt.fields.listeners,
+				listeners: tt.fields.listeners,
 			}
 			if err := m.RegisterListener(tt.args.listener); (err != nil) != tt.wantErr {
 				t.Errorf("listenerMediator.RegisterListener() error = %v, wantErr %v", err, tt.wantErr)
 			}
-		})
-	}
-}
-
-func TestServerListenerDescriptorFiles(t *testing.T) {
-	type fields struct {
-		files []*os.File
-	}
-	tests := []struct {
-		name   string
-		fields fields
-	}{
-		{
-			name: "default",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			d := &serverListenerDescriptor{
-				files: tt.fields.files,
-			}
-			d.Files()
 		})
 	}
 }

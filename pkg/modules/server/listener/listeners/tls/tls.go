@@ -309,8 +309,9 @@ func (l *tlsListener) Init(config map[string]interface{}, logger *slog.Logger) e
 
 // Register registers the listener.
 func (l *tlsListener) Register(listener core.ServerListener) error {
-	if len(listener.Descriptors()) == 1 {
-		l.listener = listener.Descriptors()[0]
+	listeners := listener.Listeners()
+	if len(listeners) == 1 {
+		l.listener = listeners[0]
 		return nil
 	}
 
@@ -320,7 +321,7 @@ func (l *tlsListener) Register(listener core.ServerListener) error {
 		return fmt.Errorf("listen: %v", err)
 	}
 
-	if err = listener.RegisterListener(l.listener); err != nil {
+	if err := listener.RegisterListener(l.listener); err != nil {
 		return fmt.Errorf("register listener: %v", err)
 	}
 

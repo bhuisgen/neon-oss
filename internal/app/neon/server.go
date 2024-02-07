@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 
 	"github.com/mitchellh/mapstructure"
@@ -109,7 +110,7 @@ func (s *server) Init(config map[string]interface{}) error {
 			continue
 		}
 		if site.Default() && defaultSiteName != "" {
-			err := fmt.Errorf("default site already defined (%s)", defaultSiteName)
+			err := fmt.Errorf("default site already defined: %s", defaultSiteName)
 			s.logger.Error("Failed to init site", "site", siteName, "err", err)
 			errConfig = true
 		}
@@ -126,11 +127,11 @@ func (s *server) Init(config map[string]interface{}) error {
 }
 
 // Register registers the server listeners and sites.
-func (s *server) Register(descriptors map[string]ServerListenerDescriptor) error {
+func (s *server) Register(listeners map[string][]net.Listener) error {
 	s.logger.Debug("Registering server")
 
 	for listenerName, listener := range s.state.listenersMap {
-		if err := listener.Register(descriptors[listenerName]); err != nil {
+		if err := listener.Register(listeners[listenerName]); err != nil {
 			return fmt.Errorf("register listener: %w", err)
 		}
 	}
@@ -148,6 +149,15 @@ func (s *server) Register(descriptors map[string]ServerListenerDescriptor) error
 func (s *server) Start() error {
 	s.logger.Info("Starting server")
 
+	for _, site := range s.state.sitesMap {
+		for listenerName, listener := range s.state.listenersMap {
+			if err := listener.Link(site); err != nil {
+				return fmt.Errorf("link site: %w", err)
+			}
+			s.state.sitesListeners[site.Name()] = append(s.state.sitesListeners[site.Name()],
+				s.state.listenersMap[listenerName])
+		}
+	}
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Serve(); err != nil {
 			return fmt.Errorf("serve listener: %w", err)
@@ -157,14 +167,6 @@ func (s *server) Start() error {
 	for _, site := range s.state.sitesMap {
 		if err := site.Start(); err != nil {
 			return fmt.Errorf("start site: %w", err)
-		}
-
-		for listenerName, listener := range s.state.listenersMap {
-			if err := listener.Link(site); err != nil {
-				return fmt.Errorf("link site: %w", err)
-			}
-			s.state.sitesListeners[site.Name()] = append(s.state.sitesListeners[site.Name()],
-				s.state.listenersMap[listenerName])
 		}
 	}
 
@@ -199,21 +201,18 @@ func (s *server) Shutdown(ctx context.Context) error {
 			return fmt.Errorf("shutdown listener: %w", err)
 		}
 	}
-
 	for _, site := range s.state.sitesMap {
-		listeners, ok := s.state.sitesListeners[site.Name()]
-		if !ok {
-			s.logger.Warn("Site is not linked")
-			continue
-		}
-		for _, listener := range listeners {
-			if err := listener.Unlink(site); err != nil {
-				return fmt.Errorf("unlink listener: %w", err)
+		if listeners, ok := s.state.sitesListeners[site.Name()]; ok {
+			for _, listener := range listeners {
+				if err := listener.Unlink(site); err != nil {
+					return fmt.Errorf("unlink listener: %w", err)
+				}
 			}
+			delete(s.state.sitesListeners, site.Name())
+		} else {
+			s.logger.Warn("Site was not linked", "site", site.Name())
 		}
-		delete(s.state.sitesListeners, site.Name())
 	}
-
 	for _, listener := range s.state.listenersMap {
 		if err := listener.Close(); err != nil {
 			return fmt.Errorf("close listener: %w", err)

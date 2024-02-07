@@ -33,7 +33,7 @@ func (l testTLSListener) Name() string {
 	return "test"
 }
 
-func (l testTLSListener) Descriptors() []net.Listener {
+func (l testTLSListener) Listeners() []net.Listener {
 	return nil
 }
 

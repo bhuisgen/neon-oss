@@ -2,8 +2,8 @@ package neon
 
 import (
 	"context"
+	"net"
 	"net/http"
-	"os"
 
 	"github.com/bhuisgen/neon/pkg/core"
 )
@@ -37,7 +37,7 @@ type Loader interface {
 // Server
 type Server interface {
 	Init(config map[string]interface{}) error
-	Register(descriptors map[string]ServerListenerDescriptor) error
+	Register(listeners map[string][]net.Listener) error
 	Start() error
 	Stop() error
 	Shutdown(ctx context.Context) error
@@ -46,7 +46,7 @@ type Server interface {
 // ServerListener
 type ServerListener interface {
 	Init(config map[string]interface{}) error
-	Register(descriptor ServerListenerDescriptor) error
+	Register(listeners []net.Listener) error
 	Serve() error
 	Shutdown(ctx context.Context) error
 	Close() error
@@ -54,17 +54,12 @@ type ServerListener interface {
 	Name() string
 	Link(site ServerSite) error
 	Unlink(site ServerSite) error
-	Descriptor() (ServerListenerDescriptor, error)
+	Listeners() ([]net.Listener, error)
 }
 
 // ServerListenerRouter
 type ServerListenerRouter interface {
 	http.Handler
-}
-
-// ServerListenerDescriptor
-type ServerListenerDescriptor interface {
-	Files() []*os.File
 }
 
 // ServerSite

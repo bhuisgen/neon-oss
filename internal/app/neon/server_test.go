@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"testing"
 )
 
@@ -24,7 +25,7 @@ func (l testServerServerListener) Init(config map[string]interface{}) error {
 	return nil
 }
 
-func (l testServerServerListener) Register(descriptor ServerListenerDescriptor) error {
+func (l testServerServerListener) Register(listeners []net.Listener) error {
 	if l.errRegister {
 		return errors.New("test error")
 	}
@@ -71,7 +72,7 @@ func (l testServerServerListener) Unlink(site ServerSite) error {
 	return nil
 }
 
-func (l testServerServerListener) Descriptor() (ServerListenerDescriptor, error) {
+func (l testServerServerListener) Listeners() ([]net.Listener, error) {
 	return nil, nil
 }
 
@@ -334,7 +335,7 @@ func TestServerRegister(t *testing.T) {
 		loader  Loader
 	}
 	type args struct {
-		descriptors map[string]ServerListenerDescriptor
+		listeners map[string][]net.Listener
 	}
 	tests := []struct {
 		name    string
@@ -343,17 +344,17 @@ func TestServerRegister(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "no descriptors",
+			name: "without listeners",
 			fields: fields{
 				logger: slog.Default(),
 				state:  &serverState{},
 			},
 			args: args{
-				descriptors: nil,
+				listeners: nil,
 			},
 		},
 		{
-			name: "descriptors",
+			name: "with listeners",
 			fields: fields{
 				logger: slog.Default(),
 				state: &serverState{
@@ -363,7 +364,9 @@ func TestServerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				descriptors: map[string]ServerListenerDescriptor{},
+				listeners: map[string][]net.Listener{
+					"default": {},
+				},
 			},
 		},
 		{
@@ -379,7 +382,9 @@ func TestServerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				descriptors: map[string]ServerListenerDescriptor{},
+				listeners: map[string][]net.Listener{
+					"default": {},
+				},
 			},
 			wantErr: true,
 		},
@@ -436,7 +441,7 @@ func TestServerRegister(t *testing.T) {
 				fetcher: tt.fields.fetcher,
 				loader:  tt.fields.loader,
 			}
-			if err := s.Register(tt.args.descriptors); (err != nil) != tt.wantErr {
+			if err := s.Register(tt.args.listeners); (err != nil) != tt.wantErr {
 				t.Errorf("server.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

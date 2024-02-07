@@ -18,8 +18,8 @@ type Server interface {
 type ServerListener interface {
 	// Returns the listener name.
 	Name() string
-	// Return the listener descriptors.
-	Descriptors() []net.Listener
+	// Returns the listener listeners.
+	Listeners() []net.Listener
 	// RegisterListener registers a listener.
 	RegisterListener(listener net.Listener) error
 }

@@ -109,21 +109,10 @@ func (l *serverListener) Init(config map[string]interface{}) error {
 }
 
 // Register registers the listener.
-func (l *serverListener) Register(descriptor ServerListenerDescriptor) error {
+func (l *serverListener) Register(listeners []net.Listener) error {
 	l.logger.Debug("Registering listener")
 
-	mediator := newServerListenerMediator(l)
-
-	if descriptor != nil {
-		for _, file := range descriptor.Files() {
-			ln, err := net.FileListener(file)
-			_ = l.osClose(file)
-			if err != nil {
-				return fmt.Errorf("create file listener: %w", err)
-			}
-			mediator.descriptors = append(mediator.descriptors, ln)
-		}
-	}
+	mediator := newServerListenerMediator(l, listeners)
 
 	if err := l.state.listener.Register(mediator); err != nil {
 		return fmt.Errorf("register listener: %w", err)
@@ -264,75 +253,49 @@ func (l *serverListener) updateRouter() error {
 	return nil
 }
 
-// Descriptor returns the listener descriptor.
-func (l *serverListener) Descriptor() (ServerListenerDescriptor, error) {
+// Listeners returns the listener listeners.
+func (l *serverListener) Listeners() ([]net.Listener, error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
 	if l.state.mediator == nil {
 		return nil, errors.New("listener not ready")
 	}
 
-	descriptor, err := l.buildDescriptor()
-	if err != nil {
-		return nil, err
-	}
-
-	return descriptor, nil
-}
-
-// buildDescriptor builds the listener descriptor.
-func (l *serverListener) buildDescriptor() (ServerListenerDescriptor, error) {
-	descriptor := newServerListenerDescriptor()
-
-	for _, listener := range l.state.mediator.descriptors {
-		switch v := listener.(type) {
-		case *net.TCPListener:
-			file, err := v.File()
-			if err != nil {
-				return nil, fmt.Errorf("get listener file: %w", err)
-			}
-			descriptor.addFile(file)
-
-		case *net.UnixListener:
-			file, err := v.File()
-			if err != nil {
-				return nil, fmt.Errorf("get listener file: %w", err)
-			}
-			descriptor.addFile(file)
-
-		default:
-			return nil, errors.New("invalid listener file")
-		}
-	}
-
-	return descriptor, nil
+	return l.state.mediator.listeners, nil
 }
 
 var _ ServerListener = (*serverListener)(nil)
 
 // serverListenerMediator implements the server listener mediator.
 type serverListenerMediator struct {
-	listener    *serverListener
-	descriptors []net.Listener
-	mu          sync.RWMutex
+	listener  *serverListener
+	listeners []net.Listener
+	mu        sync.RWMutex
 }
 
 // newServerListenerMediator creates a new server listener mediator.
-func newServerListenerMediator(listener *serverListener) *serverListenerMediator {
+func newServerListenerMediator(listener *serverListener, listeners []net.Listener) *serverListenerMediator {
 	return &serverListenerMediator{
-		listener: listener,
+		listener:  listener,
+		listeners: listeners,
 	}
 }
 
 // Names returns the listener name.
 func (m *serverListenerMediator) Name() string {
-	return m.listener.Name()
-}
-
-// Descriptors returns the listener descriptors.
-func (m *serverListenerMediator) Descriptors() []net.Listener {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return m.descriptors
+	return m.listener.Name()
+}
+
+// Listeners returns the listener listeners.
+func (m *serverListenerMediator) Listeners() []net.Listener {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return m.listeners
 }
 
 // RegisterListener registers a listener.
@@ -340,41 +303,12 @@ func (m *serverListenerMediator) RegisterListener(listener net.Listener) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.descriptors = append(m.descriptors, listener)
+	m.listeners = append(m.listeners, listener)
 
 	return nil
 }
 
 var _ core.ServerListener = (*serverListenerMediator)(nil)
-
-// serverListenerDescriptor implements the server listener descriptor.
-type serverListenerDescriptor struct {
-	files []*os.File
-	mu    sync.RWMutex
-}
-
-// newServerListenerDescriptor creates a new server listener descriptor.
-func newServerListenerDescriptor() *serverListenerDescriptor {
-	return &serverListenerDescriptor{}
-}
-
-// addFile adds a file to the descriptor.
-func (d *serverListenerDescriptor) addFile(file *os.File) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	d.files = append(d.files, file)
-}
-
-// Files returns the descriptor files.
-func (d *serverListenerDescriptor) Files() []*os.File {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	return d.files
-}
-
-var _ ServerListenerDescriptor = (*serverListenerDescriptor)(nil)
 
 // serverListenerRouter implements the server listener router.
 type serverListenerRouter struct {

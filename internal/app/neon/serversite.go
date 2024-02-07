@@ -187,10 +187,10 @@ func (s *serverSite) Init(config map[string]interface{}) error {
 
 // Register registers the site middlewares and handlers.
 func (s *serverSite) Register() error {
-	s.logger.Debug("Registering site")
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.logger.Debug("Registering site")
 
 	mediator := newServerSiteMediator(s)
 	for _, route := range s.state.routes {
@@ -222,10 +222,10 @@ func (s *serverSite) Register() error {
 
 // Start starts the site.
 func (s *serverSite) Start() error {
-	s.logger.Info("Starting site")
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.logger.Info("Starting site")
 
 	for _, route := range s.state.routes {
 		for _, middleware := range s.state.routesMap[route].middlewares {
@@ -246,10 +246,10 @@ func (s *serverSite) Start() error {
 
 // Stop stops the site.
 func (s *serverSite) Stop() error {
-	s.logger.Info("Stopping site")
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	s.logger.Info("Stopping site")
 
 	for _, route := range s.state.routes {
 		for _, middleware := range s.state.routesMap[route].middlewares {
@@ -269,6 +269,9 @@ func (s *serverSite) Stop() error {
 
 // Name returns the site name.
 func (s *serverSite) Name() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	return s.name
 }
 
@@ -519,7 +522,7 @@ func newServerSiteMiddleware(s *serverSite) *serverSiteMiddleware {
 
 // Handler implements the middleware handler.
 func (m *serverSiteMiddleware) Handler(next http.Handler) http.Handler {
-	f := func(w http.ResponseWriter, r *http.Request) {
+	fn := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -533,7 +536,7 @@ func (m *serverSiteMiddleware) Handler(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	}
 
-	return http.HandlerFunc(f)
+	return http.HandlerFunc(fn)
 }
 
 // serverSiteHandler implements the default server site handler.

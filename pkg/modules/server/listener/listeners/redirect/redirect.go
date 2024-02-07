@@ -167,8 +167,9 @@ func (l *redirectListener) Init(config map[string]interface{}, logger *slog.Logg
 
 // Register registers the listener.
 func (l *redirectListener) Register(listener core.ServerListener) error {
-	if len(listener.Descriptors()) == 1 {
-		l.listener = listener.Descriptors()[0]
+	listeners := listener.Listeners()
+	if len(listeners) == 1 {
+		l.listener = listeners[0]
 		return nil
 	}
 

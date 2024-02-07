@@ -32,7 +32,7 @@ type application struct {
 
 // applicationState implements the application state.
 type applicationState struct {
-	serverListenersDescriptors map[string]ServerListenerDescriptor
+	serverListeners map[string][]net.Listener
 }
 
 const (
@@ -264,11 +264,28 @@ func (a *application) reload() error {
 					os.Stderr,
 				}
 				for _, listener := range a.server.state.listenersMap {
-					descriptor, err := listener.Descriptor()
+					listeners, err := listener.Listeners()
 					if err != nil {
 						return fmt.Errorf("get listener descriptor: %w", err)
 					}
-					files = append(files, descriptor.Files()...)
+					for _, l := range listeners {
+						switch v := l.(type) {
+						case *net.TCPListener:
+							file, err := v.File()
+							if err != nil {
+								return fmt.Errorf("get listener file: %w", err)
+							}
+							files = append(files, file)
+						case *net.UnixListener:
+							file, err := v.File()
+							if err != nil {
+								return fmt.Errorf("get listener file: %w", err)
+							}
+							files = append(files, file)
+						default:
+							return errors.New("invalid listener type")
+						}
+					}
 				}
 
 				if _, err := os.StartProcess(exe, os.Args, &os.ProcAttr{
@@ -392,7 +409,7 @@ func (a *application) startServer(server Server, config map[string]interface{}) 
 	if err := server.Init(config); err != nil {
 		return fmt.Errorf("init server: %w", err)
 	}
-	if err := server.Register(a.state.serverListenersDescriptors); err != nil {
+	if err := server.Register(a.state.serverListeners); err != nil {
 		return fmt.Errorf("register server: %w", err)
 	}
 	if err := server.Start(); err != nil {
@@ -527,13 +544,31 @@ func (a *application) handleChild(conn net.Conn, key string, ch chan<- string, e
 					Name: listener.Name(),
 				}
 
-				descriptor, err := listener.Descriptor()
+				listeners, err := listener.Listeners()
 				if err != nil {
-					errorCh <- fmt.Errorf("get descriptor: %w", err)
+					errorCh <- fmt.Errorf("get listeners: %w", err)
 					return
 				}
-				for _, file := range descriptor.Files() {
-					helloListener.Files = append(helloListener.Files, file.Name())
+				for _, l := range listeners {
+					switch v := l.(type) {
+					case *net.TCPListener:
+						file, err := v.File()
+						if err != nil {
+							errorCh <- fmt.Errorf("get listener file: %w", err)
+							return
+						}
+						helloListener.Files = append(helloListener.Files, file.Name())
+					case *net.UnixListener:
+						file, err := v.File()
+						if err != nil {
+							errorCh <- fmt.Errorf("get listener file: %w", err)
+							return
+						}
+						helloListener.Files = append(helloListener.Files, file.Name())
+					default:
+						errorCh <- errors.New("invalid listener type")
+						return
+					}
 				}
 				response.Listeners = append(response.Listeners, helloListener)
 			}
@@ -604,6 +639,7 @@ func (a *application) child(key string) error {
 			if _, err := fmt.Fprintf(conn, "%s:%s\r\n", childCommandReload, request); err != nil {
 				return fmt.Errorf("send reload: %w", err)
 			}
+
 			if !s.Scan() {
 				break
 			}
@@ -616,16 +652,18 @@ func (a *application) child(key string) error {
 				return fmt.Errorf("decode reload response: %w", err)
 			}
 			var fdsIndex int = 3
-			a.state.serverListenersDescriptors = make(map[string]ServerListenerDescriptor, len(response.Listeners))
+			a.state.serverListeners = make(map[string][]net.Listener, len(response.Listeners))
 			for _, listener := range response.Listeners {
-				descriptor := newServerListenerDescriptor()
 				for _, file := range listener.Files {
-					descriptor.addFile(os.NewFile(uintptr(fdsIndex), file))
+					f := os.NewFile(uintptr(fdsIndex), file)
 					fdsIndex++
+					l, err := net.FileListener(f)
+					if err != nil {
+						return fmt.Errorf("copy network listener: %w", err)
+					}
+					a.state.serverListeners[listener.Name] = append(a.state.serverListeners[listener.Name], l)
 				}
-				a.state.serverListenersDescriptors[listener.Name] = descriptor
 			}
-
 			if _, err := fmt.Fprintf(conn, "%s\r\n", childCommandReady); err != nil {
 				return fmt.Errorf("send ready: %w", err)
 			}
