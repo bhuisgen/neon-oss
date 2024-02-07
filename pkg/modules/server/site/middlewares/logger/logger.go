@@ -150,7 +150,7 @@ func (m *loggerMiddleware) Start() error {
 		}()
 	}
 
-	m.log = log.New(os.Stdout, "", log.LstdFlags|log.Lmsgprefix)
+	m.log = log.New(os.Stdout, "", 0)
 	if logFileWriter != nil {
 		m.log.SetOutput(logFileWriter)
 	}
@@ -170,12 +170,13 @@ func (m *loggerMiddleware) Stop() error {
 // Handler implements the middleware handler.
 func (m *loggerMiddleware) Handler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
+		wrapped := loggerResponseWriter{ResponseWriter: w, status: http.StatusOK}
+
 		start := time.Now()
-		wrapped := loggerResponseWriter{w, false, http.StatusOK}
-
 		next.ServeHTTP(&wrapped, r)
+		duration := time.Since(start)
 
-		m.log.Println(r.Method, r.URL.EscapedPath(), wrapped.status, time.Since(start))
+		m.log.Println(r.Method, r.URL.EscapedPath(), wrapped.status, duration)
 	}
 
 	return http.HandlerFunc(fn)
