@@ -9,10 +9,18 @@ linters:
     - staticcheck
     - unused
     # bugs
-    - gosec
     - bodyclose
+    - gosec
     # performance
     - noctx
     - perfsprint
     - prealloc
+    # style
+    - errname
+    - sloglint
+    #- wrapcheck
   fast: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
