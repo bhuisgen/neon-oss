@@ -90,8 +90,7 @@ func (p *rawParser) Parse(ctx context.Context, store core.Store, fetcher core.Fe
 		return fmt.Errorf("fetch resource %s: %v", resourceName, err)
 	}
 
-	err = store.StoreResource(resourceName, resource)
-	if err != nil {
+	if err := store.StoreResource(resourceName, resource); err != nil {
 		return fmt.Errorf("store resource %s: %v", resourceName, err)
 	}
 

@@ -174,10 +174,10 @@ func (l *loader) Init(config map[string]interface{}) error {
 
 // Start starts the loader.
 func (l *loader) Start() error {
-	l.logger.Info("Starting loader")
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	l.logger.Info("Starting loader")
 
 	if len(l.config.Rules) == 0 {
 		l.logger.Warn("Execution disabled, no rules defined")
@@ -202,10 +202,10 @@ func (l *loader) Start() error {
 
 // Stop stops the loader.
 func (l *loader) Stop() error {
-	l.logger.Info("Stopping loader")
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	l.logger.Info("Stopping loader")
 
 	if len(l.config.Rules) > 0 && (*l.config.ExecStartup > 0 || *l.config.ExecInterval > 0) {
 		l.stop <- struct{}{}

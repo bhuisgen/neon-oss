@@ -389,8 +389,7 @@ func (h *appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rw := h.rwPool.Get()
 	defer h.rwPool.Put(rw)
 
-	err = h.render(rw, r)
-	if err != nil {
+	if err := h.render(rw, r); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
 		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
@@ -853,8 +852,7 @@ func (h *appHandler) app(w render.RenderWriter, r *http.Request, b io.Reader, st
 		}
 	}
 
-	err = html.Render(w, doc)
-	if err != nil {
+	if err := html.Render(w, doc); err != nil {
 		return fmt.Errorf("render html: %v", err)
 	}
 

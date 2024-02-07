@@ -153,7 +153,7 @@ func (m *staticMiddleware) Stop() error {
 
 // Handler implements the middleware handler.
 func (m *staticMiddleware) Handler(next http.Handler) http.Handler {
-	f := func(w http.ResponseWriter, r *http.Request) {
+	fn := func(w http.ResponseWriter, r *http.Request) {
 		if !m.staticFS.Exists(r.URL.Path) {
 			next.ServeHTTP(w, r)
 
@@ -163,7 +163,7 @@ func (m *staticMiddleware) Handler(next http.Handler) http.Handler {
 		m.staticHandler.ServeHTTP(w, r)
 	}
 
-	return http.HandlerFunc(f)
+	return http.HandlerFunc(fn)
 }
 
 // StaticFileSystem

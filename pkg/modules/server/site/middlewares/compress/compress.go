@@ -109,7 +109,7 @@ func (m *compressMiddleware) Stop() error {
 
 // Handler implements the middleware handler.
 func (m *compressMiddleware) Handler(next http.Handler) http.Handler {
-	f := func(w http.ResponseWriter, r *http.Request) {
+	fn := func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get(compressHeaderAcceptEncoding), compressGzipScheme) {
 			next.ServeHTTP(w, r)
 			return
@@ -125,9 +125,9 @@ func (m *compressMiddleware) Handler(next http.Handler) http.Handler {
 		}
 		writer.Reset(w)
 
-		cw := compressResponseWriter{Writer: writer, ResponseWriter: w}
-		next.ServeHTTP(&cw, r)
-		if !cw.wroteBody {
+		rw := compressResponseWriter{Writer: writer, ResponseWriter: w}
+		next.ServeHTTP(&rw, r)
+		if !rw.wroteBody {
 			if w.Header().Get(compressHeaderContentEncoding) == compressGzipScheme {
 				r.Header.Del(compressHeaderAcceptEncoding)
 			}
@@ -138,7 +138,7 @@ func (m *compressMiddleware) Handler(next http.Handler) http.Handler {
 		m.pool.Put(writer)
 	}
 
-	return http.HandlerFunc(f)
+	return http.HandlerFunc(fn)
 }
 
 // compressResponseWriter implements the compress response writer.
@@ -164,7 +164,6 @@ func (w *compressResponseWriter) Write(b []byte) (int, error) {
 	if err != nil {
 		return n, fmt.Errorf("write: %w", err)
 	}
-
 	return n, nil
 }
 
@@ -181,7 +180,6 @@ func (w *compressResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	c, rw, err := w.ResponseWriter.(http.Hijacker).Hijack()
 	if err != nil {
 		return c, rw, fmt.Errorf("hijack: %w", err)
-
 	}
 	return c, rw, nil
 }

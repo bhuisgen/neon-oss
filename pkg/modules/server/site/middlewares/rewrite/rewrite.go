@@ -124,7 +124,7 @@ func (m *rewriteMiddleware) Stop() error {
 
 // Handler implements the middleware handler.
 func (m *rewriteMiddleware) Handler(next http.Handler) http.Handler {
-	f := func(w http.ResponseWriter, r *http.Request) {
+	fn := func(w http.ResponseWriter, r *http.Request) {
 		var rewrite bool
 		var path string = r.URL.Path
 		var status int = http.StatusFound
@@ -166,7 +166,7 @@ func (m *rewriteMiddleware) Handler(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	}
 
-	return http.HandlerFunc(f)
+	return http.HandlerFunc(fn)
 }
 
 var _ core.ServerSiteMiddlewareModule = (*rewriteMiddleware)(nil)

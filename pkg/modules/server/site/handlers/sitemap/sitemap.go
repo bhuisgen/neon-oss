@@ -523,8 +523,7 @@ func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemap
 
 	for _, data := range resource.Data {
 		var jsonData interface{}
-		err = json.Unmarshal(data, &jsonData)
-		if err != nil {
+		if err := json.Unmarshal(data, &jsonData); err != nil {
 			return nil, fmt.Errorf("parse resource %s data: %v", entry.List.Resource, err)
 		}
 

@@ -115,8 +115,7 @@ func (p *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 
 	for _, data := range resource.Data {
 		var jsonData interface{}
-		err = p.jsonUnmarshal(data, &jsonData)
-		if err != nil {
+		if err := p.jsonUnmarshal(data, &jsonData); err != nil {
 			return fmt.Errorf("parse resource %s data: %v", resourceName, err)
 		}
 		result, err := jsonpath.Get(p.config.Filter, jsonData)
@@ -138,8 +137,7 @@ func (p *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 		}
 	}
 
-	err = store.StoreResource(resourceName, resource)
-	if err != nil {
+	if err := store.StoreResource(resourceName, resource); err != nil {
 		return fmt.Errorf("store resource %s: %v", resourceName, err)
 	}
 
@@ -189,8 +187,7 @@ func (p *jsonParser) executeResourceFromItem(ctx context.Context, store core.Sto
 		return fmt.Errorf("fetch item resource: %v", err)
 	}
 
-	err = store.StoreResource(itemResourceName, resource)
-	if err != nil {
+	if err := store.StoreResource(itemResourceName, resource); err != nil {
 		return fmt.Errorf("store item resource: %v", err)
 	}
 

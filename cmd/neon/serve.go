@@ -44,14 +44,12 @@ func (c *serveCommand) Description() string {
 
 // Parse parses the command arguments.
 func (c *serveCommand) Parse(args []string) error {
-	err := c.flagset.Parse(args)
-	if err != nil {
+	if err := c.flagset.Parse(args); err != nil {
 		return errors.New("parse arguments")
 	}
 	if len(c.flagset.Args()) > 0 {
 		return errors.New("check arguments")
 	}
-
 	return nil
 }
 
@@ -63,8 +61,8 @@ func (c *serveCommand) Execute() error {
 		return fmt.Errorf("load config: %v", err)
 	}
 
-	err = neon.NewApplication(config).Serve()
-	if err != nil {
+	if err := neon.NewApplication(config).Serve(); err != nil {
+		fmt.Printf("Failed to serve: %s\n", err)
 		return fmt.Errorf("serve: %v", err)
 	}
 

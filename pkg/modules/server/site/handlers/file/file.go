@@ -225,8 +225,7 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rw := h.rwPool.Get()
 	defer h.rwPool.Put(rw)
 
-	err = h.render(rw, r)
-	if err != nil {
+	if err := h.render(rw, r); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
 		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)

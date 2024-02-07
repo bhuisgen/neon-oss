@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -72,7 +73,9 @@ func healthcheck(url string, cacert string, cert string, key string, status int,
 		}
 
 		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(ca)
+		if !caCertPool.AppendCertsFromPEM(ca) {
+			return errors.New("append ca")
+		}
 
 		tlsConfig.RootCAs = caCertPool
 

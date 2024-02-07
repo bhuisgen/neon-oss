@@ -258,8 +258,7 @@ func GenerateConfig(syntax string, template string) error {
 		dst = src
 	}
 
-	_, err := os.Stat(dst)
-	if err == nil {
+	if _, err := os.Stat(dst); err == nil {
 		return fmt.Errorf("file %s already exists", dst)
 	}
 

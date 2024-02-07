@@ -48,14 +48,12 @@ func (c *initCommand) Description() string {
 
 // Parse parses the command arguments.
 func (c *initCommand) Parse(args []string) error {
-	err := c.flagset.Parse(args)
-	if err != nil {
+	if err := c.flagset.Parse(args); err != nil {
 		return errors.New("parse arguments")
 	}
 	if len(c.flagset.Args()) > 0 {
 		return errors.New("check arguments")
 	}
-
 	return nil
 }
 

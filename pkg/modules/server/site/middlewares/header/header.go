@@ -114,7 +114,7 @@ func (m *headerMiddleware) Stop() error {
 
 // Handler implements the middleware handler.
 func (m *headerMiddleware) Handler(next http.Handler) http.Handler {
-	f := func(w http.ResponseWriter, r *http.Request) {
+	fn := func(w http.ResponseWriter, r *http.Request) {
 		for index, regexp := range m.regexps {
 			if regexp.MatchString(r.URL.Path) {
 				for k, v := range m.config.Rules[index].Set {
@@ -129,7 +129,7 @@ func (m *headerMiddleware) Handler(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	}
 
-	return http.HandlerFunc(f)
+	return http.HandlerFunc(fn)
 }
 
 var _ core.ServerSiteMiddlewareModule = (*headerMiddleware)(nil)

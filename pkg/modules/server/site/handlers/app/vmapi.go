@@ -25,16 +25,14 @@ func api(v *vm) error {
 
 // apiHandler injects the handler API.
 func apiHandler(v *vm) error {
-	var err error
-	err = v.serverHandlerObject.Set("state", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverHandlerObject.Set("state", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			value, err := v8go.JSONParse(v.context, *v.config.State)
 			if err != nil {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
@@ -43,93 +41,84 @@ func apiHandler(v *vm) error {
 
 // apiRequest injects the request API.
 func apiRequest(v *vm) error {
-	var err error
-
-	err = v.serverRequestObject.Set("method", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("method", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			value, err := v8go.NewValue(v.isolate, v.config.Request.Method)
 			if err != nil {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverRequestObject.Set("proto", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("proto", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			value, err := v8go.NewValue(v.isolate, v.config.Request.Proto)
 			if err != nil {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverRequestObject.Set("protoMajor", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("protoMajor", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			value, err := v8go.NewValue(v.isolate, v.config.Request.ProtoMajor)
 			if err != nil {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverRequestObject.Set("protoMinor", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("protoMinor", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			value, err := v8go.NewValue(v.isolate, v.config.Request.ProtoMinor)
 			if err != nil {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverRequestObject.Set("remoteAddr", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("remoteAddr", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			value, err := v8go.NewValue(v.isolate, v.config.Request.RemoteAddr)
 			if err != nil {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverRequestObject.Set("host", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("host", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			value, err := v8go.NewValue(v.isolate, v.config.Request.Host)
 			if err != nil {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverRequestObject.Set("path", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("path", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			value, err := v8go.NewValue(v.isolate, v.config.Request.URL.Path)
 			if err != nil {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverRequestObject.Set("query", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("query", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			var value *v8go.Value
 			q := v.config.Request.URL.Query()
@@ -142,12 +131,11 @@ func apiRequest(v *vm) error {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverRequestObject.Set("headers", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverRequestObject.Set("headers", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			var value *v8go.Value
 			h := v.config.Request.Header
@@ -160,8 +148,7 @@ func apiRequest(v *vm) error {
 				return nil
 			}
 			return value
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
@@ -170,9 +157,7 @@ func apiRequest(v *vm) error {
 
 // apiResponse injects the response API.
 func apiResponse(v *vm) error {
-	var err error
-
-	err = v.serverResponseObject.Set("render", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverResponseObject.Set("render", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) < 1 || !args[0].IsString() {
@@ -193,12 +178,11 @@ func apiResponse(v *vm) error {
 			v.data.status = &status
 
 			return nil
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverResponseObject.Set("redirect", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverResponseObject.Set("redirect", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) < 1 || !args[0].IsString() {
@@ -221,12 +205,11 @@ func apiResponse(v *vm) error {
 			v.data.redirectStatus = &redirectStatus
 
 			return nil
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverResponseObject.Set("setHeader", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverResponseObject.Set("setHeader", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
@@ -242,12 +225,11 @@ func apiResponse(v *vm) error {
 			v.data.headers[key] = append(v.data.headers[key], value)
 
 			return nil
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverResponseObject.Set("setTitle", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverResponseObject.Set("setTitle", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) < 1 || !args[0].IsString() {
@@ -258,12 +240,11 @@ func apiResponse(v *vm) error {
 			v.data.title = &title
 
 			return nil
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverResponseObject.Set("setMeta", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverResponseObject.Set("setMeta", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) < 2 || !args[0].IsString() || !args[1].IsMap() {
@@ -327,12 +308,11 @@ func apiResponse(v *vm) error {
 			v.data.metas.Set(e)
 
 			return nil
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverResponseObject.Set("setLink", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverResponseObject.Set("setLink", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) < 2 || !args[0].IsString() || !args[1].IsMap() {
@@ -396,12 +376,11 @@ func apiResponse(v *vm) error {
 			v.data.links.Set(e)
 
 			return nil
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 
-	err = v.serverResponseObject.Set("setScript", v.v8NewFunctionTemplate(v.isolate,
+	if err := v.serverResponseObject.Set("setScript", v.v8NewFunctionTemplate(v.isolate,
 		func(info *v8go.FunctionCallbackInfo) *v8go.Value {
 			args := info.Args()
 			if len(args) < 2 || !args[0].IsString() || !args[1].IsMap() {
@@ -465,8 +444,7 @@ func apiResponse(v *vm) error {
 			v.data.scripts.Set(e)
 
 			return nil
-		}))
-	if err != nil {
+		})); err != nil {
 		return errVMConfigure
 	}
 

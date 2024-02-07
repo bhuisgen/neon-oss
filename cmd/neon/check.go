@@ -50,7 +50,6 @@ func (c *checkCommand) Parse(args []string) error {
 	if len(c.flagset.Args()) > 0 {
 		return errors.New("check arguments")
 	}
-
 	return nil
 }
 
