@@ -16,8 +16,7 @@ import (
 
 // main is the entrypoint.
 func main() {
-	err := run()
-	if err != nil {
+	if err := run(); err != nil {
 		os.Exit(1)
 	}
 }

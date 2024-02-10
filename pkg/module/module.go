@@ -2,7 +2,6 @@ package module
 
 import (
 	"fmt"
-	"log"
 	"sync"
 )
 
@@ -30,33 +29,28 @@ var (
 
 // Register registers a module.
 func Register(module Module) {
-	modulesLock.Lock()
-	defer modulesLock.Unlock()
-
 	info := module.ModuleInfo()
-	if _, ok := modules[info.ID]; ok {
-		log.Fatalf("Module '%s' already registered", info.ID)
+	modulesLock.Lock()
+	if _, ok := modules[info.ID]; !ok {
+		modules[info.ID] = info
 	}
-	modules[info.ID] = info
+	modulesLock.Unlock()
 }
 
 // Unregister unregisters a module.
 func Unregister(module Module) {
 	modulesLock.Lock()
-	defer modulesLock.Unlock()
-
 	delete(modules, module.ModuleInfo().ID)
+	modulesLock.Unlock()
 }
 
 // Lookup returns the module information if found.
 func Lookup(id ModuleID) (ModuleInfo, error) {
 	modulesLock.RLock()
-	defer modulesLock.RUnlock()
-
 	mi, ok := modules[id]
+	modulesLock.RUnlock()
 	if !ok {
 		return ModuleInfo{}, fmt.Errorf("module '%s' not registered", id)
 	}
-
 	return mi, nil
 }

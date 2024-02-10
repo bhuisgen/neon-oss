@@ -12,18 +12,17 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/bhuisgen/neon/pkg/core"
+	"github.com/bhuisgen/neon/pkg/log"
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
 // loader implements the loader.
 type loader struct {
-	config  *loaderConfig
-	logger  *slog.Logger
-	state   *loaderState
-	store   Store
-	fetcher Fetcher
-	mu      sync.RWMutex
-	stop    chan struct{}
+	config *loaderConfig
+	logger *slog.Logger
+	state  *loaderState
+	mu     *sync.RWMutex
+	stop   chan struct{}
 }
 
 // loaderConfig implements the loader configuration.
@@ -40,11 +39,14 @@ type loaderConfig struct {
 // loaderState implements the loader state.
 type loaderState struct {
 	parsers  map[string]core.LoaderParserModule
+	store    core.Store
+	fetcher  core.Fetcher
+	mediator *loaderMediator
 	failsafe bool
 }
 
 const (
-	loaderLogger string = "loader"
+	loaderModuleID module.ModuleID = "app.loader"
 
 	loaderConfigDefaultExecStartup          int = 15
 	loaderConfigDefaultExecInterval         int = 900
@@ -54,16 +56,20 @@ const (
 	loaderConfigDefaultExecMaxDelay         int = 60
 )
 
-// newLoader creates a new loader.
-func newLoader(store Store, fetcher Fetcher) *loader {
-	return &loader{
-		logger: slog.New(NewLogHandler(os.Stderr, loaderLogger, nil)),
-		state: &loaderState{
-			parsers: make(map[string]core.LoaderParserModule),
+// ModuleInfo returns the module information.
+func (l loader) ModuleInfo() module.ModuleInfo {
+	return module.ModuleInfo{
+		ID: loaderModuleID,
+		NewInstance: func() module.Module {
+			return &loader{
+				logger: slog.New(log.NewHandler(os.Stderr, string(loaderModuleID), nil)),
+				state: &loaderState{
+					parsers: make(map[string]core.LoaderParserModule),
+				},
+				mu:   &sync.RWMutex{},
+				stop: make(chan struct{}),
+			}
 		},
-		store:   store,
-		fetcher: fetcher,
-		stop:    make(chan struct{}),
 	}
 }
 
@@ -133,7 +139,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 
 	for ruleName, ruleConfig := range l.config.Rules {
 		for moduleName, moduleConfig := range ruleConfig {
-			moduleInfo, err := module.Lookup(module.ModuleID("loader.parser." + moduleName))
+			moduleInfo, err := module.Lookup(module.ModuleID("app.loader.parser." + moduleName))
 			if err != nil {
 				l.logger.Error("Unregistered parser module", "rule", ruleName, "module", moduleName, "err", err)
 				errConfig = true
@@ -150,10 +156,7 @@ func (l *loader) Init(config map[string]interface{}) error {
 			if moduleConfig == nil {
 				moduleConfig = map[string]interface{}{}
 			}
-			if err := module.Init(
-				moduleConfig,
-				slog.New(NewLogHandler(os.Stderr, loaderLogger, nil)).With("parser", moduleName),
-			); err != nil {
+			if err := module.Init(moduleConfig); err != nil {
 				l.logger.Error("Failed to init parser module", "rule", ruleName, "module", moduleName, "err", err)
 				errConfig = true
 				continue
@@ -168,6 +171,15 @@ func (l *loader) Init(config map[string]interface{}) error {
 	if errConfig {
 		return errors.New("config")
 	}
+
+	return nil
+}
+
+// Register registers the loader.
+func (l *loader) Register(app core.App) error {
+	l.state.mediator = newLoaderMediator(l)
+	l.state.store = app.Store()
+	l.state.fetcher = app.Fetcher()
 
 	return nil
 }
@@ -238,12 +250,12 @@ func (l *loader) execute(stop <-chan struct{}) {
 					results <- err
 					continue
 				}
-
-				err := parser.Parse(ctx, l.store, l.fetcher)
-				if err != nil {
+				if err := parser.Parse(ctx, l.state.store, l.state.fetcher); err != nil {
 					l.logger.Error("Execution error", "rule", ruleName, "err", err)
+					results <- err
+					continue
 				}
-				results <- err
+				results <- nil
 			}
 		}
 
@@ -338,3 +350,17 @@ func (l *loader) execute(stop <-chan struct{}) {
 }
 
 var _ Loader = (*loader)(nil)
+
+// loaderMediator implements the loader mediator.
+type loaderMediator struct {
+	loader *loader
+}
+
+// newLoaderMediator creates a new mediator.
+func newLoaderMediator(loader *loader) *loaderMediator {
+	return &loaderMediator{
+		loader: loader,
+	}
+}
+
+var _ core.Loader = (*loaderMediator)(nil)

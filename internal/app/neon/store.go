@@ -5,39 +5,47 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/bhuisgen/neon/pkg/core"
+	"github.com/bhuisgen/neon/pkg/log"
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
-// store implements the datastore
+// store implements the store
 type store struct {
 	config *storeConfig
 	logger *slog.Logger
 	state  *storeState
 }
 
-// storeConfig implements the datastore configuration
+// storeConfig implements the store configuration
 type storeConfig struct {
 	Storage map[string]map[string]interface{} `mapstructure:"storage"`
 }
 
-// storeState implements the datastore state
+// storeState implements the store state
 type storeState struct {
-	storage core.StoreStorageModule
+	storage  core.StoreStorageModule
+	mediator *storeMediator
 }
 
 const (
-	storeLogger string = "store"
+	storeModuleID module.ModuleID = "app.store"
 )
 
-// newStore creates a new store.
-func newStore() *store {
-	return &store{
-		logger: slog.New(NewLogHandler(os.Stderr, storeLogger, nil)),
-		state:  &storeState{},
+// ModuleInfo returns the module information.
+func (s store) ModuleInfo() module.ModuleInfo {
+	return module.ModuleInfo{
+		ID: storeModuleID,
+		NewInstance: func() module.Module {
+			return &store{
+				logger: slog.New(log.NewHandler(os.Stderr, string(storeModuleID), nil)),
+				state:  &storeState{},
+			}
+		},
 	}
 }
 
@@ -65,7 +73,7 @@ func (s *store) Init(config map[string]interface{}) error {
 		errConfig = true
 	}
 	for storage, storageConfig := range s.config.Storage {
-		moduleInfo, err := module.Lookup(module.ModuleID("store.storage." + storage))
+		moduleInfo, err := module.Lookup(module.ModuleID("app.store.storage." + storage))
 		if err != nil {
 			s.logger.Error("Unregistered storage module", "module", storage, "err", err)
 			errConfig = true
@@ -82,10 +90,7 @@ func (s *store) Init(config map[string]interface{}) error {
 		if storageConfig == nil {
 			storageConfig = map[string]interface{}{}
 		}
-		if err := module.Init(
-			storageConfig,
-			slog.New(NewLogHandler(os.Stderr, storeLogger, nil)).With("storage", storage),
-		); err != nil {
+		if err := module.Init(storageConfig); err != nil {
 			s.logger.Error("Failed to init storage module", "module", storage, "err", err)
 			errConfig = true
 			break
@@ -99,6 +104,13 @@ func (s *store) Init(config map[string]interface{}) error {
 	if errConfig {
 		return errors.New("config")
 	}
+
+	return nil
+}
+
+// Register registers the store.
+func (s *store) Register(app core.App) error {
+	s.state.mediator = newStoreMediator(s)
 
 	return nil
 }
@@ -127,3 +139,34 @@ func (s *store) StoreResource(name string, resource *core.Resource) error {
 }
 
 var _ Store = (*store)(nil)
+
+// storeMediator implements the store mediator.
+type storeMediator struct {
+	store *store
+	mu    sync.RWMutex
+}
+
+// newStoreMediator creates a new mediator.
+func newStoreMediator(store *store) *storeMediator {
+	return &storeMediator{
+		store: store,
+	}
+}
+
+// LoadResource loads a resource.
+func (m *storeMediator) LoadResource(name string) (*core.Resource, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return m.store.LoadResource(name)
+}
+
+// StoreResource stores a resource.
+func (m *storeMediator) StoreResource(name string, resource *core.Resource) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return m.store.StoreResource(name, resource)
+}
+
+var _ core.Store = (*storeMediator)(nil)

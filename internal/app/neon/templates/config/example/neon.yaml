@@ -1,134 +1,132 @@
-store:
-  storage:
-    memory:
+app:
+  store:
+    storage:
+      memory:
 
-fetcher:
-  providers:
-    api:
-      rest:
-        timeout: 15
-        retry: 3
-        delay: 5
-        headers:
-          Content-Type: application/json
-          Authorization: "Bearer: <secret_token>"
+  fetcher:
+    providers:
+      api:
+        rest:
+          timeout: 15
+          retry: 3
+          delay: 5
+          headers:
+            Content-Type: application/json
+            Authorization: "Bearer: <secret_token>"
 
-loader:
-  execStartup: 15
-  execInterval: 300
-  execFailsafeInterval: 60
-  execMaxOps: 100
-  execMaxDelay: 60
-  rules:
-    load-config:
-      raw:
-        resource:
-          config:
-            api:
-              method: GET
-              url: https://<backend_url>/static/config.json
-    load-pages:
-      json:
-        resource:
-          pages:
-            api:
-              method: GET
-              url: https://<backend_url>/api/v1/pages
-              params:
-                type: page
-                language: fr
-                limit: "100"
-                sort: -date
-                include: author
-              next: true
-              nextParser: body
-              nextFilter: $.links.next
-        filter: $.data
-        itemParams:
-          slug: $.attributes.slug
-        itemResource:
-          page-$id:
-            api:
-              method: GET
-              url: https://<backend_url>/api/v1/pages
-              params:
-                slug: $slug
+  loader:
+    execStartup: 15
+    execInterval: 300
+    execFailsafeInterval: 60
+    execMaxOps: 100
+    execMaxDelay: 60
+    rules:
+      load-config:
+        raw:
+          resource:
+            config:
+              api:
+                method: GET
+                url: https://<backend_url>/static/config.json
+      load-pages:
+        json:
+          resource:
+            pages:
+              api:
+                method: GET
+                url: https://<backend_url>/api/v1/pages
+                params:
+                  type: page
+                  language: fr
+                  limit: "100"
+                  sort: -date
+                  include: author
+                next: true
+                nextParser: body
+                nextFilter: $.links.next
+          filter: $.data
+          itemParams:
+            slug: $.attributes.slug
+          itemResource:
+            page-$id:
+              api:
+                method: GET
+                url: https://<backend_url>/api/v1/pages
+                params:
+                  slug: $slug
 
-server:
-  listeners:
-    secured:
-      tls:
-        listenAddr: 0.0.0.0
-        listenPort: 443
-        certFiles:
-          - cert.pem
-        keyFiles:
-          - key.pem
-    unsecured:
-      redirect:
-        listenAddr: 0.0.0.0
-        listenPort: 80
-
-  sites:
-    main:
-      listeners:
-        - default
-        - secured
-      routes:
-        default:
-          middlewares:
-            logger:
-              file: access.log
-            compress:
-              # level: -1
-            static:
-              path: app/static
-          handler:
-            app:
-              index: app/index.html
-              bundle: app/bundle.js
-              cache: true
-              cacheTTL: 60
-              rules:
-                - path: ^/
-                  state:
-                    - key: config
-                      resource: config
-                - path: ^/(?P<slug>[^\/]+)/?$
-                  state:
-                    - key: pages
-                      resource: page-$slug
-                      export: true
-                  last: true
-
-        "/robots.txt":
-          handler:
-            robots:
-              cache: true
-              cacheTTL: 60
-              sitemaps:
-                - https://<frontend_url>/sitemap.xml
-
-        "/sitemap.xml":
-          handler:
-            sitemap:
-              root: https://<frontend_url>
-              cache: true
-              cache_ttl: 60
-              kind: sitemap
+  server:
+    listeners:
+      secured:
+        tls:
+          listenAddr: 0.0.0.0
+          listenPort: 443
+          certFiles:
+            - cert.pem
+          keyFiles:
+            - key.pem
+      unsecured:
+        redirect:
+          listenAddr: 0.0.0.0
+          listenPort: 80
+    sites:
+      main:
+        listeners:
+          - default
+          - secured
+        routes:
+          default:
+            middlewares:
+              logger:
+                file: access.log
+              compress:
+                # level: -1
+              static:
+                path: app/static
+            handler:
+              js:
+                index: app/index.html
+                bundle: app/bundle.js
+                cache: true
+                cacheTTL: 60
+                rules:
+                  - path: ^/
+                    state:
+                      - key: config
+                        resource: config
+                  - path: ^/(?P<slug>[^\/]+)/?$
+                    state:
+                      - key: pages
+                        resource: page-$slug
+                        export: true
+                    last: true
+          "/robots.txt":
+            handler:
+              robots:
+                cache: true
+                cacheTTL: 60
+                sitemaps:
+                  - https://<frontend_url>/sitemap.xml
+          "/sitemap.xml":
+            handler:
               sitemap:
-                - name: home
-                  type: static
-                  static:
-                    loc: /
-                    changefreq: always
-                    priority: 1.0
-                - name: pages
-                  type: list
-                  list:
-                    resource: pages
-                    filter: $.data
-                    itemLoc: $.attributes.slug
-                    itemLastmod: $.attributes.date
-                    changeFreq: daily
-                    priority: 0.5
+                root: https://<frontend_url>
+                cache: true
+                cache_ttl: 60
+                kind: sitemap
+                sitemap:
+                  - name: home
+                    type: static
+                    static:
+                      loc: /
+                      changefreq: always
+                      priority: 1.0
+                  - name: pages
+                    type: list
+                    list:
+                      resource: pages
+                      filter: $.data
+                      itemLoc: $.attributes.slug
+                      itemLastmod: $.attributes.date
+                      changeFreq: daily
+                      priority: 0.5

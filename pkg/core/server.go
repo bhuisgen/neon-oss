@@ -72,10 +72,10 @@ type ServerSiteHandlerModule interface {
 type ServerSiteMiddlewareModule interface {
 	// Module is the interface of a module.
 	Module
-	Register(server ServerSite) error
 	// Register registers the middleware.
-	Start() error
+	Register(server ServerSite) error
 	// Start starts the middleware.
-	Stop() error
+	Start() error
 	// Stop stops the middleware.
+	Stop() error
 }

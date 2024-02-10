@@ -99,6 +99,45 @@ func TestStoreInit(t *testing.T) {
 	}
 }
 
+func TestStoreRegister(t *testing.T) {
+	type fields struct {
+		config *storeConfig
+		logger *slog.Logger
+		state  *storeState
+	}
+	type args struct {
+		app core.App
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "default",
+			fields: fields{
+				state: &storeState{},
+			},
+			args: args{
+				app: &appMediator{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &store{
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+			}
+			if err := s.Register(tt.args.app); (err != nil) != tt.wantErr {
+				t.Errorf("store.Register() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestStoreLoadResource(t *testing.T) {
 	type fields struct {
 		config *storeConfig

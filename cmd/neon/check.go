@@ -61,7 +61,7 @@ func (c *checkCommand) Execute() error {
 		return fmt.Errorf("load config: %v", err)
 	}
 
-	if err := neon.NewApplication(config).Check(); err != nil {
+	if err := neon.New(config).Check(); err != nil {
 		fmt.Println("Configuration is not valid")
 		return fmt.Errorf("check: %v", err)
 	}

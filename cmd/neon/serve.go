@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -61,7 +62,7 @@ func (c *serveCommand) Execute() error {
 		return fmt.Errorf("load config: %v", err)
 	}
 
-	if err := neon.NewApplication(config).Serve(); err != nil {
+	if err := neon.New(config).Serve(context.Background()); err != nil {
 		fmt.Printf("Failed to serve: %s\n", err)
 		return fmt.Errorf("serve: %v", err)
 	}

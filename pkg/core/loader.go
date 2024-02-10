@@ -1,6 +1,8 @@
 package core
 
-import "context"
+import (
+	"context"
+)
 
 // Loader is the interface of the loader component.
 //
@@ -16,7 +18,6 @@ type Loader interface {
 type LoaderParserModule interface {
 	// Module is the interface of a module.
 	Module
-
 	// Parse parses a resource.
 	Parse(ctx context.Context, store Store, fetcher Fetcher) error
 }

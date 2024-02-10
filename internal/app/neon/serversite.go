@@ -15,20 +15,18 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/bhuisgen/neon/pkg/core"
+	"github.com/bhuisgen/neon/pkg/log"
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
 // serverSite implements a server site.
 type serverSite struct {
-	name    string
-	config  *serverSiteConfig
-	logger  *slog.Logger
-	state   *serverSiteState
-	store   Store
-	fetcher Fetcher
-	loader  Loader
-	server  Server
-	mu      sync.RWMutex
+	name   string
+	config *serverSiteConfig
+	logger *slog.Logger
+	state  *serverSiteState
+	server Server
+	mu     sync.RWMutex
 }
 
 // serverSiteConfig implements the server site configuration.
@@ -51,9 +49,11 @@ type serverSiteState struct {
 	defaultSite bool
 	routes      []string
 	routesMap   map[string]serverSiteRouteState
+	store       core.Store
+	server      core.Server
+	mediator    *serverSiteMediator
 	middleware  *serverSiteMiddleware
 	handler     *serverSiteHandler
-	mediator    *serverSiteMediator
 	router      *serverSiteRouter
 }
 
@@ -64,23 +64,18 @@ type serverSiteRouteState struct {
 }
 
 const (
-	serverSiteLogger       string = "site"
 	serverSiteRouteDefault string = "default"
 )
 
 // newServerSite creates a new site.
-func newServerSite(name string, store Store, fetcher Fetcher, loader Loader,
-	server Server) *serverSite {
+func newServerSite(name string, server Server) *serverSite {
 	return &serverSite{
 		name:   name,
-		logger: slog.New(NewLogHandler(os.Stderr, serverSiteLogger, nil)).With("name", name),
+		logger: slog.New(log.NewHandler(os.Stderr, "app.server.site", nil)).With("name", name),
+		server: server,
 		state: &serverSiteState{
 			routesMap: make(map[string]serverSiteRouteState),
 		},
-		store:   store,
-		fetcher: fetcher,
-		loader:  loader,
-		server:  server,
 	}
 }
 
@@ -117,7 +112,7 @@ func (s *serverSite) Init(config map[string]interface{}) error {
 		}
 
 		for middleware, middlewareConfig := range routeConfig.Middlewares {
-			moduleInfo, err := module.Lookup(module.ModuleID("server.site.middleware." + middleware))
+			moduleInfo, err := module.Lookup(module.ModuleID("app.server.site.middleware." + middleware))
 			if err != nil {
 				s.logger.Error("Unregistered middleware module", "middleware", middleware, "err", err)
 				errConfig = true
@@ -132,10 +127,7 @@ func (s *serverSite) Init(config map[string]interface{}) error {
 			if middlewareConfig == nil {
 				middlewareConfig = map[string]interface{}{}
 			}
-			if err := module.Init(
-				middlewareConfig,
-				slog.New(NewLogHandler(os.Stderr, serverSiteLogger, nil)).With("middleware", middleware),
-			); err != nil {
+			if err := module.Init(middlewareConfig); err != nil {
 				s.logger.Error("Failed to init middleware module", "middleware", middleware, "err", err)
 				errConfig = true
 				continue
@@ -145,7 +137,7 @@ func (s *serverSite) Init(config map[string]interface{}) error {
 		}
 
 		for handler, handlerConfig := range routeConfig.Handler {
-			moduleInfo, err := module.Lookup(module.ModuleID("server.site.handler." + handler))
+			moduleInfo, err := module.Lookup(module.ModuleID("app.server.site.handler." + handler))
 			if err != nil {
 				s.logger.Error("Unregistered handler module", "handler", handler, "err", err)
 				errConfig = true
@@ -160,10 +152,7 @@ func (s *serverSite) Init(config map[string]interface{}) error {
 			if handlerConfig == nil {
 				handlerConfig = map[string]interface{}{}
 			}
-			if err := module.Init(
-				handlerConfig,
-				slog.New(NewLogHandler(os.Stderr, serverSiteLogger, nil)).With("handler", handler),
-			); err != nil {
+			if err := module.Init(handlerConfig); err != nil {
 				s.logger.Error("Failed to init handler module", "handler", handler, "err", err)
 				errConfig = true
 				break
@@ -185,14 +174,17 @@ func (s *serverSite) Init(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the site middlewares and handlers.
-func (s *serverSite) Register() error {
+// Register registers the site.
+func (s *serverSite) Register(app core.App) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.logger.Debug("Registering site")
 
-	mediator := newServerSiteMediator(s)
+	s.state.store = app.Store()
+	s.state.server = app.Server()
+
+	mediator := newServerSiteMediator(s, app)
 	for _, route := range s.state.routes {
 		mediator.currentRoute = route
 
@@ -207,9 +199,9 @@ func (s *serverSite) Register() error {
 			}
 		}
 	}
+	s.state.mediator = mediator
 	s.state.middleware = newServerSiteMiddleware(s)
 	s.state.handler = newServerSiteHandler(s)
-	s.state.mediator = mediator
 
 	router, err := s.buildRouter()
 	if err != nil {
@@ -229,8 +221,7 @@ func (s *serverSite) Start() error {
 
 	for _, route := range s.state.routes {
 		for _, middleware := range s.state.routesMap[route].middlewares {
-			err := middleware.Start()
-			if err != nil {
+			if err := middleware.Start(); err != nil {
 				return fmt.Errorf("start middleware: %w", err)
 			}
 		}
@@ -381,6 +372,7 @@ var _ ServerSite = (*serverSite)(nil)
 // serverSiteMediator implements the server site mediator.
 type serverSiteMediator struct {
 	site               *serverSite
+	app                core.App
 	currentRoute       string
 	defaultMiddlewares []func(http.Handler) http.Handler
 	defaultHandler     http.Handler
@@ -389,10 +381,11 @@ type serverSiteMediator struct {
 	mu                 sync.RWMutex
 }
 
-// newServerSiteMediator creates a new server site mediator.
-func newServerSiteMediator(site *serverSite) *serverSiteMediator {
+// newServerSiteMediator creates a new mediator.
+func newServerSiteMediator(site *serverSite, app core.App) *serverSiteMediator {
 	return &serverSiteMediator{
 		site: site,
+		app:  app,
 	}
 }
 
@@ -411,24 +404,14 @@ func (m *serverSiteMediator) Hosts() []string {
 	return m.site.state.hosts
 }
 
-// Store returns the store.
+// Returns the store.
 func (m *serverSiteMediator) Store() core.Store {
-	return m.site.store.(core.Store)
+	return m.site.state.store
 }
 
-// Fetcher returns the fetcher.
-func (m *serverSiteMediator) Fetcher() core.Fetcher {
-	return m.site.fetcher.(core.Fetcher)
-}
-
-// Loader returns the loader.
-func (m *serverSiteMediator) Loader() core.Loader {
-	return m.site.loader.(core.Loader)
-}
-
-// Server returns the server.
+// Returns the server.
 func (m *serverSiteMediator) Server() core.Server {
-	return m.site.server.(core.Server)
+	return m.site.state.server
 }
 
 // RegisterMiddleware registers a middleware.
@@ -474,32 +457,6 @@ func (m *serverSiteMediator) RegisterHandler(handler http.Handler) error {
 }
 
 var _ core.ServerSite = (*serverSiteMediator)(nil)
-
-// serverSiteRouter implements the server site router.
-type serverSiteRouter struct {
-	logger *slog.Logger
-	routes map[string]http.Handler
-}
-
-// newServerSiteRouter creates a new server site router.
-func newServerSiteRouter(s *serverSite) *serverSiteRouter {
-	return &serverSiteRouter{
-		logger: s.logger,
-		routes: make(map[string]http.Handler),
-	}
-}
-
-// AddRoute adds a route to the router.
-func (r *serverSiteRouter) addRoute(pattern string, handler http.Handler) {
-	r.routes[pattern] = handler
-}
-
-// Routes returns the router routes.
-func (r *serverSiteRouter) Routes() map[string]http.Handler {
-	return r.routes
-}
-
-var _ ServerSiteRouter = (*serverSiteRouter)(nil)
 
 // serverSiteMiddleware implements the server site middleware.
 type serverSiteMiddleware struct {
@@ -557,3 +514,29 @@ func (h *serverSiteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	http.NotFound(w, r)
 }
+
+// serverSiteRouter implements the server site router.
+type serverSiteRouter struct {
+	logger *slog.Logger
+	routes map[string]http.Handler
+}
+
+// newServerSiteRouter creates a new server site router.
+func newServerSiteRouter(s *serverSite) *serverSiteRouter {
+	return &serverSiteRouter{
+		logger: s.logger,
+		routes: make(map[string]http.Handler),
+	}
+}
+
+// AddRoute adds a route to the router.
+func (r *serverSiteRouter) addRoute(pattern string, handler http.Handler) {
+	r.routes[pattern] = handler
+}
+
+// Routes returns the router routes.
+func (r *serverSiteRouter) Routes() map[string]http.Handler {
+	return r.routes
+}
+
+var _ ServerSiteRouter = (*serverSiteRouter)(nil)

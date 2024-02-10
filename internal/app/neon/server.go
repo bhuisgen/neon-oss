@@ -9,16 +9,17 @@ import (
 	"os"
 
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/bhuisgen/neon/pkg/core"
+	"github.com/bhuisgen/neon/pkg/log"
+	"github.com/bhuisgen/neon/pkg/module"
 )
 
 // server implements the server.
 type server struct {
-	config  *serverConfig
-	logger  *slog.Logger
-	state   *serverState
-	store   Store
-	fetcher Fetcher
-	loader  Loader
+	config *serverConfig
+	logger *slog.Logger
+	state  *serverState
 }
 
 // serverConfig implements the server configuration.
@@ -32,24 +33,27 @@ type serverState struct {
 	listenersMap   map[string]ServerListener
 	sitesMap       map[string]ServerSite
 	sitesListeners map[string][]ServerListener
+	mediator       *serverMediator
 }
 
 const (
-	serverLogger string = "server"
+	serverModuleID module.ModuleID = "app.server"
 )
 
-// newServer creates a new server.
-func newServer(store Store, fetcher Fetcher, loader Loader) *server {
-	return &server{
-		logger: slog.New(NewLogHandler(os.Stderr, serverLogger, nil)),
-		state: &serverState{
-			listenersMap:   make(map[string]ServerListener),
-			sitesMap:       make(map[string]ServerSite),
-			sitesListeners: make(map[string][]ServerListener),
+// ModuleInfo returns the module information.
+func (s server) ModuleInfo() module.ModuleInfo {
+	return module.ModuleInfo{
+		ID: serverModuleID,
+		NewInstance: func() module.Module {
+			return &server{
+				logger: slog.New(log.NewHandler(os.Stderr, string(serverModuleID), nil)),
+				state: &serverState{
+					listenersMap:   make(map[string]ServerListener),
+					sitesMap:       make(map[string]ServerSite),
+					sitesListeners: make(map[string][]ServerListener),
+				},
+			}
 		},
-		store:   store,
-		fetcher: fetcher,
-		loader:  loader,
 	}
 }
 
@@ -74,7 +78,7 @@ func (s *server) Init(config map[string]interface{}) error {
 		errConfig = true
 	}
 	for listenerName, listenerConfig := range s.config.Listeners {
-		listener := newServerListener(listenerName)
+		listener := newServerListener(listenerName, s)
 
 		if listenerConfig == nil {
 			listenerConfig = map[string]interface{}{}
@@ -96,7 +100,7 @@ func (s *server) Init(config map[string]interface{}) error {
 	}
 	var defaultSiteName string
 	for siteName, siteConfig := range s.config.Sites {
-		site := newServerSite(siteName, s.store, s.fetcher, s.loader, s)
+		site := newServerSite(siteName, s)
 
 		if siteConfig == nil {
 			siteConfig = map[string]interface{}{}
@@ -126,19 +130,21 @@ func (s *server) Init(config map[string]interface{}) error {
 	return nil
 }
 
-// Register registers the server listeners and sites.
-func (s *server) Register(listeners map[string][]net.Listener) error {
+// Register registers the server.
+func (s *server) Register(app core.App) error {
 	s.logger.Debug("Registering server")
 
+	s.state.mediator = newServerMediator(s)
+
 	for listenerName, listener := range s.state.listenersMap {
-		if err := listener.Register(listeners[listenerName]); err != nil {
-			return fmt.Errorf("register listener: %w", err)
+		if err := listener.Register(app); err != nil {
+			return fmt.Errorf("register listener %s: %w", listenerName, err)
 		}
 	}
 
-	for _, site := range s.state.sitesMap {
-		if err := site.Register(); err != nil {
-			return fmt.Errorf("register site: %w", err)
+	for siteName, site := range s.state.sitesMap {
+		if err := site.Register(app); err != nil {
+			return fmt.Errorf("register site %s: %w", siteName, err)
 		}
 	}
 
@@ -231,4 +237,31 @@ func (s *server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-var _ (Server) = (*server)(nil)
+// Listeners returns the network listeners.
+func (s *server) Listeners() (map[string][]net.Listener, error) {
+	m := make(map[string][]net.Listener, len(s.state.listenersMap))
+	for name, listener := range s.state.listenersMap {
+		listeners, err := listener.Listeners()
+		if err != nil {
+			return nil, fmt.Errorf("get listeners: %w", err)
+		}
+		m[name] = listeners
+	}
+	return m, nil
+}
+
+var _ Server = (*server)(nil)
+
+// serverMediator implements the server mediator.
+type serverMediator struct {
+	server *server
+}
+
+// newServerMediator creates a new mediator.
+func newServerMediator(server *server) *serverMediator {
+	return &serverMediator{
+		server: server,
+	}
+}
+
+var _ core.Server = (*serverMediator)(nil)

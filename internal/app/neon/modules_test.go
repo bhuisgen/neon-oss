@@ -3,7 +3,6 @@ package neon
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"os"
 	"testing"
@@ -19,7 +18,7 @@ type testStoreStorageModule struct {
 }
 
 const (
-	testStoreStorageModuleID module.ModuleID = "store.storage.test"
+	testStoreStorageModuleID module.ModuleID = "app.store.storage.test"
 )
 
 func (m testStoreStorageModule) ModuleInfo() module.ModuleInfo {
@@ -31,7 +30,7 @@ func (m testStoreStorageModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testStoreStorageModule) Init(config map[string]interface{}, logger *slog.Logger) error {
+func (m testStoreStorageModule) Init(config map[string]interface{}) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -63,7 +62,7 @@ type testFetcherProviderModule struct {
 }
 
 const (
-	testFetcherProviderModuleID module.ModuleID = "fetcher.provider.test"
+	testFetcherProviderModuleID module.ModuleID = "app.fetcher.provider.test"
 )
 
 func (m testFetcherProviderModule) ModuleInfo() module.ModuleInfo {
@@ -75,7 +74,7 @@ func (m testFetcherProviderModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testFetcherProviderModule) Init(config map[string]interface{}, logger *slog.Logger) error {
+func (m testFetcherProviderModule) Init(config map[string]interface{}) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -101,7 +100,7 @@ type testLoaderParserModule struct {
 }
 
 const (
-	testLoaderProviderModuleID module.ModuleID = "loader.parser.test"
+	testLoaderProviderModuleID module.ModuleID = "app.loader.parser.test"
 )
 
 func (m testLoaderParserModule) ModuleInfo() module.ModuleInfo {
@@ -113,7 +112,7 @@ func (m testLoaderParserModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testLoaderParserModule) Init(config map[string]interface{}, logger *slog.Logger) error {
+func (m testLoaderParserModule) Init(config map[string]interface{}) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -138,7 +137,7 @@ type testServerListenerModule struct {
 }
 
 const (
-	testServerListenerModuleID module.ModuleID = "server.listener.test"
+	testServerListenerModuleID module.ModuleID = "app.server.listener.test"
 )
 
 func (m testServerListenerModule) ModuleInfo() module.ModuleInfo {
@@ -150,7 +149,7 @@ func (m testServerListenerModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerListenerModule) Init(config map[string]interface{}, logger *slog.Logger) error {
+func (m testServerListenerModule) Init(config map[string]interface{}) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -195,7 +194,7 @@ type testServerSiteMiddlewareModule struct {
 }
 
 const (
-	testServerSiteMiddlewareModuleID module.ModuleID = "server.site.middleware.test"
+	testServerSiteMiddlewareModuleID module.ModuleID = "app.server.site.middleware.test"
 )
 
 func (m testServerSiteMiddlewareModule) ModuleInfo() module.ModuleInfo {
@@ -207,7 +206,7 @@ func (m testServerSiteMiddlewareModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerSiteMiddlewareModule) Init(config map[string]interface{}, logger *slog.Logger) error {
+func (m testServerSiteMiddlewareModule) Init(config map[string]interface{}) error {
 	if m.errInit {
 		return errors.New("test error")
 	}
@@ -245,7 +244,7 @@ type testServerSiteHandlerModule struct {
 }
 
 const (
-	testServerSiteHandlerModuleID module.ModuleID = "server.site.handler.test"
+	testServerSiteHandlerModuleID module.ModuleID = "app.server.site.handler.test"
 )
 
 func (m testServerSiteHandlerModule) ModuleInfo() module.ModuleInfo {
@@ -257,7 +256,7 @@ func (m testServerSiteHandlerModule) ModuleInfo() module.ModuleInfo {
 	}
 }
 
-func (m testServerSiteHandlerModule) Init(config map[string]interface{}, logger *slog.Logger) error {
+func (m testServerSiteHandlerModule) Init(config map[string]interface{}) error {
 	if m.errInit {
 		return errors.New("test error")
 	}

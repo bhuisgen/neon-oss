@@ -1,25 +1,27 @@
 {
-  "store": {
-    "storage": {
-      "memory": {}
-    }
-  },
-  "server": {
-    "listeners": {
-      "default": {
-        "local": {
-          "listenAddr": "0.0.0.0",
-          "listenPort": 8080
-        }
+  "app": {
+    "store": {
+      "storage": {
+        "memory": {}
       }
     },
-    "sites": {
-      "main": {
-        "listeners": [
-          "default"
-        ],
-        "routes": {
-          "default": {}
+    "server": {
+      "listeners": {
+        "default": {
+          "local": {
+            "listenAddr": "0.0.0.0",
+            "listenPort": 8080
+          }
+        }
+      },
+      "sites": {
+        "main": {
+          "listeners": [
+            "default"
+          ],
+          "routes": {
+            "default": {}
+          }
         }
       }
     }

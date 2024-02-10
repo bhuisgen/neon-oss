@@ -8,45 +8,46 @@ import (
 	"github.com/bhuisgen/neon/pkg/core"
 )
 
-// Application
-type Application interface {
+// App
+type App interface {
+	core.Module
 	Check() error
-	Serve() error
+	Serve(ctx context.Context) error
 }
 
 // Store
 type Store interface {
-	Init(config map[string]interface{}) error
+	core.AppModule
 	LoadResource(name string) (*core.Resource, error)
 	StoreResource(name string, resource *core.Resource) error
 }
 
 // Fetcher
 type Fetcher interface {
-	Init(config map[string]interface{}) error
+	core.AppModule
 	Fetch(ctx context.Context, name string, provider string, config map[string]interface{}) (*core.Resource, error)
 }
 
 // Loader
 type Loader interface {
-	Init(config map[string]interface{}) error
+	core.AppModule
 	Start() error
 	Stop() error
 }
 
 // Server
 type Server interface {
-	Init(config map[string]interface{}) error
-	Register(listeners map[string][]net.Listener) error
+	core.AppModule
 	Start() error
 	Stop() error
 	Shutdown(ctx context.Context) error
+	Listeners() (map[string][]net.Listener, error)
 }
 
 // ServerListener
 type ServerListener interface {
 	Init(config map[string]interface{}) error
-	Register(listeners []net.Listener) error
+	Register(core.App) error
 	Serve() error
 	Shutdown(ctx context.Context) error
 	Close() error
@@ -65,7 +66,7 @@ type ServerListenerRouter interface {
 // ServerSite
 type ServerSite interface {
 	Init(config map[string]interface{}) error
-	Register() error
+	Register(core.App) error
 	Start() error
 	Stop() error
 	Name() string

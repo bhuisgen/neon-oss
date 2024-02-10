@@ -2,6 +2,7 @@ package neon
 
 import (
 	"log/slog"
+	"sync"
 	"testing"
 )
 
@@ -11,11 +12,11 @@ func intPtr(i int) *int {
 
 func TestLoaderInit(t *testing.T) {
 	type fields struct {
-		config  *loaderConfig
-		logger  *slog.Logger
-		state   *loaderState
-		fetcher Fetcher
-		stop    chan struct{}
+		config *loaderConfig
+		logger *slog.Logger
+		state  *loaderState
+		mu     *sync.RWMutex
+		stop   chan struct{}
 	}
 	type args struct {
 		config map[string]interface{}
@@ -109,11 +110,11 @@ func TestLoaderInit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &loader{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
-				stop:    tt.fields.stop,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				mu:     tt.fields.mu,
+				stop:   tt.fields.stop,
 			}
 			if err := l.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("loader.Init() error = %v, wantErr %v", err, tt.wantErr)
@@ -124,11 +125,11 @@ func TestLoaderInit(t *testing.T) {
 
 func TestLoaderStart(t *testing.T) {
 	type fields struct {
-		config  *loaderConfig
-		logger  *slog.Logger
-		state   *loaderState
-		fetcher Fetcher
-		stop    chan struct{}
+		config *loaderConfig
+		logger *slog.Logger
+		state  *loaderState
+		mu     *sync.RWMutex
+		stop   chan struct{}
 	}
 	tests := []struct {
 		name    string
@@ -145,6 +146,7 @@ func TestLoaderStart(t *testing.T) {
 				},
 				logger: slog.Default(),
 				state:  &loaderState{},
+				mu:     &sync.RWMutex{},
 				stop:   make(chan struct{}, 1),
 			},
 		},
@@ -158,6 +160,7 @@ func TestLoaderStart(t *testing.T) {
 				},
 				logger: slog.Default(),
 				state:  &loaderState{},
+				mu:     &sync.RWMutex{},
 				stop:   make(chan struct{}, 1),
 			},
 		},
@@ -165,11 +168,11 @@ func TestLoaderStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &loader{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
-				stop:    tt.fields.stop,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				mu:     tt.fields.mu,
+				stop:   tt.fields.stop,
 			}
 			if err := l.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("loader.Start() error = %v, wantErr %v", err, tt.wantErr)
@@ -180,11 +183,11 @@ func TestLoaderStart(t *testing.T) {
 
 func TestLoaderStop(t *testing.T) {
 	type fields struct {
-		config  *loaderConfig
-		logger  *slog.Logger
-		state   *loaderState
-		fetcher Fetcher
-		stop    chan struct{}
+		config *loaderConfig
+		logger *slog.Logger
+		state  *loaderState
+		mu     *sync.RWMutex
+		stop   chan struct{}
 	}
 	tests := []struct {
 		name    string
@@ -201,6 +204,7 @@ func TestLoaderStop(t *testing.T) {
 				},
 				logger: slog.Default(),
 				state:  &loaderState{},
+				mu:     &sync.RWMutex{},
 				stop:   make(chan struct{}, 1),
 			},
 		},
@@ -214,6 +218,7 @@ func TestLoaderStop(t *testing.T) {
 				},
 				logger: slog.Default(),
 				state:  &loaderState{},
+				mu:     &sync.RWMutex{},
 				stop:   make(chan struct{}, 1),
 			},
 		},
@@ -221,11 +226,11 @@ func TestLoaderStop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &loader{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
-				stop:    tt.fields.stop,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				mu:     tt.fields.mu,
+				stop:   tt.fields.stop,
 			}
 			if err := l.Stop(); (err != nil) != tt.wantErr {
 				t.Errorf("loader.Stop() error = %v, wantErr %v", err, tt.wantErr)

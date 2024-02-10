@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"testing"
+
+	"github.com/bhuisgen/neon/pkg/core"
 )
 
 type testServerListenerRouterResponseWriter struct {
@@ -49,6 +51,7 @@ func TestServerListenerInit(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -98,6 +101,7 @@ func TestServerListenerInit(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -114,12 +118,13 @@ func TestServerListenerRegister(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
 	}
 	type args struct {
-		listeners []net.Listener
+		app core.App
 	}
 	tests := []struct {
 		name    string
@@ -151,7 +156,7 @@ func TestServerListenerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				listeners: []net.Listener{&net.TCPListener{}, &net.UnixListener{}},
+				app: &appMediator{},
 			},
 		},
 		{
@@ -173,11 +178,12 @@ func TestServerListenerRegister(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
 			}
-			if err := l.Register(tt.args.listeners); (err != nil) != tt.wantErr {
+			if err := l.Register(tt.args.app); (err != nil) != tt.wantErr {
 				t.Errorf("listener.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -189,6 +195,7 @@ func TestServerListenerServe(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -226,6 +233,7 @@ func TestServerListenerServe(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -242,6 +250,7 @@ func TestServerListenerShutdown(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -283,6 +292,7 @@ func TestServerListenerShutdown(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -299,6 +309,7 @@ func TestServerListenerClose(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -336,6 +347,7 @@ func TestServerListenerClose(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -352,6 +364,7 @@ func TestServerListenerRemove(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -379,6 +392,7 @@ func TestServerListenerRemove(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -395,6 +409,7 @@ func TestServerListenerName(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -418,6 +433,7 @@ func TestServerListenerName(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -449,6 +465,7 @@ func TestServerListenerLink(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -500,6 +517,7 @@ func TestServerListenerLink(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -531,6 +549,7 @@ func TestServerListenerUnlink(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -582,6 +601,7 @@ func TestServerListenerUnlink(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -598,6 +618,7 @@ func TestServerListenerListeners(t *testing.T) {
 		name    string
 		logger  *slog.Logger
 		state   *serverListenerState
+		server  Server
 		quit    chan struct{}
 		update  chan chan error
 		osClose func(f *os.File) error
@@ -631,6 +652,7 @@ func TestServerListenerListeners(t *testing.T) {
 				name:    tt.fields.name,
 				logger:  tt.fields.logger,
 				state:   tt.fields.state,
+				server:  tt.fields.server,
 				quit:    tt.fields.quit,
 				update:  tt.fields.update,
 				osClose: tt.fields.osClose,
@@ -646,6 +668,8 @@ func TestServerListenerListeners(t *testing.T) {
 
 func TestServerListenerMediatorRegisterListener(t *testing.T) {
 	type fields struct {
+		listener  *serverListener
+		app       core.App
 		listeners []net.Listener
 	}
 	type args struct {
@@ -667,58 +691,13 @@ func TestServerListenerMediatorRegisterListener(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &serverListenerMediator{
+				listener:  tt.fields.listener,
+				app:       tt.fields.app,
 				listeners: tt.fields.listeners,
 			}
 			if err := m.RegisterListener(tt.args.listener); (err != nil) != tt.wantErr {
 				t.Errorf("listenerMediator.RegisterListener() error = %v, wantErr %v", err, tt.wantErr)
 			}
-		})
-	}
-}
-
-func TestServerListenerRouterServeHTTP(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {})
-
-	req, err := http.NewRequest(http.MethodGet, "/test", nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	type fields struct {
-		logger *slog.Logger
-		mux    *http.ServeMux
-	}
-	type args struct {
-		w http.ResponseWriter
-		r *http.Request
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		{
-			name: "default",
-			fields: fields{
-				logger: slog.Default(),
-				mux:    http.NewServeMux(),
-			},
-			args: args{
-				w: testServerListenerRouterResponseWriter{
-					header: http.Header{},
-				},
-				r: req,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			l := &serverListenerRouter{
-				logger: tt.fields.logger,
-				mux:    tt.fields.mux,
-			}
-			l.ServeHTTP(tt.args.w, tt.args.r)
 		})
 	}
 }
@@ -780,6 +759,53 @@ func TestServerListenerHandlerServeHTTP(t *testing.T) {
 				router: tt.fields.router,
 			}
 			h.ServeHTTP(tt.args.w, tt.args.r)
+		})
+	}
+}
+
+func TestServerListenerRouterServeHTTP(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {})
+
+	req, err := http.NewRequest(http.MethodGet, "/test", nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	type fields struct {
+		logger *slog.Logger
+		mux    *http.ServeMux
+	}
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		{
+			name: "default",
+			fields: fields{
+				logger: slog.Default(),
+				mux:    http.NewServeMux(),
+			},
+			args: args{
+				w: testServerListenerRouterResponseWriter{
+					header: http.Header{},
+				},
+				r: req,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &serverListenerRouter{
+				logger: tt.fields.logger,
+				mux:    tt.fields.mux,
+			}
+			l.ServeHTTP(tt.args.w, tt.args.r)
 		})
 	}
 }

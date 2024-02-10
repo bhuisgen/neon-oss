@@ -1,6 +1,8 @@
 package core
 
-import "context"
+import (
+	"context"
+)
 
 // Fetcher is the interface of the fetcher component.
 //
@@ -15,7 +17,6 @@ type Fetcher interface {
 type FetcherProviderModule interface {
 	// Module is the interface of a module.
 	Module
-
 	// Fetch fetches a resource with the given configuration.
 	Fetch(ctx context.Context, name string, config map[string]interface{}) (
 		*Resource, error)

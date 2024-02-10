@@ -6,16 +6,19 @@ import (
 	"log/slog"
 	"net"
 	"testing"
+
+	"github.com/bhuisgen/neon/pkg/core"
 )
 
 type testServerServerListener struct {
-	name        string
-	errInit     bool
-	errRegister bool
-	errServe    bool
-	errShutdown bool
-	errClose    bool
-	errRemove   bool
+	name         string
+	errInit      bool
+	errRegister  bool
+	errServe     bool
+	errShutdown  bool
+	errClose     bool
+	errRemove    bool
+	errListeners bool
 }
 
 func (l testServerServerListener) Init(config map[string]interface{}) error {
@@ -25,7 +28,7 @@ func (l testServerServerListener) Init(config map[string]interface{}) error {
 	return nil
 }
 
-func (l testServerServerListener) Register(listeners []net.Listener) error {
+func (l testServerServerListener) Register(app core.App) error {
 	if l.errRegister {
 		return errors.New("test error")
 	}
@@ -73,10 +76,13 @@ func (l testServerServerListener) Unlink(site ServerSite) error {
 }
 
 func (l testServerServerListener) Listeners() ([]net.Listener, error) {
+	if l.errListeners {
+		return nil, errors.New("test error")
+	}
 	return nil, nil
 }
 
-var _ (ServerListener) = (*testServerServerListener)(nil)
+var _ ServerListener = (*testServerServerListener)(nil)
 
 type testServerServerSite struct {
 	name        string
@@ -94,7 +100,7 @@ func (s testServerServerSite) Init(config map[string]interface{}) error {
 	return nil
 }
 
-func (s testServerServerSite) Register() error {
+func (s testServerServerSite) Register(app core.App) error {
 	if s.errRegister {
 		return errors.New("test error")
 	}
@@ -131,16 +137,13 @@ func (s testServerServerSite) Router() (ServerSiteRouter, error) {
 	return nil, nil
 }
 
-var _ (ServerSite) = (*testServerServerSite)(nil)
+var _ ServerSite = (*testServerServerSite)(nil)
 
 func TestServerInit(t *testing.T) {
 	type fields struct {
-		config  *serverConfig
-		logger  *slog.Logger
-		state   *serverState
-		store   Store
-		fetcher Fetcher
-		loader  Loader
+		config *serverConfig
+		logger *slog.Logger
+		state  *serverState
 	}
 	type args struct {
 		config map[string]interface{}
@@ -311,12 +314,9 @@ func TestServerInit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &server{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				store:   tt.fields.store,
-				fetcher: tt.fields.fetcher,
-				loader:  tt.fields.loader,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
 			}
 			if err := s.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("server.Init() error = %v, wantErr %v", err, tt.wantErr)
@@ -327,15 +327,12 @@ func TestServerInit(t *testing.T) {
 
 func TestServerRegister(t *testing.T) {
 	type fields struct {
-		config  *serverConfig
-		logger  *slog.Logger
-		state   *serverState
-		store   Store
-		fetcher Fetcher
-		loader  Loader
+		config *serverConfig
+		logger *slog.Logger
+		state  *serverState
 	}
 	type args struct {
-		listeners map[string][]net.Listener
+		app core.App
 	}
 	tests := []struct {
 		name    string
@@ -344,29 +341,13 @@ func TestServerRegister(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "without listeners",
+			name: "default",
 			fields: fields{
 				logger: slog.Default(),
 				state:  &serverState{},
 			},
 			args: args{
-				listeners: nil,
-			},
-		},
-		{
-			name: "with listeners",
-			fields: fields{
-				logger: slog.Default(),
-				state: &serverState{
-					listenersMap: map[string]ServerListener{
-						"test": testServerServerListener{},
-					},
-				},
-			},
-			args: args{
-				listeners: map[string][]net.Listener{
-					"default": {},
-				},
+				app: &appMediator{},
 			},
 		},
 		{
@@ -382,9 +363,7 @@ func TestServerRegister(t *testing.T) {
 				},
 			},
 			args: args{
-				listeners: map[string][]net.Listener{
-					"default": {},
-				},
+				app: &appMediator{},
 			},
 			wantErr: true,
 		},
@@ -428,20 +407,20 @@ func TestServerRegister(t *testing.T) {
 					},
 				},
 			},
+			args: args{
+				app: &appMediator{},
+			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &server{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				store:   tt.fields.store,
-				fetcher: tt.fields.fetcher,
-				loader:  tt.fields.loader,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
 			}
-			if err := s.Register(tt.args.listeners); (err != nil) != tt.wantErr {
+			if err := s.Register(tt.args.app); (err != nil) != tt.wantErr {
 				t.Errorf("server.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -450,12 +429,9 @@ func TestServerRegister(t *testing.T) {
 
 func TestServerStart(t *testing.T) {
 	type fields struct {
-		config  *serverConfig
-		logger  *slog.Logger
-		state   *serverState
-		store   Store
-		fetcher Fetcher
-		loader  Loader
+		config *serverConfig
+		logger *slog.Logger
+		state  *serverState
 	}
 	tests := []struct {
 		name    string
@@ -589,12 +565,9 @@ func TestServerStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &server{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				store:   tt.fields.store,
-				fetcher: tt.fields.fetcher,
-				loader:  tt.fields.loader,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
 			}
 			if err := s.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("server.Start() error = %v, wantErr %v", err, tt.wantErr)
@@ -605,12 +578,9 @@ func TestServerStart(t *testing.T) {
 
 func TestServerStop(t *testing.T) {
 	type fields struct {
-		config  *serverConfig
-		logger  *slog.Logger
-		state   *serverState
-		store   Store
-		fetcher Fetcher
-		loader  Loader
+		config *serverConfig
+		logger *slog.Logger
+		state  *serverState
 	}
 	tests := []struct {
 		name    string
@@ -669,12 +639,9 @@ func TestServerStop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &server{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				store:   tt.fields.store,
-				fetcher: tt.fields.fetcher,
-				loader:  tt.fields.loader,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
 			}
 			if err := s.Stop(); (err != nil) != tt.wantErr {
 				t.Errorf("server.Stop() error = %v, wantErr %v", err, tt.wantErr)
@@ -685,12 +652,9 @@ func TestServerStop(t *testing.T) {
 
 func TestServerShutdown(t *testing.T) {
 	type fields struct {
-		config  *serverConfig
-		logger  *slog.Logger
-		state   *serverState
-		store   Store
-		fetcher Fetcher
-		loader  Loader
+		config *serverConfig
+		logger *slog.Logger
+		state  *serverState
 	}
 	type args struct {
 		ctx context.Context
@@ -921,15 +885,62 @@ func TestServerShutdown(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &server{
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				store:   tt.fields.store,
-				fetcher: tt.fields.fetcher,
-				loader:  tt.fields.loader,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
 			}
 			if err := s.Shutdown(tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("server.Shutdown() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestServerMediatorListeners(t *testing.T) {
+	type fields struct {
+		config *serverConfig
+		logger *slog.Logger
+		state  *serverState
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr bool
+	}{
+		{
+			name: "default",
+			fields: fields{
+				state: &serverState{
+					listenersMap: map[string]ServerListener{
+						"default": testServerServerListener{},
+					},
+				},
+			},
+		},
+		{
+			name: "error get listeners",
+			fields: fields{
+				state: &serverState{
+					listenersMap: map[string]ServerListener{
+						"default": testServerServerListener{
+							errListeners: true,
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &server{
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+			}
+			if _, err := s.Listeners(); (err != nil) != tt.wantErr {
+				t.Errorf("server.Listeners() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 		})
 	}

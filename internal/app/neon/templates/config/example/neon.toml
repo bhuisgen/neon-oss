@@ -1,119 +1,119 @@
-[store.storage]
+[app.store.storage]
 
-[fetcher.providers.api.rest]
+[app.fetcher.providers.api.rest]
 timeout = 15
 retry = 3
 delay = 5
 
-[fetcher.providers.api.rest.headers]
+[app.fetcher.providers.api.rest.headers]
 Content-Type = "application/json"
 Authorization = "Bearer: <secret_token>"
 
-[loader]
+[app.loader]
 execStartup = 15
 execInterval = 300
 execFailsafeInterval = 60
 execMaxOps = 100
 execMaxDelay = 60
 
-[loader.rules.load-config.raw.resource.config.api]
+[app.loader.rules.load-config.raw.resource.config.api]
 method = "GET"
 url = "https://<backend_url>/static/config.json"
 
-[loader.rules.load-pages.json]
+[app.loader.rules.load-pages.json]
 filter = "$.data"
 
-[loader.rules.load-pages.json.resource.pages.api]
+[app.loader.rules.load-pages.json.resource.pages.api]
 method = "GET"
 url = "https://<backend_url>/api/v1/pages"
 next = true
 nextParser = "body"
 nextFilter = "$.links.next"
 
-[loader.rules.load-pages.json.resource.pages.api.params]
+[app.loader.rules.load-pages.json.resource.pages.api.params]
 type = "page"
 language = "fr"
 limit = "100"
 sort = "-date"
 include = "author"
 
-[loader.rules.load-pages.json.itemParams]
+[app.loader.rules.load-pages.json.itemParams]
 slug = "$.attributes.slug"
 
-[loader.rules.load-pages.json.itemResource."page-$id".api]
+[app.loader.rules.load-pages.json.itemResource."page-$id".api]
 method = "GET"
 url = "https://<backend_url>/api/v1/pages"
 
-[loader.rules.load-pages.json.itemResource."page-$id".api.params]
+[app.loader.rules.load-pages.json.itemResource."page-$id".api.params]
 slug = "$slug"
 
-[server.listeners.secured.tls]
+[app.server.listeners.secured.tls]
 listenAddr = "0.0.0.0"
 listenPort = 443
 certFiles = ["cert.pem"]
 keyFiles = ["key.pem"]
 
-[server.listeners.unsecured.redirect]
+[app.server.listeners.unsecured.redirect]
 listenAddr = "0.0.0.0"
 listenPort = 80
 
-[server.sites.main]
+[app.server.sites.main]
 listeners = ["default", "secured"]
 
-[server.sites.main.routes.default.middlewares]
+[app.server.sites.main.routes.default.middlewares]
 [server.sites.main.routes.default.middlewares.logger]
 file = "access.log"
 
-[server.sites.main.routes.default.middlewares.static]
+[app.server.sites.main.routes.default.middlewares.static]
 path = "app/static"
 
-[server.sites.main.routes.default.handler.app]
+[app.server.sites.main.routes.default.handler.js]
 index = "app/index.html"
 bundle = "app/bundle.js"
 cache = true
 cacheTTL = 60
 
-[[server.sites.main.routes.default.handler.app.rules]]
+[[app.server.sites.main.routes.default.handler.js.rules]]
 path = "^/"
 
-[[server.sites.main.routes.default.handler.app.rules.state]]
+[[app.server.sites.main.routes.default.handler.js.rules.state]]
 key = "config"
 resource = "config"
 
-[[server.sites.main.routes.default.handler.app.rules]]
+[[app.server.sites.main.routes.default.handler.js.rules]]
 path = "^/(?P<slug>[^\\/]+)/?$"
 last = true
 
-[[server.sites.main.routes.default.handler.app.rules.state]]
+[[app.server.sites.main.routes.default.handler.js.rules.state]]
 key = "pages"
 resource = "page-$slug"
 export = true
 
-[server.sites.main.routes."/robots.txt".handler.robots]
+[app.server.sites.main.routes."/robots.txt".handler.robots]
 cache = true
 cacheTTL = 60
 sitemaps = ["https://<frontend_url>/sitemap.xml"]
 
-[server.sites.main.routes."/sitemap.xml".handler.sitemap]
+[app.server.sites.main.routes."/sitemap.xml".handler.sitemap]
 root = "https://<frontend_url>"
 cache = true
 cache_ttl = 60
 kind = "sitemap"
 
-[[server.sites.main.routes."/sitemap.xml".handler.sitemap.sitemap]]
+[[app.server.sites.main.routes."/sitemap.xml".handler.sitemap.sitemap]]
 name = "home"
 type = "static"
 
-[server.sites.main.routes."/sitemap.xml".handler.sitemap.sitemap.static]
+[app.server.sites.main.routes."/sitemap.xml".handler.sitemap.sitemap.static]
 loc = "/"
 changefreq = "always"
 priority = 1
 
-[[server.sites.main.routes."/sitemap.xml".handler.sitemap.sitemap]]
+[[app.server.sites.main.routes."/sitemap.xml".handler.sitemap.sitemap]]
 name = "pages"
 type = "list"
 
-[server.sites.main.routes."/sitemap.xml".handler.sitemap.sitemap.list]
+[app.server.sites.main.routes."/sitemap.xml".handler.sitemap.sitemap.list]
 resource = "pages"
 filter = "$.data"
 itemLoc = "$.attributes.slug"

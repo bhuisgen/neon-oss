@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/bhuisgen/neon/pkg/core"
@@ -14,6 +15,7 @@ func TestFetcherInit(t *testing.T) {
 		config *fetcherConfig
 		logger *slog.Logger
 		state  *fetcherState
+		mu     *sync.RWMutex
 	}
 	type args struct {
 		config map[string]interface{}
@@ -89,9 +91,51 @@ func TestFetcherInit(t *testing.T) {
 				config: tt.fields.config,
 				logger: tt.fields.logger,
 				state:  tt.fields.state,
+				mu:     tt.fields.mu,
 			}
 			if err := f.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("fetcher.Init() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFetcherRegister(t *testing.T) {
+	type fields struct {
+		config *fetcherConfig
+		logger *slog.Logger
+		state  *fetcherState
+		mu     *sync.RWMutex
+	}
+	type args struct {
+		app core.App
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "default",
+			fields: fields{
+				state: &fetcherState{},
+			},
+			args: args{
+				app: &appMediator{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fetcher{
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				mu:     tt.fields.mu,
+			}
+			if err := f.Register(tt.args.app); (err != nil) != tt.wantErr {
+				t.Errorf("fetcher.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -102,6 +146,7 @@ func TestFetcherFetch(t *testing.T) {
 		config *fetcherConfig
 		logger *slog.Logger
 		state  *fetcherState
+		mu     *sync.RWMutex
 	}
 	type args struct {
 		ctx      context.Context
@@ -125,6 +170,7 @@ func TestFetcherFetch(t *testing.T) {
 						"test": testFetcherProviderModule{},
 					},
 				},
+				mu: &sync.RWMutex{},
 			},
 			args: args{
 				ctx:      context.Background(),
@@ -141,6 +187,7 @@ func TestFetcherFetch(t *testing.T) {
 			fields: fields{
 				logger: slog.Default(),
 				state:  &fetcherState{},
+				mu:     &sync.RWMutex{},
 			},
 			args: args{
 				ctx:      context.Background(),
@@ -156,6 +203,7 @@ func TestFetcherFetch(t *testing.T) {
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{},
 				},
+				mu: &sync.RWMutex{},
 			},
 			args: args{
 				ctx:      context.Background(),
@@ -171,6 +219,7 @@ func TestFetcherFetch(t *testing.T) {
 				state: &fetcherState{
 					providers: map[string]core.FetcherProviderModule{},
 				},
+				mu: &sync.RWMutex{},
 			},
 			args: args{
 				ctx:      context.Background(),
@@ -190,6 +239,7 @@ func TestFetcherFetch(t *testing.T) {
 						},
 					},
 				},
+				mu: &sync.RWMutex{},
 			},
 			args: args{
 				ctx:      context.Background(),
@@ -205,6 +255,7 @@ func TestFetcherFetch(t *testing.T) {
 				config: tt.fields.config,
 				logger: tt.fields.logger,
 				state:  tt.fields.state,
+				mu:     tt.fields.mu,
 			}
 			got, err := f.Fetch(tt.args.ctx, tt.args.name, tt.args.provider, tt.args.config)
 			if (err != nil) != tt.wantErr {

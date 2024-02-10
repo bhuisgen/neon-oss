@@ -30,11 +30,11 @@ var _ http.ResponseWriter = (*testServerSiteResponseWriter)(nil)
 
 func TestServerSiteInit(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
 	}
 	type args struct {
 		config map[string]interface{}
@@ -115,11 +115,11 @@ func TestServerSiteInit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
 			if err := s.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("server.Init() error = %v, wantErr %v", err, tt.wantErr)
@@ -130,15 +130,19 @@ func TestServerSiteInit(t *testing.T) {
 
 func TestServerSiteRegister(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
+	}
+	type args struct {
+		app core.App
 	}
 	tests := []struct {
 		name    string
 		fields  fields
+		args    args
 		wantErr bool
 	}{
 		{
@@ -146,6 +150,15 @@ func TestServerSiteRegister(t *testing.T) {
 			fields: fields{
 				logger: slog.Default(),
 				state:  &serverSiteState{},
+			},
+			args: args{
+				app: &appMediator{
+					app: &app{
+						state: &appState{
+							store: &store{},
+						},
+					},
+				},
 			},
 		},
 		{
@@ -160,6 +173,15 @@ func TestServerSiteRegister(t *testing.T) {
 								"test": testServerSiteMiddlewareModule{},
 							},
 							handler: testServerSiteHandlerModule{},
+						},
+					},
+				},
+			},
+			args: args{
+				app: &appMediator{
+					app: &app{
+						state: &appState{
+							store: &store{},
 						},
 					},
 				},
@@ -182,6 +204,15 @@ func TestServerSiteRegister(t *testing.T) {
 					},
 				},
 			},
+			args: args{
+				app: &appMediator{
+					app: &app{
+						state: &appState{
+							store: &store{},
+						},
+					},
+				},
+			},
 			wantErr: true,
 		},
 		{
@@ -198,19 +229,28 @@ func TestServerSiteRegister(t *testing.T) {
 					},
 				},
 			},
+			args: args{
+				app: &appMediator{
+					app: &app{
+						state: &appState{
+							store: &store{},
+						},
+					},
+				},
+			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
-			if err := s.Register(); (err != nil) != tt.wantErr {
+			if err := s.Register(tt.args.app); (err != nil) != tt.wantErr {
 				t.Errorf("server.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -219,11 +259,11 @@ func TestServerSiteRegister(t *testing.T) {
 
 func TestServerSiteStart(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
 	}
 	tests := []struct {
 		name    string
@@ -295,11 +335,11 @@ func TestServerSiteStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
 			if err := s.Start(); (err != nil) != tt.wantErr {
 				t.Errorf("server.Start() error = %v, wantErr %v", err, tt.wantErr)
@@ -310,11 +350,11 @@ func TestServerSiteStart(t *testing.T) {
 
 func TestServerSiteStop(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
 	}
 	tests := []struct {
 		name    string
@@ -349,11 +389,11 @@ func TestServerSiteStop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
 			if err := s.Stop(); (err != nil) != tt.wantErr {
 				t.Errorf("server.Stop() error = %v, wantErr %v", err, tt.wantErr)
@@ -364,11 +404,11 @@ func TestServerSiteStop(t *testing.T) {
 
 func TestServerSiteName(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
 	}
 	tests := []struct {
 		name   string
@@ -386,11 +426,11 @@ func TestServerSiteName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
 			if got := s.Name(); got != tt.want {
 				t.Errorf("server.Name() = %v, want %v", got, tt.want)
@@ -401,11 +441,11 @@ func TestServerSiteName(t *testing.T) {
 
 func TestServerSiteListeners(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
 	}
 	tests := []struct {
 		name   string
@@ -425,11 +465,11 @@ func TestServerSiteListeners(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
 			if got := s.Listeners(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("server.Listeners() = %v, want %v", got, tt.want)
@@ -440,11 +480,11 @@ func TestServerSiteListeners(t *testing.T) {
 
 func TestServerSiteHosts(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
 	}
 	tests := []struct {
 		name   string
@@ -464,11 +504,11 @@ func TestServerSiteHosts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
 			if got := s.Hosts(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("server.Hosts() = %v, want %v", got, tt.want)
@@ -479,11 +519,11 @@ func TestServerSiteHosts(t *testing.T) {
 
 func TestServerSiteDefault(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
 	}
 	tests := []struct {
 		name   string
@@ -512,11 +552,11 @@ func TestServerSiteDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
 			if got := s.Default(); got != tt.want {
 				t.Errorf("server.Default() = %v, want %v", got, tt.want)
@@ -527,11 +567,11 @@ func TestServerSiteDefault(t *testing.T) {
 
 func TestServerSiteRouter(t *testing.T) {
 	type fields struct {
-		name    string
-		config  *serverSiteConfig
-		logger  *slog.Logger
-		state   *serverSiteState
-		fetcher Fetcher
+		name   string
+		config *serverSiteConfig
+		logger *slog.Logger
+		state  *serverSiteState
+		server Server
 	}
 	tests := []struct {
 		name    string
@@ -558,11 +598,11 @@ func TestServerSiteRouter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &serverSite{
-				name:    tt.fields.name,
-				config:  tt.fields.config,
-				logger:  tt.fields.logger,
-				state:   tt.fields.state,
-				fetcher: tt.fields.fetcher,
+				name:   tt.fields.name,
+				config: tt.fields.config,
+				logger: tt.fields.logger,
+				state:  tt.fields.state,
+				server: tt.fields.server,
 			}
 			_, err := s.Router()
 			if (err != nil) != tt.wantErr {

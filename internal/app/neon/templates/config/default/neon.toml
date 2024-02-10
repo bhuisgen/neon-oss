@@ -1,10 +1,10 @@
-[store.storage.memory]
+[app.store.storage.memory]
 
-[server.listeners.default.local]
+[app.server.listeners.default.local]
 listenAddr = "0.0.0.0"
 listenPort = 8080
 
-[server.sites.main]
+[app.server.sites.main]
 listeners = ["default"]
 
-[server.sites.main.routes.default]
+[app.server.sites.main.routes.default]
