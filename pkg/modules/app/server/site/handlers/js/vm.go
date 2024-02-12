@@ -2,7 +2,6 @@ package js
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -195,7 +194,10 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 	case err := <-errs:
 		var jsError *v8go.JSError
 		if errors.As(err, &jsError) {
-			v.logger.Debug("Failed to execute script", "name", name, "stackTrace", fmt.Sprintf("%+v", jsError))
+			v.logger.Debug("Failed to execute script", "name", name, "message", jsError.Message,
+				"location", jsError.Location, "stackTrace", jsError.StackTrace)
+		} else {
+			v.logger.Debug("Failed to execute script", "name", name, "err", err)
 		}
 		return nil, errVMExecute
 
