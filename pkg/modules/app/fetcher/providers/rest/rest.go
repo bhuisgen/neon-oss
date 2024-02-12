@@ -46,10 +46,11 @@ type restProviderConfig struct {
 	TLSCertFiles        *[]string         `mapstructure:"tlsCertFiles"`
 	TLSKeyFiles         *[]string         `mapstructure:"tlsKeyFiles"`
 	Timeout             *int              `mapstructure:"timeout"`
-	MaxConnsPerHost     *int              `mapstructure:"maxConnsPerHost"`
+	ConnectTimeout      *int              `mapstructure:"connectTimeout"`
 	MaxIdleConns        *int              `mapstructure:"maxIdleConns"`
 	MaxIdleConnsPerHost *int              `mapstructure:"maxIdleConnsPerHost"`
 	IdleConnTimeout     *int              `mapstructure:"idleConnTimeout"`
+	MaxConnsPerHost     *int              `mapstructure:"maxConnsPerHost"`
 	Retry               *int              `mapstructure:"retry"`
 	RetryDelay          *int              `mapstructure:"retryDelay"`
 	Headers             map[string]string `mapstructure:"headers"`
@@ -70,11 +71,12 @@ type restResourceConfig struct {
 const (
 	restModuleID module.ModuleID = "app.fetcher.provider.rest"
 
-	restConfigDefaultTimeout             int = 30
-	restConfigDefaultMaxConnsPerHost     int = 100
+	restConfigDefaultTimeout             int = 15
+	restConfigDefaultConnectTimeout      int = 5
 	restConfigDefaultMaxIdleConns        int = 100
 	restConfigDefaultMaxIdleConnsPerHost int = 100
 	restConfigDefaultIdleConnTimeout     int = 60
+	restConfigDefaultMaxConnsPerHost     int = 100
 	restConfigDefaultRetry               int = 3
 	restConfigDefaultRetryDelay          int = 1
 
@@ -258,12 +260,12 @@ func (p *restProvider) Init(config map[string]interface{}) error {
 		p.logger.Error("Invalid value", "option", "Timeout", "value", *p.config.Timeout)
 		errConfig = true
 	}
-	if p.config.MaxConnsPerHost == nil {
-		defaultValue := restConfigDefaultMaxConnsPerHost
-		p.config.MaxConnsPerHost = &defaultValue
+	if p.config.ConnectTimeout == nil {
+		defaultValue := restConfigDefaultConnectTimeout
+		p.config.ConnectTimeout = &defaultValue
 	}
-	if *p.config.MaxConnsPerHost < 0 {
-		p.logger.Error("Invalid value", "option", "MaxConnsPerHost", "value", *p.config.MaxConnsPerHost)
+	if *p.config.ConnectTimeout < 0 {
+		p.logger.Error("Invalid value", "option", "ConnectTimeout", "value", *p.config.Timeout)
 		errConfig = true
 	}
 	if p.config.MaxIdleConns == nil {
@@ -288,6 +290,14 @@ func (p *restProvider) Init(config map[string]interface{}) error {
 	}
 	if *p.config.IdleConnTimeout < 0 {
 		p.logger.Error("Invalid value", "option", "IdleConnTimeout", "value", *p.config.IdleConnTimeout)
+		errConfig = true
+	}
+	if p.config.MaxConnsPerHost == nil {
+		defaultValue := restConfigDefaultMaxConnsPerHost
+		p.config.MaxConnsPerHost = &defaultValue
+	}
+	if *p.config.MaxConnsPerHost < 0 {
+		p.logger.Error("Invalid value", "option", "MaxConnsPerHost", "value", *p.config.MaxConnsPerHost)
 		errConfig = true
 	}
 	if p.config.Retry == nil {
@@ -355,17 +365,17 @@ func (p *restProvider) Init(config map[string]interface{}) error {
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			Dial: (&net.Dialer{
-				Timeout: time.Duration(*p.config.Timeout) * time.Second,
+				Timeout: time.Duration(*p.config.ConnectTimeout) * time.Second,
 			}).Dial,
 			TLSClientConfig:       tlsConfig,
 			TLSHandshakeTimeout:   time.Duration(*p.config.Timeout) * time.Second,
 			ResponseHeaderTimeout: time.Duration(*p.config.Timeout) * time.Second,
 			ExpectContinueTimeout: time.Duration(*p.config.Timeout) * time.Second,
-			ForceAttemptHTTP2:     true,
-			MaxConnsPerHost:       *p.config.MaxConnsPerHost,
 			MaxIdleConns:          *p.config.MaxIdleConns,
 			MaxIdleConnsPerHost:   *p.config.MaxIdleConnsPerHost,
 			IdleConnTimeout:       time.Duration(*p.config.IdleConnTimeout) * time.Second,
+			MaxConnsPerHost:       *p.config.MaxConnsPerHost,
+			ForceAttemptHTTP2:     true,
 		},
 		Timeout: time.Duration(*p.config.Timeout) * time.Second,
 	}
