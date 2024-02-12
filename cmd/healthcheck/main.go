@@ -107,13 +107,13 @@ func healthcheck(url string, cacert string, cert string, key string, status int,
 		return fmt.Errorf("create request: %v", err)
 	}
 	response, err := client.Do(request)
-	if response != nil {
-		defer response.Body.Close()
-	}
 	if err != nil {
 		return fmt.Errorf("send request: %v", err)
 	}
-	_, _ = io.Copy(io.Discard, response.Body)
+	defer response.Body.Close()
+	if _, err := io.Copy(io.Discard, response.Body); err != nil {
+		return fmt.Errorf("read response: %v", err)
+	}
 
 	if status > 0 {
 		if response.StatusCode != status {

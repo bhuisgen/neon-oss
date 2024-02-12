@@ -496,13 +496,11 @@ func (p *restProvider) fetchResource(ctx context.Context, config *restResourceCo
 		startTime := time.Now()
 
 		response, err := p.httpClientDo(&p.client, req)
-		if response != nil {
-			defer response.Body.Close()
-		}
 		if err != nil {
 			p.logger.Error("Failed to send request", "err", err)
 			return nil, nil, fmt.Errorf("send requests: %v", err)
 		}
+		defer response.Body.Close()
 		responseBody, err := p.ioReadAll(response.Body)
 		if err != nil {
 			p.logger.Error("Failed to read response", "err", err)
