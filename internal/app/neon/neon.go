@@ -18,9 +18,6 @@ func New(config *config) App {
 	if _, ok := os.LookupEnv("DEBUG"); ok {
 		DEBUG = true
 	}
-	if _, ok := os.LookupEnv("MONITOR"); ok {
-		MONITOR = true
-	}
 	if v, ok := os.LookupEnv("CHILD_SOCKET"); ok {
 		CHILD_SOCKET = v
 	}
