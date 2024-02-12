@@ -476,10 +476,10 @@ func (p *restProvider) fetchResource(ctx context.Context, config *restResourceCo
 
 	query := req.URL.Query()
 	for key, value := range p.config.Params {
-		query.Add(key, value)
+		query.Set(key, value)
 	}
 	for key, value := range config.Params {
-		query.Add(key, value)
+		query.Set(key, value)
 	}
 	req.URL.RawQuery = query.Encode()
 
