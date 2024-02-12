@@ -598,6 +598,7 @@ func TestFileHandlerServeHTTP(t *testing.T) {
 			args: args{
 				w: testFileHandlerResponseWriter{},
 				r: &http.Request{
+					Method: http.MethodGet,
 					URL: &url.URL{
 						Path: "/test",
 					},

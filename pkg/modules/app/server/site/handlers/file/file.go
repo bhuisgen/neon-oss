@@ -192,6 +192,12 @@ func (h *fileHandler) Stop() error {
 
 // ServeHTTP implements the http handler.
 func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
 	if *h.config.Cache {
 		h.muCache.RLock()
 		if h.cache != nil && h.cache.expire.After(time.Now()) {

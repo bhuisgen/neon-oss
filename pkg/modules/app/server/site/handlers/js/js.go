@@ -344,6 +344,12 @@ func (h *jsHandler) Stop() error {
 
 // ServeHTTP implements the http handler.
 func (h *jsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
 	key := r.URL.Path
 
 	if *h.config.Cache {

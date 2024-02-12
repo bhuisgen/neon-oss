@@ -736,6 +736,7 @@ func TestJSHandlerServeHTTP(t *testing.T) {
 			args: args{
 				w: testJSHandlerResponseWriter{},
 				r: &http.Request{
+					Method: http.MethodGet,
 					URL: &url.URL{
 						Path: "/test",
 					},

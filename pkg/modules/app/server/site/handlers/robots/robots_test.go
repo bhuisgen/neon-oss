@@ -367,6 +367,7 @@ func TestRobotsHandlerServeHTTP(t *testing.T) {
 			args: args{
 				w: testRobotsHandlerResponseWriter{},
 				r: &http.Request{
+					Method: http.MethodGet,
 					URL: &url.URL{
 						Path: "/test",
 					},

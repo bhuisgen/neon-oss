@@ -578,6 +578,7 @@ func TestSitemapHandlerServeHTTP(t *testing.T) {
 			args: args{
 				w: testSitemapHandlerResponseWriter{},
 				r: &http.Request{
+					Method: http.MethodGet,
 					URL: &url.URL{
 						Path: "/test",
 					},
