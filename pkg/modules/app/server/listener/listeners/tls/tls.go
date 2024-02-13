@@ -331,12 +331,13 @@ func (l *tlsListener) Register(listener core.ServerListener) error {
 // Serve accepts incoming connections.
 func (l *tlsListener) Serve(handler http.Handler) error {
 	l.server = &http.Server{
-		Addr:              fmt.Sprintf("%s:%d", *l.config.ListenAddr, *l.config.ListenPort),
-		Handler:           handler,
-		ReadTimeout:       time.Duration(*l.config.ReadTimeout) * time.Second,
-		ReadHeaderTimeout: time.Duration(*l.config.ReadHeaderTimeout) * time.Second,
-		WriteTimeout:      time.Duration(*l.config.WriteTimeout) * time.Second,
-		IdleTimeout:       time.Duration(*l.config.IdleTimeout) * time.Second,
+		Addr:                         fmt.Sprintf("%s:%d", *l.config.ListenAddr, *l.config.ListenPort),
+		Handler:                      handler,
+		ReadTimeout:                  time.Duration(*l.config.ReadTimeout) * time.Second,
+		ReadHeaderTimeout:            time.Duration(*l.config.ReadHeaderTimeout) * time.Second,
+		WriteTimeout:                 time.Duration(*l.config.WriteTimeout) * time.Second,
+		IdleTimeout:                  time.Duration(*l.config.IdleTimeout) * time.Second,
+		DisableGeneralOptionsHandler: true,
 	}
 
 	tlsConfig := &tls.Config{
