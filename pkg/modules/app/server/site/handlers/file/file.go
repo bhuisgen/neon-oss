@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -36,10 +38,11 @@ type fileHandler struct {
 
 // fileHandlerConfig implements the file handler configuration.
 type fileHandlerConfig struct {
-	Path       string `mapstructure:"path"`
-	StatusCode *int   `mapstructure:"statusCode"`
-	Cache      *bool  `mapstructure:"cache"`
-	CacheTTL   *int   `mapstructure:"cacheTTL"`
+	Path        string  `mapstructure:"path"`
+	ContentType *string `mapstructure:"contentType"`
+	StatusCode  *int    `mapstructure:"statusCode"`
+	Cache       *bool   `mapstructure:"cache"`
+	CacheTTL    *int    `mapstructure:"cacheTTL"`
 }
 
 // fileHandlerCache implments the file handler cache.
@@ -129,6 +132,10 @@ func (h *fileHandler) Init(config map[string]interface{}) error {
 			}
 		}
 	}
+	if h.config.ContentType != nil && *h.config.ContentType == "" {
+		h.logger.Error("Invalid value", "option", "ContentType")
+		errConfig = true
+	}
 	if h.config.StatusCode == nil {
 		defaultValue := fileConfigDefaultStatusCode
 		h.config.StatusCode = &defaultValue
@@ -204,6 +211,11 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			render := h.cache.render
 			h.muCache.RUnlock()
 
+			for key, values := range render.Header() {
+				for _, value := range values {
+					w.Header().Add(key, value)
+				}
+			}
 			w.WriteHeader(render.StatusCode())
 			if _, err := w.Write(render.Body()); err != nil {
 				h.logger.Error("Failed to write render", "err", err)
@@ -247,6 +259,11 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.muCache.Unlock()
 	}
 
+	for key, values := range render.Header() {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
 	w.WriteHeader(render.StatusCode())
 	if _, err := w.Write(render.Body()); err != nil {
 		h.logger.Error("Failed to write render", "err", err)
@@ -287,6 +304,15 @@ func (h *fileHandler) read() error {
 
 // render makes a new render.
 func (h *fileHandler) render(w render.RenderWriter, r *http.Request) error {
+	if h.config.ContentType != nil {
+		w.Header().Set("Content-Type", *h.config.ContentType)
+	} else {
+		contentType := mime.TypeByExtension(path.Ext(h.config.Path))
+		if contentType != "" {
+			w.Header().Set("Content-Type", contentType)
+		}
+	}
+
 	w.WriteHeader(*h.config.StatusCode)
 
 	h.muFile.RLock()
