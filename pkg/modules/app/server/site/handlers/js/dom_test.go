@@ -34,7 +34,7 @@ func TestNewDOMElement(t *testing.T) {
 func TestDOMElementId(t *testing.T) {
 	type fields struct {
 		id string
-		m  *orderedMap
+		m  map[string]string
 	}
 	tests := []struct {
 		name   string
@@ -45,7 +45,7 @@ func TestDOMElementId(t *testing.T) {
 			name: "default",
 			fields: fields{
 				id: "test",
-				m:  &orderedMap{},
+				m:  map[string]string{},
 			},
 			want: "test",
 		},
@@ -66,7 +66,7 @@ func TestDOMElementId(t *testing.T) {
 func TestDOMElementAttributes(t *testing.T) {
 	type fields struct {
 		id string
-		m  *orderedMap
+		m  map[string]string
 	}
 	tests := []struct {
 		name   string
@@ -77,8 +77,10 @@ func TestDOMElementAttributes(t *testing.T) {
 			name: "default",
 			fields: fields{
 				id: "test",
-				m: &orderedMap{
-					keys: []interface{}{"key1", "key2", "key3"},
+				m: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
 				},
 			},
 			want: []string{"key1", "key2", "key3"},
@@ -100,7 +102,7 @@ func TestDOMElementAttributes(t *testing.T) {
 func TestDOMElementGetAttribute(t *testing.T) {
 	type fields struct {
 		id string
-		m  *orderedMap
+		m  map[string]string
 	}
 	type args struct {
 		name string
@@ -115,11 +117,8 @@ func TestDOMElementGetAttribute(t *testing.T) {
 			name: "default",
 			fields: fields{
 				id: "test",
-				m: &orderedMap{
-					keys: []interface{}{"key"},
-					data: map[interface{}]interface{}{
-						"key": "value",
-					},
+				m: map[string]string{
+					"key": "value",
 				},
 			},
 			args: args{
@@ -131,11 +130,8 @@ func TestDOMElementGetAttribute(t *testing.T) {
 			name: "invalid key",
 			fields: fields{
 				id: "test",
-				m: &orderedMap{
-					keys: []interface{}{"key"},
-					data: map[interface{}]interface{}{
-						"key": "value",
-					},
+				m: map[string]string{
+					"key": "value",
 				},
 			},
 			args: args{
@@ -160,7 +156,7 @@ func TestDOMElementGetAttribute(t *testing.T) {
 func TestDOMElementSetAttribute(t *testing.T) {
 	type fields struct {
 		id string
-		m  *orderedMap
+		m  map[string]string
 	}
 	type args struct {
 		key   string
@@ -175,9 +171,8 @@ func TestDOMElementSetAttribute(t *testing.T) {
 			name: "default",
 			fields: fields{
 				id: "test",
-				m: &orderedMap{
-					keys: []interface{}{},
-					data: map[interface{}]interface{}{},
+				m: map[string]string{
+					"key": "value",
 				},
 			},
 		},
@@ -215,7 +210,7 @@ func TestNewDOMElementList(t *testing.T) {
 func TestDOMElementListIds(t *testing.T) {
 	type fields struct {
 		ids []string
-		m   *orderedMap
+		m   map[string]*domElement
 	}
 	tests := []struct {
 		name   string
@@ -226,7 +221,7 @@ func TestDOMElementListIds(t *testing.T) {
 			name: "default",
 			fields: fields{
 				ids: []string{"test"},
-				m:   &orderedMap{},
+				m:   map[string]*domElement{},
 			},
 			want: []string{"test"},
 		},
@@ -234,8 +229,8 @@ func TestDOMElementListIds(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &domElementList{
-				ids:  tt.fields.ids,
-				data: tt.fields.m,
+				ids: tt.fields.ids,
+				m:   tt.fields.m,
 			}
 			if got := l.Ids(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("domElementList.Ids() = %v, want %v", got, tt.want)
@@ -249,7 +244,7 @@ func TestDOMElementListGet(t *testing.T) {
 
 	type fields struct {
 		ids []string
-		m   *orderedMap
+		m   map[string]*domElement
 	}
 	type args struct {
 		id string
@@ -265,11 +260,8 @@ func TestDOMElementListGet(t *testing.T) {
 			name: "default",
 			fields: fields{
 				ids: []string{"test"},
-				m: &orderedMap{
-					keys: []interface{}{"test"},
-					data: map[interface{}]interface{}{
-						"test": test,
-					},
+				m: map[string]*domElement{
+					"test": test,
 				},
 			},
 			args: args{
@@ -281,11 +273,8 @@ func TestDOMElementListGet(t *testing.T) {
 			name: "invalid id",
 			fields: fields{
 				ids: []string{"test"},
-				m: &orderedMap{
-					keys: []interface{}{"test"},
-					data: map[interface{}]interface{}{
-						"test": test,
-					},
+				m: map[string]*domElement{
+					"test": test,
 				},
 			},
 			args: args{
@@ -297,8 +286,8 @@ func TestDOMElementListGet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &domElementList{
-				ids:  tt.fields.ids,
-				data: tt.fields.m,
+				ids: tt.fields.ids,
+				m:   tt.fields.m,
 			}
 			got, err := l.Get(tt.args.id)
 			if (err != nil) != tt.wantErr {
@@ -317,7 +306,7 @@ func TestDOMElementListSet(t *testing.T) {
 
 	type fields struct {
 		ids []string
-		m   *orderedMap
+		m   map[string]*domElement
 	}
 	type args struct {
 		e *domElement
@@ -331,10 +320,7 @@ func TestDOMElementListSet(t *testing.T) {
 			name: "default",
 			fields: fields{
 				ids: []string{},
-				m: &orderedMap{
-					keys: []interface{}{},
-					data: map[interface{}]interface{}{},
-				},
+				m:   map[string]*domElement{},
 			},
 			args: args{
 				e: test,
@@ -344,8 +330,8 @@ func TestDOMElementListSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &domElementList{
-				ids:  tt.fields.ids,
-				data: tt.fields.m,
+				ids: tt.fields.ids,
+				m:   tt.fields.m,
 			}
 			l.Set(tt.args.e)
 		})
