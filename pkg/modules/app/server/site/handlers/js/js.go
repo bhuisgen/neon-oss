@@ -606,6 +606,7 @@ func (h *jsHandler) render(w render.RenderWriter, r *http.Request) error {
 		return nil
 	}
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	for key, value := range vmResult.Headers {
 		for _, v := range value {
 			w.Header().Add(key, v)

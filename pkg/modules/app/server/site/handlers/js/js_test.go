@@ -734,12 +734,15 @@ func TestJSHandlerServeHTTP(t *testing.T) {
 				},
 			},
 			args: args{
-				w: testJSHandlerResponseWriter{},
+				w: testJSHandlerResponseWriter{
+					header: http.Header{},
+				},
 				r: &http.Request{
 					Method: http.MethodGet,
 					URL: &url.URL{
 						Path: "/test",
 					},
+					Header: http.Header{},
 				},
 			},
 		},

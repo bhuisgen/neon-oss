@@ -435,6 +435,7 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // render makes a new render.
 func (h *sitemapHandler) render(w render.RenderWriter, r *http.Request) error {
+	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 
 	var err error
