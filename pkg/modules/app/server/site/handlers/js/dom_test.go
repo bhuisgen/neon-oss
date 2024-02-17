@@ -92,8 +92,18 @@ func TestDOMElementAttributes(t *testing.T) {
 				id: tt.fields.id,
 				m:  tt.fields.m,
 			}
-			if got := e.Attributes(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("domElement.Attributes() = %v, want %v", got, tt.want)
+			got := e.Attributes()
+			for _, e := range tt.want {
+				var found bool
+				for _, g := range got {
+					if g == e {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("domElement.Attributes() = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}

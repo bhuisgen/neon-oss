@@ -190,7 +190,6 @@ func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResu
 	go worker(vals, errs)
 	select {
 	case <-vals:
-
 	case err := <-errs:
 		var jsError *v8go.JSError
 		if errors.As(err, &jsError) {
