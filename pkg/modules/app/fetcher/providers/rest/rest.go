@@ -459,11 +459,10 @@ func parseLinkNextFromBody(body []byte, filter string) string {
 	if err != nil {
 		return ""
 	}
-	url, ok := result.(string)
-	if !ok {
-		return ""
+	if url, ok := result.(string); ok {
+		return url
 	}
-	return url
+	return ""
 }
 
 // fetchResource fetches the resource
