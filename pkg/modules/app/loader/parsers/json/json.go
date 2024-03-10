@@ -120,20 +120,23 @@ func (p *jsonParser) Parse(ctx context.Context, store core.Store, fetcher core.F
 		if err := p.jsonUnmarshal(data, &jsonData); err != nil {
 			return fmt.Errorf("parse resource %s data: %v", resourceName, err)
 		}
+
 		result, err := jsonpath.Get(p.config.Filter, jsonData)
 		if err != nil {
 			return fmt.Errorf("filter resource %s data: %v", resourceName, err)
 		}
-		switch v := result.(type) {
-		case []interface{}:
-			for _, item := range v {
-				mItem, ok := item.(map[string]interface{})
-				if !ok {
-					return fmt.Errorf("parse resource %s item: %v", resourceName, err)
-				}
-				if err := p.executeResourceFromItem(ctx, store, fetcher, mItem); err != nil {
-					return fmt.Errorf("execute resource %s subresource: %v", resourceName, err)
-				}
+
+		v, ok := result.([]interface{})
+		if !ok {
+			continue
+		}
+		for _, item := range v {
+			mItem, ok := item.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("parse resource %s item: %v", resourceName, err)
+			}
+			if err := p.executeResourceFromItem(ctx, store, fetcher, mItem); err != nil {
+				return fmt.Errorf("execute resource %s subresource: %v", resourceName, err)
 			}
 		}
 	}

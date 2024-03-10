@@ -10,19 +10,19 @@ import (
 )
 
 type testRawParserStore struct {
-	errGet bool
-	errSet bool
+	errLoadResource  bool
+	errStoreResource bool
 }
 
 func (s *testRawParserStore) LoadResource(name string) (*core.Resource, error) {
-	if s.errGet {
+	if s.errLoadResource {
 		return nil, errors.New("test error")
 	}
 	return nil, nil
 }
 
 func (s *testRawParserStore) StoreResource(name string, resource *core.Resource) error {
-	if s.errSet {
+	if s.errStoreResource {
 		return errors.New("test error")
 	}
 	return nil
@@ -192,7 +192,8 @@ func TestRawParserParse(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				store: &testRawParserStore{
-					errSet: true},
+					errStoreResource: true,
+				},
 				fetcher: &testRawParserFetcher{},
 			},
 			wantErr: true,

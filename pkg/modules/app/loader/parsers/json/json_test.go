@@ -11,19 +11,19 @@ import (
 )
 
 type testJSONParserStore struct {
-	errGet bool
-	errSet bool
+	errLoadResource  bool
+	errStoreResource bool
 }
 
 func (s *testJSONParserStore) LoadResource(name string) (*core.Resource, error) {
-	if s.errGet {
+	if s.errLoadResource {
 		return nil, errors.New("test error")
 	}
 	return nil, nil
 }
 
 func (s *testJSONParserStore) StoreResource(name string, resource *core.Resource) error {
-	if s.errSet {
+	if s.errStoreResource {
 		return errors.New("test error")
 	}
 	return nil
@@ -249,7 +249,8 @@ func TestJSONParserParse(t *testing.T) {
 			args: args{
 				ctx: context.Background(),
 				store: &testJSONParserStore{
-					errSet: true},
+					errStoreResource: true,
+				},
 				fetcher: &testJSONParserFetcher{
 					resource: &core.Resource{
 						Data: [][]byte{},
