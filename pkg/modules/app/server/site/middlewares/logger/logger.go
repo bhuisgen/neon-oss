@@ -184,6 +184,7 @@ type loggerResponseWriter struct {
 	http.ResponseWriter
 	wroteHeader bool
 	status      int
+	size        int
 }
 
 // WriteHeader sends an HTTP response header with the provided status code.
@@ -202,6 +203,7 @@ func (w *loggerResponseWriter) Write(b []byte) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("write: %s", err)
 	}
+	w.size += len(b)
 	return n, nil
 }
 

@@ -120,10 +120,6 @@ func (m *compressMiddleware) Handler(next http.Handler) http.Handler {
 		r.Header.Del(compressHeaderAcceptEncoding)
 
 		writer := m.pool.Get()
-		if writer == nil {
-			next.ServeHTTP(w, r)
-			return
-		}
 		writer.Reset(w)
 
 		rw := compressResponseWriter{Writer: writer, ResponseWriter: w}
