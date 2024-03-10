@@ -92,7 +92,7 @@ func (a *app) Init(config map[string]interface{}) error {
 	}
 	store, ok := storeModuleInfo.NewInstance().(Store)
 	if !ok {
-		return fmt.Errorf("invalid store")
+		return errors.New("invalid store")
 	}
 
 	fetcherModuleInfo, err := module.Lookup("app.fetcher")
@@ -101,7 +101,7 @@ func (a *app) Init(config map[string]interface{}) error {
 	}
 	fetcher, ok := fetcherModuleInfo.NewInstance().(Fetcher)
 	if !ok {
-		return fmt.Errorf("invalid fetcher")
+		return errors.New("invalid fetcher")
 	}
 
 	loaderModuleInfo, err := module.Lookup("app.loader")
@@ -110,7 +110,7 @@ func (a *app) Init(config map[string]interface{}) error {
 	}
 	loader, ok := loaderModuleInfo.NewInstance().(Loader)
 	if !ok {
-		return fmt.Errorf("invalid loader")
+		return errors.New("invalid loader")
 	}
 
 	serverModuleInfo, err := module.Lookup("app.server")
@@ -119,7 +119,7 @@ func (a *app) Init(config map[string]interface{}) error {
 	}
 	server, ok := serverModuleInfo.NewInstance().(Server)
 	if !ok {
-		return fmt.Errorf("invalid server")
+		return errors.New("invalid server")
 	}
 
 	a.state.store = store
@@ -642,7 +642,7 @@ func (a *app) child(key string) error {
 	}
 
 	if !ready {
-		return fmt.Errorf("not ready")
+		return errors.New("not ready")
 	}
 
 	return nil
