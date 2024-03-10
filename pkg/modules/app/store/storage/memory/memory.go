@@ -49,7 +49,7 @@ func (s *memoryStorage) LoadResource(name string) (*core.Resource, error) {
 	v := s.storage.Get(name)
 	data, ok := v.(*core.Resource)
 	if !ok {
-		return nil, errors.New("invalid data")
+		return nil, errors.New("no resource")
 	}
 	return data, nil
 }
