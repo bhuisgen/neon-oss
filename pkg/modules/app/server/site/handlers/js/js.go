@@ -867,7 +867,7 @@ func (h *jsHandler) doc(w render.RenderWriter, r *http.Request, b io.Reader, sta
 func (h *jsHandler) replaceIndexRouteParameters(s string, params map[string]string) string {
 	tmp := s
 	for key, value := range params {
-		tmp = strings.ReplaceAll(tmp, fmt.Sprint("$", key), value)
+		tmp = strings.ReplaceAll(tmp, "$"+key, value)
 	}
 	return tmp
 }

@@ -606,7 +606,7 @@ func (h *sitemapHandler) absURL(url string, root string) string {
 	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
 		return url
 	}
-	return fmt.Sprintf("%s%s", root, url)
+	return root + url
 }
 
 var _ core.ServerSiteHandlerModule = (*sitemapHandler)(nil)
