@@ -180,7 +180,7 @@ func (h *sitemapHandler) Init(config map[string]interface{}) error {
 		defaultValue := sitemapConfigDefaultCacheTTL
 		h.config.CacheTTL = &defaultValue
 	}
-	if *h.config.CacheTTL < 0 {
+	if *h.config.CacheTTL <= 0 {
 		h.logger.Error("Invalid value", "option", "CacheTTL", "value", *h.config.CacheTTL)
 		errConfig = true
 	}

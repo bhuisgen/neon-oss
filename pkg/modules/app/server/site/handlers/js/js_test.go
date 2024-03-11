@@ -335,9 +335,9 @@ func TestJSHandlerInit(t *testing.T) {
 					"Container":     "",
 					"State":         "",
 					"Timeout":       -1,
-					"MaxVMs":        -1,
-					"CacheTTL":      -1,
-					"CacheMaxItems": -1,
+					"MaxVMs":        0,
+					"CacheTTL":      0,
+					"CacheMaxItems": 0,
 					"Rules": []map[string]interface{}{
 						{
 							"Path": "",

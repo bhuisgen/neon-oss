@@ -262,8 +262,8 @@ func TestFileHandlerInit(t *testing.T) {
 			args: args{
 				config: map[string]interface{}{
 					"Path":       "",
-					"StatusCode": -1,
-					"CacheTTL":   -1,
+					"StatusCode": 0,
+					"CacheTTL":   0,
 				},
 			},
 			wantErr: true,

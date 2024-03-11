@@ -264,7 +264,7 @@ func TestSitemapHandlerInit(t *testing.T) {
 			args: args{
 				config: map[string]interface{}{
 					"Root":     "",
-					"CacheTTL": -1,
+					"CacheTTL": 0,
 					"Kind":     "",
 				},
 			},

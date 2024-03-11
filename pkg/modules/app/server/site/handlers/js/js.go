@@ -247,7 +247,7 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		defaultValue := runtime.GOMAXPROCS(0)
 		h.config.MaxVMs = &defaultValue
 	}
-	if *h.config.MaxVMs < 0 {
+	if *h.config.MaxVMs <= 0 {
 		h.logger.Error("Invalid value", "option", "MaxVMs", "name", *h.config.MaxVMs)
 		errConfig = true
 	}
@@ -259,7 +259,7 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		defaultValue := jsConfigDefaultCacheTTL
 		h.config.CacheTTL = &defaultValue
 	}
-	if *h.config.CacheTTL < 0 {
+	if *h.config.CacheTTL <= 0 {
 		h.logger.Error("Invalid value", "option", "CacheTTL", "name", *h.config.CacheTTL)
 		errConfig = true
 	}
@@ -267,7 +267,7 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		defaultValue := jsConfigDefaultCacheMaxItems
 		h.config.CacheMaxItems = &defaultValue
 	}
-	if *h.config.CacheMaxItems < 0 {
+	if *h.config.CacheMaxItems <= 0 {
 		h.logger.Error("Invalid value", "option", "CacheMaxCapacity", "name", *h.config.CacheMaxItems)
 		errConfig = true
 	}

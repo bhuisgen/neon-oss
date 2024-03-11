@@ -180,7 +180,7 @@ func TestRobotsHandlerInit(t *testing.T) {
 			args: args{
 				config: map[string]interface{}{
 					"Hosts":    []string{""},
-					"CacheTTL": -1,
+					"CacheTTL": 0,
 					"Sitemaps": []string{""},
 				},
 			},
