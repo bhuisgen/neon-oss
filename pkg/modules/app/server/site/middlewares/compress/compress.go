@@ -51,7 +51,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (m compressMiddleware) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: compressModuleID,
+		ID:           compressModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &compressMiddleware{
 				logger: slog.New(log.NewHandler(os.Stderr, string(compressModuleID), nil)),

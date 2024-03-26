@@ -46,7 +46,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (m headerMiddleware) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: headerModuleID,
+		ID:           headerModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &headerMiddleware{
 				logger: slog.New(log.NewHandler(os.Stderr, string(headerModuleID), nil)),

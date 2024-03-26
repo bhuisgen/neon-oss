@@ -149,7 +149,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (h sitemapHandler) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: sitemapModuleID,
+		ID:           sitemapModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &sitemapHandler{
 				logger:  slog.New(log.NewHandler(os.Stderr, string(sitemapModuleID), nil)),

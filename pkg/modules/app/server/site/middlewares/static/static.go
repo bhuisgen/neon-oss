@@ -64,7 +64,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (m staticMiddleware) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: staticModuleID,
+		ID:           staticModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &staticMiddleware{
 				logger:     slog.New(log.NewHandler(os.Stderr, string(staticModuleID), nil)),

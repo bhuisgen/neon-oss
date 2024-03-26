@@ -51,7 +51,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (m rewriteMiddleware) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: rewriteModuleID,
+		ID:           rewriteModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &rewriteMiddleware{
 				logger: slog.New(log.NewHandler(os.Stderr, string(rewriteModuleID), nil)),

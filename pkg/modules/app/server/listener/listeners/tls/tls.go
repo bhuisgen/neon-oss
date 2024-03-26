@@ -128,7 +128,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (l tlsListener) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: tlsModuleID,
+		ID:           tlsModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &tlsListener{
 				logger:                         slog.New(log.NewHandler(os.Stderr, string(tlsModuleID), nil)),

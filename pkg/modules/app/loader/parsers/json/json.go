@@ -51,7 +51,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (p jsonParser) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: jsonModuleID,
+		ID:           jsonModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &jsonParser{
 				logger:        slog.New(log.NewHandler(os.Stderr, string(jsonModuleID), nil)),

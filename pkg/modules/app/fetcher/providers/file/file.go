@@ -47,7 +47,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (p fileProvider) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: fileModuleID,
+		ID:           fileModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &fileProvider{
 				logger:     slog.New(log.NewHandler(os.Stderr, string(fileModuleID), nil)),

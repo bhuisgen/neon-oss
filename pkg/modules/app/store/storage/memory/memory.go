@@ -28,7 +28,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (s memoryStorage) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: memoryModuleID,
+		ID:           memoryModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &memoryStorage{
 				logger: slog.New(log.NewHandler(os.Stderr, string(memoryModuleID), nil)),

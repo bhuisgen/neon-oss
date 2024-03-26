@@ -86,7 +86,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (l redirectListener) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: redirectModuleID,
+		ID:           redirectModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &redirectListener{
 				logger:             slog.New(log.NewHandler(os.Stderr, string(redirectModuleID), nil)),

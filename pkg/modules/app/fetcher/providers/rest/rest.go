@@ -140,7 +140,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (p restProvider) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: restModuleID,
+		ID:           restModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &restProvider{
 				logger:                         slog.New(log.NewHandler(os.Stderr, string(restModuleID), nil)),

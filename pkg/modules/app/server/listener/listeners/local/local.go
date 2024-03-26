@@ -84,7 +84,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (l localListener) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: localModuleID,
+		ID:           localModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &localListener{
 				logger:             slog.New(log.NewHandler(os.Stderr, string(localModuleID), nil)),

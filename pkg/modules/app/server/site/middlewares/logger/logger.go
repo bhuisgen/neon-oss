@@ -61,7 +61,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (m loggerMiddleware) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: loggerModuleID,
+		ID:           loggerModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &loggerMiddleware{
 				osOpenFile: loggerOsOpenFile,

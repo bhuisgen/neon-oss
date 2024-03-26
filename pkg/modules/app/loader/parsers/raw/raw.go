@@ -37,7 +37,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (p rawParser) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: rawModuleID,
+		ID:           rawModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &rawParser{
 				logger: slog.New(log.NewHandler(os.Stderr, string(rawModuleID), nil)),

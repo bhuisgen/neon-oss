@@ -69,7 +69,9 @@ func init() {
 // ModuleInfo returns the module information.
 func (h robotsHandler) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: robotsModuleID,
+		ID:           robotsModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &robotsHandler{
 				logger:  slog.New(log.NewHandler(os.Stderr, string(robotsModuleID), nil)),
