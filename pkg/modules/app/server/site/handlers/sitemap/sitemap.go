@@ -396,7 +396,7 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
+			h.logger.Debug("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
 
 			return
 		} else {
@@ -404,18 +404,14 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rw := h.rwPool.Get()
-	defer h.rwPool.Put(rw)
-
-	if err := h.render(rw, r); err != nil {
+	render, err := h.render(r)
+	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
 		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
 
 		return
 	}
-
-	render := rw.Render()
 
 	if *h.config.Cache {
 		h.muCache.Lock()
@@ -432,31 +428,34 @@ func (h *sitemapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
+	h.logger.Debug("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
 }
 
 // render makes a new render.
-func (h *sitemapHandler) render(w render.RenderWriter, r *http.Request) error {
-	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+func (h *sitemapHandler) render(r *http.Request) (render.Render, error) {
+	rw := h.rwPool.Get()
+	defer h.rwPool.Put(rw)
+
+	rw.Header().Set("Content-Type", "text/xml; charset=utf-8")
+	rw.WriteHeader(http.StatusOK)
 
 	var err error
 	switch h.config.Kind {
 	case sitemapKindSitemapIndex:
-		err = h.sitemapIndex(h.config.SitemapIndex, w, r)
+		err = h.sitemapIndex(h.config.SitemapIndex, rw, r)
 	case sitemapKindSitemap:
-		err = h.sitemap(h.config.Sitemap, w, r)
+		err = h.sitemap(h.config.Sitemap, rw, r)
 	}
 	if err != nil {
 		h.logger.Error("Failed to generate sitemap", "err", err)
-		return fmt.Errorf("generate sitemap: %v", err)
+		return nil, fmt.Errorf("generate sitemap: %v", err)
 	}
 
-	return nil
+	return rw.Render(), nil
 }
 
 // sitemapIndex writes the sitemap index.
-func (h *sitemapHandler) sitemapIndex(s []SitemapIndexEntry, w io.Writer, r *http.Request) error {
+func (h *sitemapHandler) sitemapIndex(s []SitemapIndexEntry, w io.Writer, _ *http.Request) error {
 	items := make([]sitemapTemplateSitemapIndexItem, 0, len(s))
 	for _, sitemapEntry := range s {
 		items = append(items, sitemapTemplateSitemapIndexItem{
@@ -474,7 +473,7 @@ func (h *sitemapHandler) sitemapIndex(s []SitemapIndexEntry, w io.Writer, r *htt
 }
 
 // sitemap writes the sitemap.
-func (h *sitemapHandler) sitemap(s []SitemapEntry, w io.Writer, r *http.Request) error {
+func (h *sitemapHandler) sitemap(s []SitemapEntry, w io.Writer, _ *http.Request) error {
 	var items []sitemapTemplateSitemapItem
 	for _, sitemapEntry := range s {
 		switch sitemapEntry.Type {

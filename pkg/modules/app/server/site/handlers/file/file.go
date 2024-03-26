@@ -224,7 +224,7 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
+			h.logger.Debug("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
 
 			return
 		}
@@ -239,18 +239,14 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rw := h.rwPool.Get()
-	defer h.rwPool.Put(rw)
-
-	if err := h.render(rw, r); err != nil {
+	render, err := h.render(r)
+	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
 		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
 
 		return
 	}
-
-	render := rw.Render()
 
 	if *h.config.Cache {
 		h.muCache.Lock()
@@ -272,7 +268,7 @@ func (h *fileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
+	h.logger.Debug("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
 }
 
 // read reads the file.
@@ -305,32 +301,35 @@ func (h *fileHandler) read() error {
 }
 
 // render makes a new render.
-func (h *fileHandler) render(w render.RenderWriter, r *http.Request) error {
+func (h *fileHandler) render(_ *http.Request) (render.Render, error) {
+	rw := h.rwPool.Get()
+	defer h.rwPool.Put(rw)
+
 	if h.config.ContentType != nil {
-		w.Header().Set("Content-Type", *h.config.ContentType)
+		rw.Header().Set("Content-Type", *h.config.ContentType)
 	} else {
 		contentType := mime.TypeByExtension(path.Ext(h.config.Path))
 		if contentType != "" {
-			w.Header().Set("Content-Type", contentType)
+			rw.Header().Set("Content-Type", contentType)
 		}
 	}
 
-	w.WriteHeader(*h.config.StatusCode)
+	rw.WriteHeader(*h.config.StatusCode)
 
 	h.muFile.RLock()
 	var err error
 	if h.file != nil {
-		_, err = w.Write(h.file)
+		_, err = rw.Write(h.file)
 	} else {
 		err = errors.New("file not loaded")
 	}
 	h.muFile.RUnlock()
 	if err != nil {
 		h.logger.Error("Failed to process render", "err", err)
-		return fmt.Errorf("process render: %v", err)
+		return nil, fmt.Errorf("process render: %v", err)
 	}
 
-	return nil
+	return rw.Render(), nil
 }
 
 var _ core.ServerSiteHandlerModule = (*fileHandler)(nil)

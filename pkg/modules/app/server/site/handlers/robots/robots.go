@@ -173,7 +173,7 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
+			h.logger.Debug("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
 
 			return
 		} else {
@@ -181,18 +181,14 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rw := h.rwPool.Get()
-	defer h.rwPool.Put(rw)
-
-	if err := h.render(rw, r); err != nil {
+	render, err := h.render(r)
+	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
 		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
 
 		return
 	}
-
-	render := rw.Render()
 
 	if *h.config.Cache {
 		h.muCache.Lock()
@@ -213,9 +209,12 @@ func (h *robotsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // render makes a new render.
-func (h *robotsHandler) render(w render.RenderWriter, r *http.Request) error {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+func (h *robotsHandler) render(r *http.Request) (render.Render, error) {
+	rw := h.rwPool.Get()
+	defer h.rwPool.Put(rw)
+
+	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	rw.WriteHeader(http.StatusOK)
 
 	var check bool
 	for _, host := range h.config.Hosts {
@@ -224,15 +223,15 @@ func (h *robotsHandler) render(w render.RenderWriter, r *http.Request) error {
 		}
 	}
 
-	if err := h.template.Execute(w, robotsTemplateData{
+	if err := h.template.Execute(rw, robotsTemplateData{
 		Check:    check,
 		Sitemaps: h.config.Sitemaps,
 	}); err != nil {
 		h.logger.Error("Failed to execute template", "err", err)
-		return fmt.Errorf("execute template: %v", err)
+		return nil, fmt.Errorf("execute template: %v", err)
 	}
 
-	return nil
+	return rw.Render(), nil
 }
 
 var _ core.ServerSiteHandlerModule = (*robotsHandler)(nil)
