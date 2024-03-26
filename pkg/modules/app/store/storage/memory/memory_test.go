@@ -121,7 +121,6 @@ func TestMemoryStorageInit(t *testing.T) {
 			}
 			if err := s.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("memoryStorage.Init() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}
@@ -173,7 +172,6 @@ func TestMemoryStorageLoadResource(t *testing.T) {
 			_, err := s.LoadResource(tt.args.name)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("memoryStorage.LoadResource() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}

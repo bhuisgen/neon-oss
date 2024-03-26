@@ -29,6 +29,10 @@ func (s testLoggerMiddlewareServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testLoggerMiddlewareServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testLoggerMiddlewareServerSite) Store() core.Store {
 	return nil
 }

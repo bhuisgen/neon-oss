@@ -90,7 +90,6 @@ func TestJSONParserInit(t *testing.T) {
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("restProvider.Init() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}

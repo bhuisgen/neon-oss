@@ -40,6 +40,10 @@ func (s testFileHandlerServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testFileHandlerServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testFileHandlerServerSite) Store() core.Store {
 	return nil
 }

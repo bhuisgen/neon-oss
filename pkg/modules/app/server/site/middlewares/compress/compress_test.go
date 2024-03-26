@@ -26,6 +26,10 @@ func (s testCompressMiddlewareServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testCompressMiddlewareServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testCompressMiddlewareServerSite) Store() core.Store {
 	return nil
 }
@@ -153,7 +157,6 @@ func TestCompressMiddlewareInit(t *testing.T) {
 			}
 			if err := m.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("compressMiddleware.Init() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}

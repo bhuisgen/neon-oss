@@ -27,6 +27,10 @@ func (s testRewriteMiddlewareServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testRewriteMiddlewareServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testRewriteMiddlewareServerSite) Store() core.Store {
 	return nil
 }

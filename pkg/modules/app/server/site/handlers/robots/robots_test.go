@@ -39,6 +39,10 @@ func (s testRobotsHandlerServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testRobotsHandlerServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testRobotsHandlerServerSite) Store() core.Store {
 	return nil
 }

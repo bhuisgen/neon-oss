@@ -265,7 +265,6 @@ func TestRestProviderInit(t *testing.T) {
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("restProvider.Init() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}
@@ -411,7 +410,6 @@ func TestRestProviderFetch(t *testing.T) {
 			_, err := p.Fetch(tt.args.ctx, tt.args.name, tt.args.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("restProvider.Fetch() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}

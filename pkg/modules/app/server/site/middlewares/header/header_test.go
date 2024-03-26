@@ -27,6 +27,10 @@ func (s testHeaderMiddlewareServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testHeaderMiddlewareServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testHeaderMiddlewareServerSite) Store() core.Store {
 	return nil
 }

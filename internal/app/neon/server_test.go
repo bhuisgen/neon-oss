@@ -940,7 +940,6 @@ func TestServerMediatorListeners(t *testing.T) {
 			}
 			if _, err := s.Listeners(); (err != nil) != tt.wantErr {
 				t.Errorf("server.Listeners() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}

@@ -68,7 +68,6 @@ app:
 			_, err := LoadConfig()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LoadConfig() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}

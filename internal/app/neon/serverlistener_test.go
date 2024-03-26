@@ -107,7 +107,7 @@ func TestServerListenerInit(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if err := l.Init(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Init() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverListener.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -184,7 +184,7 @@ func TestServerListenerRegister(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if err := l.Register(tt.args.app); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Register() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverListener.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -239,7 +239,7 @@ func TestServerListenerServe(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if err := l.Serve(); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Serve() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverListener.Serve() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -298,7 +298,7 @@ func TestServerListenerShutdown(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if err := l.Shutdown(tt.args.ctx); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Shutdown() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverListener.Shutdown() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -353,7 +353,7 @@ func TestServerListenerClose(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if err := l.Close(); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Close() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverListener.Close() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -398,7 +398,7 @@ func TestServerListenerRemove(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if err := l.Remove(); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Remove() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverListener.Remove() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -439,7 +439,7 @@ func TestServerListenerName(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if got := l.Name(); got != tt.want {
-				t.Errorf("listener.Name() = %v, want %v", got, tt.want)
+				t.Errorf("serverListener.Name() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -523,7 +523,7 @@ func TestServerListenerLink(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if err := l.Link(tt.args.site); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Link() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverListener.Link() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -607,7 +607,7 @@ func TestServerListenerUnlink(t *testing.T) {
 				osClose: tt.fields.osClose,
 			}
 			if err := l.Unlink(tt.args.site); (err != nil) != tt.wantErr {
-				t.Errorf("listener.Unlink() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverListener.Unlink() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -659,8 +659,7 @@ func TestServerListenerListeners(t *testing.T) {
 			}
 			_, err := l.Listeners()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("listener.Listeners() error = %v, wantErr %v", err, tt.wantErr)
-				return
+				t.Errorf("serverListener.Listeners() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

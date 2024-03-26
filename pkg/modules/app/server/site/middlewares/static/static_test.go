@@ -33,6 +33,10 @@ func (s testStaticMiddlewareServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testStaticMiddlewareServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testStaticMiddlewareServerSite) Store() core.Store {
 	return nil
 }
@@ -614,7 +618,6 @@ func TestStaticFileSystemOpen(t *testing.T) {
 			_, err := fs.Open(tt.args.name)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("staticFileSystem.Open() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 		})
 	}

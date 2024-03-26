@@ -39,6 +39,10 @@ func (s testSitemapHandlerServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testSitemapHandlerServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testSitemapHandlerServerSite) Store() core.Store {
 	return nil
 }

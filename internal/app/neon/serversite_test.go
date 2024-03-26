@@ -122,7 +122,7 @@ func TestServerSiteInit(t *testing.T) {
 				server: tt.fields.server,
 			}
 			if err := s.Init(tt.args.config); (err != nil) != tt.wantErr {
-				t.Errorf("server.Init() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverSite.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -251,7 +251,7 @@ func TestServerSiteRegister(t *testing.T) {
 				server: tt.fields.server,
 			}
 			if err := s.Register(tt.args.app); (err != nil) != tt.wantErr {
-				t.Errorf("server.Register() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverSite.Register() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -342,7 +342,7 @@ func TestServerSiteStart(t *testing.T) {
 				server: tt.fields.server,
 			}
 			if err := s.Start(); (err != nil) != tt.wantErr {
-				t.Errorf("server.Start() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverSite.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -396,7 +396,7 @@ func TestServerSiteStop(t *testing.T) {
 				server: tt.fields.server,
 			}
 			if err := s.Stop(); (err != nil) != tt.wantErr {
-				t.Errorf("server.Stop() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("serverSite.Stop() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -433,7 +433,7 @@ func TestServerSiteName(t *testing.T) {
 				server: tt.fields.server,
 			}
 			if got := s.Name(); got != tt.want {
-				t.Errorf("server.Name() = %v, want %v", got, tt.want)
+				t.Errorf("serverSite.Name() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -472,7 +472,7 @@ func TestServerSiteListeners(t *testing.T) {
 				server: tt.fields.server,
 			}
 			if got := s.Listeners(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("server.Listeners() = %v, want %v", got, tt.want)
+				t.Errorf("serverSite.Listeners() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -511,7 +511,7 @@ func TestServerSiteHosts(t *testing.T) {
 				server: tt.fields.server,
 			}
 			if got := s.Hosts(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("server.Hosts() = %v, want %v", got, tt.want)
+				t.Errorf("serverSite.Hosts() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -559,7 +559,7 @@ func TestServerSiteDefault(t *testing.T) {
 				server: tt.fields.server,
 			}
 			if got := s.Default(); got != tt.want {
-				t.Errorf("server.Default() = %v, want %v", got, tt.want)
+				t.Errorf("serverSite.Default() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -606,8 +606,7 @@ func TestServerSiteRouter(t *testing.T) {
 			}
 			_, err := s.Router()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("server.Router() error = %v, wantErr %v", err, tt.wantErr)
-				return
+				t.Errorf("serverSite.Router() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
