@@ -18,6 +18,10 @@ type ModuleID string
 type ModuleInfo struct {
 	// ID is the module ID.
 	ID ModuleID
+	// LoadModule is the hook called when the module is loaded.
+	LoadModule func()
+	// UnloadModule is the hook called when the module unloaded.
+	UnloadModule func()
 	// NewInstance returns a new module instance.
 	NewInstance func() Module
 }
@@ -37,13 +41,6 @@ func Register(module Module) {
 	modulesLock.Unlock()
 }
 
-// Unregister unregisters a module.
-func Unregister(module Module) {
-	modulesLock.Lock()
-	delete(modules, module.ModuleInfo().ID)
-	modulesLock.Unlock()
-}
-
 // Lookup returns the module information if found.
 func Lookup(id ModuleID) (ModuleInfo, error) {
 	modulesLock.RLock()
@@ -53,4 +50,22 @@ func Lookup(id ModuleID) (ModuleInfo, error) {
 		return ModuleInfo{}, fmt.Errorf("module '%s' not registered", id)
 	}
 	return mi, nil
+}
+
+// Load loads all the registered modules.
+func Load() {
+	modulesLock.RLock()
+	for _, m := range modules {
+		m.LoadModule()
+	}
+	modulesLock.RUnlock()
+}
+
+// Unload unload all the registered modules.
+func Unload() {
+	modulesLock.RLock()
+	for _, m := range modules {
+		m.UnloadModule()
+	}
+	modulesLock.RUnlock()
 }
