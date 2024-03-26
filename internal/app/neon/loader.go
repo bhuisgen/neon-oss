@@ -59,7 +59,9 @@ const (
 // ModuleInfo returns the module information.
 func (l loader) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: loaderModuleID,
+		ID:           loaderModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &loader{
 				logger: slog.New(log.NewHandler(os.Stderr, string(loaderModuleID), nil)),
@@ -323,8 +325,8 @@ func (l *loader) execute(stop <-chan struct{}) {
 					}
 				}
 
-				l.logger.Info("Execution done", "duration", time.Since(startTime).Round(time.Second),
-					"total", rulesCount, "success", success, "failure", failure)
+				l.logger.Info("Execution done", "total", rulesCount, "success", success, "failure", failure,
+					"duration", time.Since(startTime).Round(time.Second))
 
 				if failure > 0 && !l.state.failsafe && *l.config.ExecFailsafeInterval > 0 {
 					l.logger.Warn("Last execution failed, enabling failsafe mode")

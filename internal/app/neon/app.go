@@ -63,7 +63,9 @@ func (a app) ModuleInfo() module.ModuleInfo {
 	module.Register(server{})
 
 	return module.ModuleInfo{
-		ID: appModuleID,
+		ID:           appModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &app{
 				logger: slog.New(log.NewHandler(os.Stderr, string(appModuleID), nil)),
@@ -160,6 +162,8 @@ func (a *app) Serve(ctx context.Context) error {
 	a.logger.Info(fmt.Sprintf("%s version %s, commit %s", Name, Version, Commit))
 
 	a.logger.Info("Starting instance")
+
+	module.Load()
 
 	if DEBUG {
 		a.logger.Warn("Debug enabled")
@@ -261,6 +265,8 @@ func (a *app) Serve(ctx context.Context) error {
 	signal.Stop(exit)
 	signal.Stop(shutdown)
 	signal.Stop(reload)
+
+	module.Unload()
 
 	a.logger.Info("Instance terminated")
 

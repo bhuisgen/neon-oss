@@ -43,7 +43,9 @@ const (
 // ModuleInfo returns the module information.
 func (s server) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: serverModuleID,
+		ID:           serverModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &server{
 				logger: slog.New(log.NewHandler(os.Stderr, string(serverModuleID), nil)),

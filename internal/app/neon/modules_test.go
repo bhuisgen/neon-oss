@@ -23,7 +23,9 @@ const (
 
 func (m testStoreStorageModule) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: testStoreStorageModuleID,
+		ID:           testStoreStorageModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &testStoreStorageModule{}
 		},
@@ -67,7 +69,9 @@ const (
 
 func (m testFetcherProviderModule) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: testFetcherProviderModuleID,
+		ID:           testFetcherProviderModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &testFetcherProviderModule{}
 		},
@@ -105,7 +109,9 @@ const (
 
 func (m testLoaderParserModule) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: testLoaderProviderModuleID,
+		ID:           testLoaderProviderModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &testLoaderParserModule{}
 		},
@@ -142,7 +148,9 @@ const (
 
 func (m testServerListenerModule) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: testServerListenerModuleID,
+		ID:           testServerListenerModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &testServerListenerModule{}
 		},
@@ -199,7 +207,9 @@ const (
 
 func (m testServerSiteMiddlewareModule) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: testServerSiteMiddlewareModuleID,
+		ID:           testServerSiteMiddlewareModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &testServerSiteMiddlewareModule{}
 		},
@@ -249,7 +259,9 @@ const (
 
 func (m testServerSiteHandlerModule) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: testServerSiteHandlerModuleID,
+		ID:           testServerSiteHandlerModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &testServerSiteHandlerModule{}
 		},
@@ -293,12 +305,7 @@ func TestMain(m *testing.M) {
 	module.Register(testServerListenerModule{})
 	module.Register(testServerSiteMiddlewareModule{})
 	module.Register(testServerSiteHandlerModule{})
+
 	code := m.Run()
-	module.Unregister(testStoreStorageModule{})
-	module.Unregister(testFetcherProviderModule{})
-	module.Unregister(testLoaderParserModule{})
-	module.Unregister(testServerListenerModule{})
-	module.Unregister(testServerSiteMiddlewareModule{})
-	module.Unregister(testServerSiteHandlerModule{})
 	os.Exit(code)
 }

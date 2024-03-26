@@ -41,7 +41,9 @@ const (
 // ModuleInfo returns the module information.
 func (f fetcher) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
-		ID: fetcherModuleID,
+		ID:           fetcherModuleID,
+		LoadModule:   func() {},
+		UnloadModule: func() {},
 		NewInstance: func() module.Module {
 			return &fetcher{
 				logger: slog.New(log.NewHandler(os.Stderr, string(fetcherModuleID), nil)),
