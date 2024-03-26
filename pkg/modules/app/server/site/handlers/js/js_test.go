@@ -49,6 +49,10 @@ func (s testJSHandlerServerSite) Hosts() []string {
 	return nil
 }
 
+func (s testJSHandlerServerSite) IsDefault() bool {
+	return false
+}
+
 func (s testJSHandlerServerSite) Store() core.Store {
 	return nil
 }
@@ -140,11 +144,11 @@ func TestJSHandlerModuleInfo(t *testing.T) {
 		index       []byte
 		indexInfo   *time.Time
 		muIndex     *sync.RWMutex
-		bundle      string
+		bundle      []byte
 		bundleInfo  *time.Time
 		muBundle    *sync.RWMutex
+		vms         chan struct{}
 		rwPool      render.RenderWriterPool
-		vmPool      VMPool
 		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
@@ -179,8 +183,8 @@ func TestJSHandlerModuleInfo(t *testing.T) {
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
 				muBundle:    tt.fields.muBundle,
+				vms:         tt.fields.vms,
 				rwPool:      tt.fields.rwPool,
-				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
 				site:        tt.fields.site,
 				osOpen:      tt.fields.osOpen,
@@ -209,11 +213,11 @@ func TestJSHandlerInit(t *testing.T) {
 		index       []byte
 		indexInfo   *time.Time
 		muIndex     *sync.RWMutex
-		bundle      string
+		bundle      []byte
 		bundleInfo  *time.Time
 		muBundle    *sync.RWMutex
+		vms         chan struct{}
 		rwPool      render.RenderWriterPool
-		vmPool      VMPool
 		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
@@ -274,8 +278,10 @@ func TestJSHandlerInit(t *testing.T) {
 					"Env":           "test",
 					"Container":     "root",
 					"State":         "state",
-					"Timeout":       200,
-					"MaxVMs":        2,
+					"MaxVMs":        4,
+					"VMMaxHeapSize": 32 * 1024 * 1024,
+					"VMStackSize":   512 * 1024,
+					"VMTimeout":     1000,
 					"Cache":         true,
 					"CacheTTL":      60,
 					"CacheMaxItems": 100,
@@ -334,8 +340,10 @@ func TestJSHandlerInit(t *testing.T) {
 					"Env":           "",
 					"Container":     "",
 					"State":         "",
-					"Timeout":       -1,
 					"MaxVMs":        0,
+					"VMMaxHeapSize": -1,
+					"VMStackSize":   -1,
+					"VMTimeout":     0,
 					"CacheTTL":      0,
 					"CacheMaxItems": 0,
 					"Rules": []map[string]interface{}{
@@ -434,8 +442,8 @@ func TestJSHandlerInit(t *testing.T) {
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
 				muBundle:    tt.fields.muBundle,
+				vms:         tt.fields.vms,
 				rwPool:      tt.fields.rwPool,
-				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
 				site:        tt.fields.site,
 				osOpen:      tt.fields.osOpen,
@@ -460,11 +468,11 @@ func TestJSHandlerRegister(t *testing.T) {
 		index       []byte
 		indexInfo   *time.Time
 		muIndex     *sync.RWMutex
-		bundle      string
+		bundle      []byte
 		bundleInfo  *time.Time
 		muBundle    *sync.RWMutex
+		vms         chan struct{}
 		rwPool      render.RenderWriterPool
-		vmPool      VMPool
 		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
@@ -511,8 +519,8 @@ func TestJSHandlerRegister(t *testing.T) {
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
 				muBundle:    tt.fields.muBundle,
+				vms:         tt.fields.vms,
 				rwPool:      tt.fields.rwPool,
-				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
 				site:        tt.fields.site,
 				osOpen:      tt.fields.osOpen,
@@ -537,11 +545,11 @@ func TestJSHandlerStart(t *testing.T) {
 		index       []byte
 		indexInfo   *time.Time
 		muIndex     *sync.RWMutex
-		bundle      string
+		bundle      []byte
 		bundleInfo  *time.Time
 		muBundle    *sync.RWMutex
+		vms         chan struct{}
 		rwPool      render.RenderWriterPool
-		vmPool      VMPool
 		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
@@ -560,14 +568,14 @@ func TestJSHandlerStart(t *testing.T) {
 			name: "default",
 			fields: fields{
 				config: &jsHandlerConfig{
-					Index:  "test/default/index.html",
-					Bundle: "test/default/bundle.js",
-					MaxVMs: intPtr(1),
+					Index:         "test/default/index.html",
+					Bundle:        "test/default/bundle.js",
+					VMMaxHeapSize: intPtr(0),
+					VMStackSize:   intPtr(0),
 				},
 				logger:   slog.Default(),
 				muIndex:  &sync.RWMutex{},
 				muBundle: &sync.RWMutex{},
-				vmPool:   newVMPool(1),
 				osReadFile: func(name string) ([]byte, error) {
 					return os.ReadFile(name)
 				},
@@ -589,8 +597,8 @@ func TestJSHandlerStart(t *testing.T) {
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
 				muBundle:    tt.fields.muBundle,
+				vms:         tt.fields.vms,
 				rwPool:      tt.fields.rwPool,
-				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
 				site:        tt.fields.site,
 				osOpen:      tt.fields.osOpen,
@@ -615,11 +623,11 @@ func TestJSHandlerStop(t *testing.T) {
 		index       []byte
 		indexInfo   *time.Time
 		muIndex     *sync.RWMutex
-		bundle      string
+		bundle      []byte
 		bundleInfo  *time.Time
 		muBundle    *sync.RWMutex
+		vms         chan struct{}
 		rwPool      render.RenderWriterPool
-		vmPool      VMPool
 		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
@@ -655,8 +663,8 @@ func TestJSHandlerStop(t *testing.T) {
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
 				muBundle:    tt.fields.muBundle,
+				vms:         tt.fields.vms,
 				rwPool:      tt.fields.rwPool,
-				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
 				site:        tt.fields.site,
 				osOpen:      tt.fields.osOpen,
@@ -681,11 +689,11 @@ func TestJSHandlerServeHTTP(t *testing.T) {
 		index       []byte
 		indexInfo   *time.Time
 		muIndex     *sync.RWMutex
-		bundle      string
+		bundle      []byte
 		bundleInfo  *time.Time
 		muBundle    *sync.RWMutex
+		vms         chan struct{}
 		rwPool      render.RenderWriterPool
-		vmPool      VMPool
 		cache       Cache
 		site        core.ServerSite
 		osOpen      func(name string) (*os.File, error)
@@ -713,8 +721,10 @@ func TestJSHandlerServeHTTP(t *testing.T) {
 					Env:           stringPtr("test"),
 					Container:     stringPtr("root"),
 					State:         stringPtr("state"),
-					Timeout:       intPtr(200),
-					MaxVMs:        intPtr(1),
+					MaxVMs:        intPtr(0),
+					VMMaxHeapSize: intPtr(0),
+					VMStackSize:   intPtr(0),
+					VMTimeout:     intPtr(1000),
 					Cache:         boolPtr(true),
 					CacheTTL:      intPtr(60),
 					CacheMaxItems: intPtr(100),
@@ -722,8 +732,8 @@ func TestJSHandlerServeHTTP(t *testing.T) {
 				logger:   slog.Default(),
 				muIndex:  &sync.RWMutex{},
 				muBundle: &sync.RWMutex{},
+				vms:      make(chan struct{}, 1),
 				rwPool:   render.NewRenderWriterPool(),
-				vmPool:   newVMPool(1),
 				cache:    newCache(1),
 				site:     testJSHandlerServerSite{},
 				osReadFile: func(name string) ([]byte, error) {
@@ -759,8 +769,8 @@ func TestJSHandlerServeHTTP(t *testing.T) {
 				bundle:      tt.fields.bundle,
 				bundleInfo:  tt.fields.bundleInfo,
 				muBundle:    tt.fields.muBundle,
+				vms:         tt.fields.vms,
 				rwPool:      tt.fields.rwPool,
-				vmPool:      tt.fields.vmPool,
 				cache:       tt.fields.cache,
 				site:        tt.fields.site,
 				osOpen:      tt.fields.osOpen,

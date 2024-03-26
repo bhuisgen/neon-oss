@@ -4,6 +4,8 @@ github.com/PaesslerAG/gval v1.2.2/go.mod h1:XRFLwvmkTEdYziLdaCeCa5ImcGVrfQbeNUbV
 github.com/PaesslerAG/jsonpath v0.1.0/go.mod h1:4BzmtoM/PI8fPO4aQGIusjGxGir2BzcV0grWtFzq1Y8=
 github.com/PaesslerAG/jsonpath v0.1.1 h1:c1/AToHQMVsduPAa4Vh6xp2U0evy4t8SWp8imEsylIk=
 github.com/PaesslerAG/jsonpath v0.1.1/go.mod h1:lVboNxFGal/VwW6d9JzIy56bUsYAP6tH/x80vjnCseY=
+github.com/bhuisgen/gomonkey v0.0.0-20240323094722-2c26ff2d9271 h1:z9EmIUxfpzes2/jqKDnrcdfBCBf62LPy5ulimKDCYu8=
+github.com/bhuisgen/gomonkey v0.0.0-20240323094722-2c26ff2d9271/go.mod h1:HQTNyvaHHRGcjfd5jQttSSV/5lTC1CJrtdJYUwFkQ+Q=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
@@ -16,5 +18,3 @@ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-rogchap.com/v8go v0.8.0 h1:/crDEiga68kOtbIqw3K9Rt9OztYz0LhAPHm2e3wK7Q4=
-rogchap.com/v8go v0.8.0/go.mod h1:MxgP3pL2MW4dpme/72QRs8sgNMmM0pRc8DPhcuLWPAs=

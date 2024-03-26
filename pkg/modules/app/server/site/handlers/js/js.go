@@ -11,12 +11,12 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/bhuisgen/gomonkey"
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/net/html"
 
@@ -34,11 +34,11 @@ type jsHandler struct {
 	index       []byte
 	indexInfo   *time.Time
 	muIndex     *sync.RWMutex
-	bundle      string
+	bundle      []byte
 	bundleInfo  *time.Time
 	muBundle    *sync.RWMutex
+	vms         chan struct{}
 	rwPool      render.RenderWriterPool
-	vmPool      VMPool
 	cache       Cache
 	site        core.ServerSite
 	osOpen      func(name string) (*os.File, error)
@@ -56,8 +56,10 @@ type jsHandlerConfig struct {
 	Env           *string  `mapstructure:"env"`
 	Container     *string  `mapstructure:"container"`
 	State         *string  `mapstructure:"state"`
-	Timeout       *int     `mapstructure:"timeout"`
 	MaxVMs        *int     `mapstructure:"maxVMs"`
+	VMMaxHeapSize *int     `mapstructure:"vmMaxHeapSize"`
+	VMStackSize   *int     `mapstructure:"vmStackSize"`
+	VMTimeout     *int     `mapstructure:"vmTimeout"`
 	Cache         *bool    `mapstructure:"cache"`
 	CacheTTL      *int     `mapstructure:"cacheTTL"`
 	CacheMaxItems *int     `mapstructure:"cacheMaxItems"`
@@ -95,14 +97,16 @@ const (
 
 	jsResourceUnknown string = "unknown resource"
 
-	jsConfigDefaultBundleCodeCache bool   = false
-	jsConfigDefaultEnv             string = "production"
-	jsConfigDefaultContainer       string = "root"
-	jsConfigDefaultState           string = "state"
-	jsConfigDefaultTimeout         int    = 200
-	jsConfigDefaultCache           bool   = false
-	jsConfigDefaultCacheTTL        int    = 60
-	jsConfigDefaultCacheMaxItems   int    = 100
+	jsConfigDefaultEnv            string = "production"
+	jsConfigDefaultContainer      string = "root"
+	jsConfigDefaultState          string = "state"
+	jsConfigDefaultMaxVMs         int    = 4
+	jsConfigDefaultVMTimeout      int    = 1000
+	jsConfigDefaultVMHeapMaxBytes int    = 0
+	jsConfigDefaultVMStackSize    int    = 0
+	jsConfigDefaultCache          bool   = false
+	jsConfigDefaultCacheTTL       int    = 60
+	jsConfigDefaultCacheMaxItems  int    = 100
 )
 
 // jsOsOpen redirects to os.Open.
@@ -144,6 +148,12 @@ func init() {
 func (h jsHandler) ModuleInfo() module.ModuleInfo {
 	return module.ModuleInfo{
 		ID: jsModuleID,
+		LoadModule: func() {
+			gomonkey.Init()
+		},
+		UnloadModule: func() {
+			gomonkey.ShutDown()
+		},
 		NewInstance: func() module.Module {
 			return &jsHandler{
 				logger:      slog.New(log.NewHandler(os.Stderr, string(jsModuleID), nil)),
@@ -216,7 +226,7 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		h.config.Env = &defaultValue
 	}
 	if *h.config.Env == "" {
-		h.logger.Error("Invalid value", "option", "Env", "name", *h.config.Env)
+		h.logger.Error("Invalid value", "option", "Env", "value", *h.config.Env)
 		errConfig = true
 	}
 	if h.config.Container == nil {
@@ -224,7 +234,7 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		h.config.Container = &defaultValue
 	}
 	if *h.config.Container == "" {
-		h.logger.Error("Invalid value", "option", "Container", "name", *h.config.Container)
+		h.logger.Error("Invalid value", "option", "Container", "value", *h.config.Container)
 		errConfig = true
 	}
 	if h.config.State == nil {
@@ -232,23 +242,39 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		h.config.State = &defaultValue
 	}
 	if *h.config.State == "" {
-		h.logger.Error("Invalid value", "option", "State", "name", *h.config.State)
-		errConfig = true
-	}
-	if h.config.Timeout == nil {
-		defaultValue := jsConfigDefaultTimeout
-		h.config.Timeout = &defaultValue
-	}
-	if *h.config.Timeout < 0 {
-		h.logger.Error("Invalid value", "option", "Timeout", "name", *h.config.Timeout)
+		h.logger.Error("Invalid value", "option", "State", "value", *h.config.State)
 		errConfig = true
 	}
 	if h.config.MaxVMs == nil {
-		defaultValue := runtime.GOMAXPROCS(0)
+		defaultValue := jsConfigDefaultMaxVMs
 		h.config.MaxVMs = &defaultValue
 	}
 	if *h.config.MaxVMs <= 0 {
-		h.logger.Error("Invalid value", "option", "MaxVMs", "name", *h.config.MaxVMs)
+		h.logger.Error("Invalid value", "option", "MaxVMs", "value", *h.config.MaxVMs)
+		errConfig = true
+	}
+	if h.config.VMMaxHeapSize == nil {
+		defaultValue := jsConfigDefaultVMHeapMaxBytes
+		h.config.VMMaxHeapSize = &defaultValue
+	}
+	if *h.config.VMMaxHeapSize < 0 {
+		h.logger.Error("Invalid value", "option", "VMHeapMaxBytes", "value", *h.config.VMMaxHeapSize)
+		errConfig = true
+	}
+	if h.config.VMStackSize == nil {
+		defaultValue := jsConfigDefaultVMStackSize
+		h.config.VMStackSize = &defaultValue
+	}
+	if *h.config.VMStackSize < 0 {
+		h.logger.Error("Invalid value", "option", "VMStackSize", "value", *h.config.VMStackSize)
+		errConfig = true
+	}
+	if h.config.VMTimeout == nil {
+		defaultValue := jsConfigDefaultVMTimeout
+		h.config.VMTimeout = &defaultValue
+	}
+	if *h.config.VMTimeout <= 0 {
+		h.logger.Error("Invalid value", "option", "VMTimeout", "value", *h.config.VMTimeout)
 		errConfig = true
 	}
 	if h.config.Cache == nil {
@@ -260,7 +286,7 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		h.config.CacheTTL = &defaultValue
 	}
 	if *h.config.CacheTTL <= 0 {
-		h.logger.Error("Invalid value", "option", "CacheTTL", "name", *h.config.CacheTTL)
+		h.logger.Error("Invalid value", "option", "CacheTTL", "value", *h.config.CacheTTL)
 		errConfig = true
 	}
 	if h.config.CacheMaxItems == nil {
@@ -268,7 +294,7 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		h.config.CacheMaxItems = &defaultValue
 	}
 	if *h.config.CacheMaxItems <= 0 {
-		h.logger.Error("Invalid value", "option", "CacheMaxCapacity", "name", *h.config.CacheMaxItems)
+		h.logger.Error("Invalid value", "option", "CacheMaxCapacity", "value", *h.config.CacheMaxItems)
 		errConfig = true
 	}
 	for index, rule := range h.config.Rules {
@@ -300,8 +326,8 @@ func (h *jsHandler) Init(config map[string]interface{}) error {
 		return errors.New("config")
 	}
 
+	h.vms = make(chan struct{}, *h.config.MaxVMs)
 	h.rwPool = render.NewRenderWriterPool()
-	h.vmPool = newVMPool(*h.config.MaxVMs)
 	h.cache = newCache(*h.config.CacheMaxItems)
 
 	return nil
@@ -356,18 +382,14 @@ func (h *jsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if item, ok := h.cache.Get(key).(*jsCacheItem); ok && item.expire.After(time.Now()) {
 			render := item.render
 
-			if render.Redirect() {
-				http.Redirect(w, r, render.RedirectURL(), render.StatusCode())
-
-				h.logger.Info("Render completed", "url", r.URL.Path, "redirect", render.RedirectURL(),
-					"status", render.StatusCode(), "cache", true)
-				return
-			}
-
 			for key, values := range render.Header() {
 				for _, value := range values {
 					w.Header().Add(key, value)
 				}
+			}
+			if render.Redirect() {
+				http.Redirect(w, r, render.RedirectURL(), render.StatusCode())
+				return
 			}
 			w.WriteHeader(render.StatusCode())
 			if _, err := w.Write(render.Body()); err != nil {
@@ -375,7 +397,7 @@ func (h *jsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
+			h.logger.Debug("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", true)
 
 			return
 		}
@@ -389,18 +411,14 @@ func (h *jsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rw := h.rwPool.Get()
-	defer h.rwPool.Put(rw)
-
-	if err := h.render(rw, r); err != nil {
+	render, err := h.render(r)
+	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 
 		h.logger.Error("Render error", "url", r.URL.Path, "status", http.StatusServiceUnavailable)
 
 		return
 	}
-
-	render := rw.Render()
 
 	if *h.config.Cache {
 		h.cache.Set(key, &jsCacheItem{
@@ -409,19 +427,14 @@ func (h *jsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if render.Redirect() {
-		http.Redirect(w, r, render.RedirectURL(), render.StatusCode())
-
-		h.logger.Error("Render completed", "url", r.URL.Path, "redirect", render.RedirectURL(),
-			"status", http.StatusServiceUnavailable, "cache", false)
-
-		return
-	}
-
-	for key, values := range rw.Header() {
+	for key, values := range render.Header() {
 		for _, value := range values {
 			w.Header().Add(key, value)
 		}
+	}
+	if render.Redirect() {
+		http.Redirect(w, r, render.RedirectURL(), render.StatusCode())
+		return
 	}
 	w.WriteHeader(render.StatusCode())
 	if _, err := w.Write(render.Body()); err != nil {
@@ -429,7 +442,7 @@ func (h *jsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
+	h.logger.Debug("Render completed", "url", r.URL.Path, "status", render.StatusCode(), "cache", false)
 }
 
 // read reads the application html and bundle files.
@@ -476,7 +489,7 @@ func (h *jsHandler) read() error {
 		}
 
 		h.muBundle.Lock()
-		h.bundle = string(buf)
+		h.bundle = buf
 		i := bundleInfo.ModTime()
 		h.bundleInfo = &i
 		h.muBundle.Unlock()
@@ -488,12 +501,15 @@ func (h *jsHandler) read() error {
 }
 
 // render makes a new render.
-func (h *jsHandler) render(w render.RenderWriter, r *http.Request) error {
+func (h *jsHandler) render(r *http.Request) (render.Render, error) {
+	rw := h.rwPool.Get()
+	defer h.rwPool.Put(rw)
+
 	var valid bool = true
 	var mServerState map[string]jsResource
-	var serverState *string
+	var serverState *[]byte
 	var mClientState map[string]jsResource
-	var clientState *string
+	var clientState *[]byte
 	var vmResult *vmResult
 
 	for index, rule := range h.config.Rules {
@@ -554,21 +570,19 @@ func (h *jsHandler) render(w render.RenderWriter, r *http.Request) error {
 		if mServerState != nil {
 			buf, err := h.jsonMarshal(mServerState)
 			if err != nil {
-				return fmt.Errorf("marshal server state: %v", err)
+				return nil, fmt.Errorf("marshal server state: %v", err)
 			}
 
-			s := string(buf)
-			serverState = &s
+			serverState = &buf
 		}
 
 		if mClientState != nil {
 			buf, err := h.jsonMarshal(mClientState)
 			if err != nil {
-				return fmt.Errorf("marshal client state: %v", err)
+				return nil, fmt.Errorf("marshal client state: %v", err)
 			}
 
-			s := string(buf)
-			clientState = &s
+			clientState = &buf
 		}
 
 		if h.config.Rules[index].Last {
@@ -576,65 +590,67 @@ func (h *jsHandler) render(w render.RenderWriter, r *http.Request) error {
 		}
 	}
 
-	vm := h.vmPool.Get()
-	defer h.vmPool.Put(vm)
-
-	if err := vm.Configure(&vmConfig{
-		Env:     *h.config.Env,
-		Request: r,
-		State:   serverState,
-	}, slog.New(slog.NewTextHandler(os.Stderr, nil)).With("site", h.site.Name()),
-	); err != nil {
-		h.logger.Debug("Failed to configure VM", "err", err)
-		return fmt.Errorf("configure VM: %v", err)
+	h.vms <- struct{}{}
+	defer func() {
+		<-h.vms
+	}()
+	vm, err := newVM(
+		WithHeapMaxBytes(uint(*h.config.VMMaxHeapSize)),
+		WithStackSize(uint(*h.config.VMStackSize)),
+	)
+	if err != nil {
+		h.logger.Debug("Failed to create VM", "err", err)
+		return nil, fmt.Errorf("create VM: %v", err)
 	}
 
-	var err error
 	h.muBundle.RLock()
-	result, err := vm.Execute(h.config.Bundle, h.bundle, time.Duration(*h.config.Timeout)*time.Second)
+	vmResult, err = vm.Execute(vmConfig{
+		Env:     *h.config.Env,
+		State:   serverState,
+		Request: r,
+		Site:    h.site,
+	}, h.config.Bundle, h.bundle, time.Duration(*h.config.VMTimeout)*time.Millisecond)
 	h.muBundle.RUnlock()
 	if err != nil {
 		h.logger.Debug("Failed to execute VM", "err", err)
-		return fmt.Errorf("execute VM: %v", err)
+		return nil, fmt.Errorf("execute VM: %v", err)
 	}
-
-	vmResult = result
 
 	if vmResult.Redirect != nil && *vmResult.Redirect && vmResult.RedirectURL != nil && vmResult.RedirectStatus != nil {
-		w.WriteRedirect(*vmResult.RedirectURL, *vmResult.RedirectStatus)
+		rw.WriteRedirect(*vmResult.RedirectURL, *vmResult.RedirectStatus)
 
-		return nil
+		return rw.Render(), nil
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	for key, value := range vmResult.Headers {
 		for _, v := range value {
-			w.Header().Add(key, v)
+			rw.Header().Add(key, v)
 		}
 	}
 	if valid {
-		w.WriteHeader(*vmResult.Status)
+		rw.WriteHeader(*vmResult.Status)
 	} else {
-		w.WriteHeader(http.StatusServiceUnavailable)
+		rw.WriteHeader(http.StatusServiceUnavailable)
 	}
 
 	h.muIndex.RLock()
 	if h.index != nil {
-		err = h.doc(w, r, bytes.NewReader(h.index), clientState, vmResult)
+		err = h.doc(rw, r, bytes.NewReader(h.index), clientState, vmResult)
 	} else {
 		err = errors.New("index not loaded")
 	}
 	h.muIndex.RUnlock()
 	if err != nil {
 		h.logger.Debug("Failed to process render", "err", err)
-		return fmt.Errorf("process render: %v", err)
+		return nil, fmt.Errorf("process render: %v", err)
 	}
 
-	return nil
+	return rw.Render(), nil
 }
 
 // doc writes the final index.
-func (h *jsHandler) doc(w render.RenderWriter, r *http.Request, b io.Reader, state *string, result *vmResult) error {
+func (h *jsHandler) doc(w render.RenderWriter, _ *http.Request, b io.Reader, state *[]byte, result *vmResult) error {
 	doc, err := html.Parse(b)
 	if err != nil {
 		return fmt.Errorf("parse html: %v", err)
@@ -685,7 +701,7 @@ func (h *jsHandler) doc(w render.RenderWriter, r *http.Request, b io.Reader, sta
 					},
 					FirstChild: &html.Node{
 						Type: html.RawNode,
-						Data: *state,
+						Data: string(*state),
 					},
 				})
 				return true

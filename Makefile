@@ -8,25 +8,21 @@ TAG ?= dev
 all: build
 
 clean:
-	rm -fr build/
+	rm -f neon
+	rm -f healthcheck
 
 build:
-	CGO_ENABLED=1 go build -tags netgo,osusergo \
+	CGO_ENABLED=1 go build \
 		-ldflags " \
-			-s -w -extldflags '-static' \
 			-X github.com/bhuisgen/neon/internal/app/neon.Version=${TAG} \
 			-X github.com/bhuisgen/neon/internal/app/neon.Commit=${GIT_COMMIT} \
 			-X github.com/bhuisgen/neon/internal/app/neon.Date=${DATE} \
 		" \
 		-o neon ./cmd/neon/*
-
-dist:
-	docker run --rm -v ${DOCKER_VOLUME}:/workspace -w /workspace/neon-oss \
-		-e DOCKER_CERT_PATH=${DOCKER_CERT_PATH} -e DOCKER_HOST=${DOCKER_HOST} -e DOCKER_TLS_VERIFY=${DOCKER_TLS_VERIFY} \
-		goreleaser/goreleaser-cross:v1.21 --snapshot --clean
-
-dist-release:
-	docker run --rm -v ${DOCKER_VOLUME}:/workspace -w /workspace/neon-oss \
-		-e DOCKER_CERT_PATH=${DOCKER_CERT_PATH} -e DOCKER_HOST=${DOCKER_HOST} -e DOCKER_TLS_VERIFY=${DOCKER_TLS_VERIFY} \
-		-e GITHUB_TOKEN=${GITHUB_TOKEN} \
-		goreleaser/goreleaser-cross:v1.21 --clean
+	CGO_ENABLED=1 go build \
+		-ldflags " \
+			-X github.com/bhuisgen/neon/internal/app/neon.Version=${TAG} \
+			-X github.com/bhuisgen/neon/internal/app/neon.Commit=${GIT_COMMIT} \
+			-X github.com/bhuisgen/neon/internal/app/neon.Date=${DATE} \
+		" \
+		-o healthcheck ./cmd/healthcheck/*

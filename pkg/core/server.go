@@ -46,6 +46,8 @@ type ServerSite interface {
 	Listeners() []string
 	// Hosts returns the site hosts.
 	Hosts() []string
+	// IsDefault returns the default flag.
+	IsDefault() bool
 	// Store returns the store.
 	Store() Store
 	// Server returns the server.

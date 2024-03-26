@@ -1,25 +1,56 @@
 package js
 
 import (
-	"log/slog"
 	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	"rogchap.com/v8go"
+	"github.com/bhuisgen/neon/pkg/core"
 )
 
-func TestVMAPIServerHandler(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
+type testVMAPIServerSite struct {
+	name      string
+	listeners []string
+	hosts     []string
+	isDefault bool
+}
 
-	isolate := v8go.NewIsolate()
-	defer isolate.Dispose()
-	context := v8go.NewContext(isolate)
-	defer context.Close()
+func (t *testVMAPIServerSite) Name() string {
+	return t.name
+}
 
+func (t *testVMAPIServerSite) Listeners() []string {
+	return t.listeners
+}
+
+func (t *testVMAPIServerSite) Hosts() []string {
+	return t.hosts
+}
+
+func (t *testVMAPIServerSite) IsDefault() bool {
+	return t.isDefault
+}
+
+func (t *testVMAPIServerSite) Server() core.Server {
+	return nil
+}
+
+func (t *testVMAPIServerSite) Store() core.Store {
+	return nil
+}
+
+func (t *testVMAPIServerSite) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
+	return nil
+}
+
+func (t *testVMAPIServerSite) RegisterHandler(handler http.Handler) error {
+	return nil
+}
+
+var _ core.ServerSite = (*testVMAPIServerSite)(nil)
+
+func TestVMAPIServerSite(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://localhost", nil)
 	if err != nil {
 		t.Errorf("failed to create request: %s", err)
@@ -28,7 +59,129 @@ func TestVMAPIServerHandler(t *testing.T) {
 	type args struct {
 		name    string
 		config  vmConfig
-		source  string
+		code    []byte
+		timeout time.Duration
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *vmResult
+		wantErr bool
+	}{
+		{
+			name: "name",
+			args: args{
+				name: "test",
+				config: vmConfig{
+					Env:     "test",
+					Request: req,
+					State:   bytePtr([]byte(`{}`)),
+					Site: &testVMAPIServerSite{
+						name: "test",
+					},
+				},
+				code:    []byte(`(() => { if (server.site.name() !== "test") throw Error(); })();`),
+				timeout: 4 * time.Second,
+			},
+			want: &vmResult{},
+		},
+		{
+			name: "listeners",
+			args: args{
+				name: "test",
+				config: vmConfig{
+					Env:     "test",
+					Request: req,
+					State:   bytePtr([]byte(`{}`)),
+					Site: &testVMAPIServerSite{
+						listeners: []string{"listener1", "listener2"},
+					},
+				},
+				code: []byte(`
+(() => {
+  if (JSON.stringify(server.site.listeners()) !== JSON.stringify(["listener1","listener2"])) {
+    throw Error();
+  }
+})();
+`),
+				timeout: 4 * time.Second,
+			},
+			want: &vmResult{},
+		},
+		{
+			name: "hosts",
+			args: args{
+				name: "test",
+				config: vmConfig{
+					Env:     "test",
+					Request: req,
+					State:   bytePtr([]byte(`{}`)),
+					Site: &testVMAPIServerSite{
+						hosts: []string{"host1", "host2"},
+					},
+				},
+				code: []byte(`
+(() => {
+  if (JSON.stringify(server.site.hosts()) !== JSON.stringify(["host1","host2"])) {
+    throw Error();
+  }
+})();
+`),
+				timeout: 4 * time.Second,
+			},
+			want: &vmResult{},
+		},
+		{
+			name: "isDefault",
+			args: args{
+				name: "test",
+				config: vmConfig{
+					Env:     "test",
+					Request: req,
+					State:   bytePtr([]byte(`{}`)),
+					Site: &testVMAPIServerSite{
+						isDefault: true,
+					},
+				},
+				code: []byte(`
+(() => {
+  if (server.site.isDefault() !== true) {
+    throw Error();
+  }
+})();
+`),
+				timeout: 4 * time.Second,
+			},
+			want: &vmResult{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v, err := newVM()
+			if err != nil {
+				t.Fatal()
+			}
+			got, err := v.Execute(tt.args.config, tt.args.name, tt.args.code, tt.args.timeout)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("vm.Execute() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("vm.Execute() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVMAPIServerHandler(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "http://localhost", nil)
+	if err != nil {
+		t.Errorf("failed to create request: %s", err)
+	}
+
+	type args struct {
+		name    string
+		config  vmConfig
+		code    []byte
 		timeout time.Duration
 	}
 	tests := []struct {
@@ -44,22 +197,21 @@ func TestVMAPIServerHandler(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{"test":"value"}`)),
 				},
-				source:  `(() => { server.handler.state(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { if (server.handler.state().test !== "value") throw Error(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := newVM()
-			c := tt.args.config
-			if err := v.Configure(&c, slog.Default()); err != nil {
-				t.Errorf("failed to configure VM: %s", err)
+			v, err := newVM()
+			if err != nil {
+				t.Fatal()
 			}
-			got, err := v.Execute(tt.args.name, tt.args.source, tt.args.timeout)
+			got, err := v.Execute(tt.args.config, tt.args.name, tt.args.code, tt.args.timeout)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("vm.Execute() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -72,15 +224,6 @@ func TestVMAPIServerHandler(t *testing.T) {
 }
 
 func TestVMAPIServerRequest(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	isolate := v8go.NewIsolate()
-	defer isolate.Dispose()
-	context := v8go.NewContext(isolate)
-	defer context.Close()
-
 	req, err := http.NewRequest(http.MethodGet, "http://localhost", nil)
 	if err != nil {
 		t.Errorf("failed to create request: %s", err)
@@ -89,7 +232,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 	type args struct {
 		name    string
 		config  vmConfig
-		source  string
+		code    []byte
 		timeout time.Duration
 	}
 	tests := []struct {
@@ -105,10 +248,10 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.method(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.method(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
@@ -119,10 +262,10 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.proto(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.proto(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
@@ -133,10 +276,10 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.protoMajor(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.protoMajor(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
@@ -147,10 +290,10 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.protoMinor(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.protoMinor(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
@@ -161,10 +304,10 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.remoteAddr(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.remoteAddr(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
@@ -175,10 +318,10 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.host(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.host(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
@@ -189,10 +332,10 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.path(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.path(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
@@ -203,10 +346,10 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.query(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.query(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
@@ -217,22 +360,21 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.request.headers(); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.request.headers(); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := newVM()
-			c := tt.args.config
-			if err := v.Configure(&c, slog.Default()); err != nil {
-				t.Errorf("failed to configure VM: %s", err)
+			v, err := newVM()
+			if err != nil {
+				t.Fatal()
 			}
-			got, err := v.Execute(tt.args.name, tt.args.source, tt.args.timeout)
+			got, err := v.Execute(tt.args.config, tt.args.name, tt.args.code, tt.args.timeout)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("vm.Execute() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -245,15 +387,6 @@ func TestVMAPIServerRequest(t *testing.T) {
 }
 
 func TestVMAPIServerResponse(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-
-	isolate := v8go.NewIsolate()
-	defer isolate.Dispose()
-	context := v8go.NewContext(isolate)
-	defer context.Close()
-
 	req, err := http.NewRequest(http.MethodGet, "http://localhost", nil)
 	if err != nil {
 		t.Errorf("failed to create request: %s", err)
@@ -283,7 +416,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 	type args struct {
 		name    string
 		config  vmConfig
-		source  string
+		code    []byte
 		timeout time.Duration
 	}
 	tests := []struct {
@@ -299,10 +432,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.render("test"); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.render("test"); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Render: bytePtr([]byte("test")),
@@ -316,10 +449,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.render("test", 200); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.render("test", 200); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Render: bytePtr([]byte("test")),
@@ -333,15 +466,12 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.render("test", 9999); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.render("test", 9999); })();`),
+				timeout: 4 * time.Second,
 			},
-			want: &vmResult{
-				Render: bytePtr([]byte("test")),
-				Status: intPtr(http.StatusInternalServerError),
-			},
+			wantErr: true,
 		},
 		{
 			name: "redirect without status code",
@@ -350,10 +480,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.redirect("http://test"); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.redirect("http://test"); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Redirect:       boolPtr(true),
@@ -368,10 +498,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.redirect("http://test", 303); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.redirect("http://test", 303); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Redirect:       boolPtr(true),
@@ -386,16 +516,12 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.redirect("http://test", 999); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.redirect("http://test", 999); })();`),
+				timeout: 4 * time.Second,
 			},
-			want: &vmResult{
-				Redirect:       boolPtr(true),
-				RedirectURL:    stringPtr("http://test"),
-				RedirectStatus: intPtr(http.StatusInternalServerError),
-			},
+			wantErr: true,
 		},
 		{
 			name: "set header",
@@ -404,10 +530,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.setHeader("key", "value"); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.setHeader("key", "value"); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Headers: map[string][]string{
@@ -422,10 +548,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.setTitle("test"); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.setTitle("test"); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Title: stringPtr("test"),
@@ -438,10 +564,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.setMeta("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.setMeta("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Metas: metas,
@@ -454,10 +580,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.setLink("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.setLink("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Links: links,
@@ -470,10 +596,10 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   stringPtr("{}"),
+					State:   bytePtr([]byte(`{}`)),
 				},
-				source:  `(() => { server.response.setScript("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`,
-				timeout: time.Duration(1) * time.Second,
+				code:    []byte(`(() => { server.response.setScript("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`),
+				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
 				Scripts: scripts,
@@ -482,12 +608,11 @@ func TestVMAPIServerResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := newVM()
-			c := tt.args.config
-			if err := v.Configure(&c, slog.Default()); err != nil {
-				t.Errorf("failed to configure VM: %s", err)
+			v, err := newVM()
+			if err != nil {
+				t.Fatal()
 			}
-			got, err := v.Execute(tt.args.name, tt.args.source, tt.args.timeout)
+			got, err := v.Execute(tt.args.config, tt.args.name, tt.args.code, tt.args.timeout)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("vm.Execute() error = %v, wantErr %v", err, tt.wantErr)
 				return

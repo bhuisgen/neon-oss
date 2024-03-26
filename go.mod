@@ -1,14 +1,14 @@
 module github.com/bhuisgen/neon
 
-go 1.21
+go 1.21.7
 
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
+	github.com/bhuisgen/gomonkey v0.0.0-20240323094722-2c26ff2d9271
 	github.com/google/uuid v1.6.0
 	github.com/mitchellh/mapstructure v1.5.0
 	golang.org/x/net v0.21.0
 	gopkg.in/yaml.v3 v3.0.1
-	rogchap.com/v8go v0.8.0
 )
 
 require (

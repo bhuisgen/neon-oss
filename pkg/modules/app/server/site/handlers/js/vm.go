@@ -2,52 +2,47 @@ package js
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"runtime"
 	"time"
 
-	"rogchap.com/v8go"
+	"github.com/bhuisgen/gomonkey"
+
+	"github.com/bhuisgen/neon/pkg/core"
+	"github.com/bhuisgen/neon/pkg/log"
 )
 
 // VM
 type VM interface {
-	Close()
-	Reset()
-	Configure(config *vmConfig, logger *slog.Logger) error
-	Execute(name string, source string, timeout time.Duration) (*vmResult, error)
+	Execute(config vmConfig, name string, code []byte, timeout time.Duration) (*vmResult, error)
 }
 
 // vm implements a VM.
 type vm struct {
-	isolate                     *v8go.Isolate
-	processObject               *v8go.ObjectTemplate
-	envObject                   *v8go.ObjectTemplate
-	serverObject                *v8go.ObjectTemplate
-	serverHandlerObject         *v8go.ObjectTemplate
-	serverRequestObject         *v8go.ObjectTemplate
-	serverResponseObject        *v8go.ObjectTemplate
-	context                     *v8go.Context
-	status                      vmStatus
-	config                      *vmConfig
-	logger                      *slog.Logger
-	data                        *vmData
-	v8NewFunctionTemplate       func(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate
-	v8ObjectTemplateNewInstance func(template *v8go.ObjectTemplate, context *v8go.Context) (*v8go.Object, error)
+	options vmOptions
+	logger  *slog.Logger
+	config  *vmConfig
+	data    *vmData
 }
 
-// vmStatus implements the VM status.
-type vmStatus int
+// vmOptions implements the VM options.
+type vmOptions struct {
+	heapMaxBytes uint
+	stackSize    uint
+}
 
-const (
-	vmStatusNew = iota
-	vmStatusConfigured
-)
+// vmOptionFunc represents a vm option function.
+type vmOptionFunc func(v *vm) error
 
 // vmConfig implements the VM execution configuration.
 type vmConfig struct {
 	Env     string
+	State   *[]byte
 	Request *http.Request
-	State   *string
+	Site    core.ServerSite
 }
 
 // vmData implements the VM execution data.
@@ -64,183 +59,172 @@ type vmData struct {
 	scripts        *domElementList
 }
 
-// vmV8NewFunctionTemplate redirects to v8go.NewFunctionTemplate.
-func vmV8NewFunctionTemplate(isolate *v8go.Isolate, callback v8go.FunctionCallback) *v8go.FunctionTemplate {
-	return v8go.NewFunctionTemplate(isolate, callback)
-}
-
-// vmV8ObjectTemplateNewInstance redirects to v8go.ObjectTemplate.NewInstance.
-func vmV8ObjectTemplateNewInstance(template *v8go.ObjectTemplate, context *v8go.Context) (*v8go.Object, error) {
-	return template.NewInstance(context)
-}
+const (
+	vmLoggerID string = "app.server.site.handler.js.vm"
+)
 
 // newVM creates a new VM.
-func newVM() *vm {
-	isolate := v8go.NewIsolate()
-	return &vm{
-		isolate:                     isolate,
-		processObject:               v8go.NewObjectTemplate(isolate),
-		envObject:                   v8go.NewObjectTemplate(isolate),
-		serverObject:                v8go.NewObjectTemplate(isolate),
-		serverHandlerObject:         v8go.NewObjectTemplate(isolate),
-		serverRequestObject:         v8go.NewObjectTemplate(isolate),
-		serverResponseObject:        v8go.NewObjectTemplate(isolate),
-		context:                     v8go.NewContext(isolate),
-		status:                      vmStatusNew,
-		data:                        &vmData{},
-		v8NewFunctionTemplate:       vmV8NewFunctionTemplate,
-		v8ObjectTemplateNewInstance: vmV8ObjectTemplateNewInstance,
+func newVM(options ...vmOptionFunc) (*vm, error) {
+	v := &vm{
+		logger: slog.New(log.NewHandler(os.Stderr, vmLoggerID, nil)),
+		data:   &vmData{},
 	}
-}
-
-// Close closes the VM.
-func (v *vm) Close() {
-	v.context.Close()
-	v.isolate.Dispose()
-}
-
-// Reset resets the VM.
-func (v *vm) Reset() {
-	v.config = nil
-	v.logger = nil
-	v.data = nil
-}
-
-// Configure configures the VM
-func (v *vm) Configure(config *vmConfig, logger *slog.Logger) error {
-	if v.status == vmStatusNew {
-		if err := api(v); err != nil {
-			return errVMConfigure
+	for _, option := range options {
+		if err := option(v); err != nil {
+			return nil, err
 		}
 	}
+	return v, nil
+}
 
-	process, err := v.v8ObjectTemplateNewInstance(v.processObject, v.context)
-	if err != nil {
-		return errVMConfigure
+// WithHeapMaxBytes sets the maximum heap size in bytes.
+func WithHeapMaxBytes(max uint) vmOptionFunc {
+	return func(v *vm) error {
+		v.options.heapMaxBytes = max
+		return nil
 	}
-	env, err := v.v8ObjectTemplateNewInstance(v.envObject, v.context)
-	if err != nil {
-		return errVMConfigure
-	}
-	server, err := v.v8ObjectTemplateNewInstance(v.serverObject, v.context)
-	if err != nil {
-		return errVMConfigure
-	}
-	serverHandler, err := v.v8ObjectTemplateNewInstance(v.serverHandlerObject, v.context)
-	if err != nil {
-		return errVMConfigure
-	}
-	serverRequest, err := v.v8ObjectTemplateNewInstance(v.serverRequestObject, v.context)
-	if err != nil {
-		return errVMConfigure
-	}
-	serverResponse, err := v.v8ObjectTemplateNewInstance(v.serverResponseObject, v.context)
-	if err != nil {
-		return errVMConfigure
-	}
+}
 
-	if err := env.Set("ENV", config.Env); err != nil {
-		return errVMConfigure
+// WithStackSize sets the stack size in bytes.
+func WithStackSize(size uint) vmOptionFunc {
+	return func(v *vm) error {
+		v.options.stackSize = size
+		return nil
 	}
-	if err := process.Set("env", env); err != nil {
-		return errVMConfigure
-	}
-	if err := server.Set("handler", serverHandler); err != nil {
-		return errVMConfigure
-	}
-	if err := server.Set("request", serverRequest); err != nil {
-		return errVMConfigure
-	}
-	if err := server.Set("response", serverResponse); err != nil {
-		return errVMConfigure
-	}
+}
 
-	global := v.context.Global()
-	if err := global.Set("process", process); err != nil {
-		return errVMConfigure
+// configure configures the VM.
+func (v *vm) configure(context *gomonkey.Context, config *vmConfig) error {
+	global, err := context.Global()
+	if err != nil {
+		return err
 	}
-	if err := global.Set("server", server); err != nil {
-		return errVMConfigure
+	defer global.Release()
+
+	server, err := context.DefineObject(global, "server", 0)
+	if err != nil {
+		return err
+	}
+	defer server.Release()
+
+	if err := v.apiSite(context, server); err != nil {
+		return err
+	}
+	if err := v.apiHandler(context, server); err != nil {
+		return err
+	}
+	if err := v.apiRequest(context, server); err != nil {
+		return err
+	}
+	if err := v.apiResponse(context, server); err != nil {
+		return err
 	}
 
-	v.status = vmStatusConfigured
+	process, err := context.DefineObject(global, "process", 0)
+	if err != nil {
+		return err
+	}
+	defer process.Release()
+	env, err := context.DefineObject(process, "env", 0)
+	if err != nil {
+		return err
+	}
+	defer env.Release()
+	envName, err := gomonkey.NewValueString(context, config.Env)
+	if err != nil {
+		return err
+	}
+	defer envName.Release()
+	if err := env.Set("ENV", envName); err != nil {
+		return err
+	}
 
 	v.config = config
-	v.logger = logger
 	v.data = &vmData{}
 
 	return nil
 }
 
-// Executes executes a script.
-func (v *vm) Execute(name string, source string, timeout time.Duration) (*vmResult, error) {
+// Executes executes the VM.
+func (v *vm) Execute(config vmConfig, name string, code []byte, timeout time.Duration) (*vmResult, error) {
 	defer v.timeTrack("Execute()", time.Now())
 
-	worker := func(vals chan<- *v8go.Value, errs chan<- error) {
-		value, err := v.context.RunScript(source, name)
+	ctxCh := make(chan *gomonkey.Context, 1)
+	doneCh := make(chan struct{}, 1)
+	errCh := make(chan error, 1)
+
+	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		ctx, err := gomonkey.NewContext(
+			gomonkey.WithHeapMaxBytes(v.options.heapMaxBytes),
+			gomonkey.WithNativeStackSize(v.options.stackSize),
+		)
 		if err != nil {
-			errs <- err
+			errCh <- err
 			return
 		}
-		vals <- value
-	}
-	vals := make(chan *v8go.Value, 1)
-	errs := make(chan error, 1)
+		defer ctx.Destroy()
+		ctxCh <- ctx
 
-	go worker(vals, errs)
+		if err := v.configure(ctx, &config); err != nil {
+			errCh <- err
+			return
+		}
+
+		script, err := ctx.CompileScript(name, code)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		result, err := ctx.ExecuteScript(script)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		result.Release()
+		doneCh <- struct{}{}
+	}()
+
+	ctx := <-ctxCh
+
 	select {
-	case <-vals:
-	case err := <-errs:
-		var jsError *v8go.JSError
+	case <-doneCh:
+		return newVMResult(v.data), nil
+
+	case err := <-errCh:
+		var jsError *gomonkey.JSError
 		if errors.As(err, &jsError) {
-			v.logger.Debug("Failed to execute script", "name", name, "message", jsError.Message,
-				"location", jsError.Location, "stackTrace", jsError.StackTrace)
+			v.logger.Error("Failed to execute VM", "err", "JS error",
+				"message", jsError.Message, "filename", jsError.Filename, "line", jsError.LineNumber)
 		} else {
-			v.logger.Debug("Failed to execute script", "name", name, "err", err)
+			v.logger.Error("Failed to execute VM", "err", err)
 		}
 		return nil, errVMExecute
 
 	case <-time.After(timeout):
-		v.isolate.TerminateExecution()
-		<-errs
-		return nil, errVMExecutionTimeout
-	}
+		ctx.RequestInterrupt()
 
-	return newVMResult(v.data), nil
+		err := <-errCh
+		var jsError *gomonkey.JSError
+		if errors.As(err, &jsError) {
+			v.logger.Error("Failed to execute VM", "err", "JS error",
+				"message", jsError.Message, "filename", jsError.Filename, "line", jsError.LineNumber)
+		} else {
+			v.logger.Error("Failed to execute VM", "err", err)
+		}
+		return nil, errVMExecuteTimeout
+	}
 }
 
 // timeTrack outputs the execution time of a function or code block
 func (v *vm) timeTrack(label string, start time.Time) {
 	elapsed := time.Since(start)
-	v.logger.Debug("Execution of %s took %s", label, elapsed)
+	v.logger.Debug(fmt.Sprintf("Execution of %s took %dms", label, elapsed.Milliseconds()))
 }
 
 var _ VM = (*vm)(nil)
-
-// vmError implements a VM error.
-type vmError struct {
-	message string
-}
-
-// newVMError creates a new error.
-func newVMError(message string) *vmError {
-	return &vmError{
-		message: message,
-	}
-}
-
-// Error returns the error message.
-func (e vmError) Error() string {
-	return e.message
-}
-
-var (
-	errVMConfigure        = newVMError("configuration error")
-	errVMExecute          = newVMError("execution error")
-	errVMExecutionTimeout = newVMError("execution timeout")
-)
-
-var _ error = (*vmError)(nil)
 
 // vmResult implements the results of a VM.
 type vmResult struct {
@@ -271,3 +255,28 @@ func newVMResult(d *vmData) *vmResult {
 		Scripts:        d.scripts,
 	}
 }
+
+// vmError implements a VM error.
+type vmError struct {
+	message string
+}
+
+// newVMError creates a new error.
+func newVMError(message string) *vmError {
+	return &vmError{
+		message: message,
+	}
+}
+
+// Error returns the error message.
+func (e vmError) Error() string {
+	return e.message
+}
+
+var (
+	errVMBuild          = newVMError("build error")
+	errVMExecute        = newVMError("execution error")
+	errVMExecuteTimeout = newVMError("execution timeout")
+)
+
+var _ error = (*vmError)(nil)

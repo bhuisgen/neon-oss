@@ -16,6 +16,41 @@ export interface Resource {
 }
 
 /**
+ * Site interface.
+ *
+ * @interface Site
+ */
+interface Site {
+  /**
+   * Return the site name.
+   *
+   * @returns {string} The site name.
+   */
+  name(): string;
+
+  /**
+   * Returns the site listeners.
+   *
+   * @returns {string[]} The list of listeners.
+   */
+  listeners(): string[];
+
+  /**
+   * Return the site hosts.
+   *
+   * @returns {string[]} The list of hosts.
+   */
+  hosts(): string[];
+
+  /**
+   * Returns true if the site is the default site of the server.
+   *
+   * @returns {boolean} The default site flag.
+   */
+  isDefault(): boolean;
+}
+
+/**
  * Handler interface.
  *
  * @interface Handler
@@ -102,7 +137,7 @@ interface Response {
   redirect(url: string, status: number): void;
 
   /**
-   * Sets a response header
+   * Sets a response header.
    *
    * @param key the key
    * @param value  the value
@@ -110,7 +145,7 @@ interface Response {
   setHeader(key: string, value: string): void;
 
   /**
-   * Sets the page title
+   * Sets the page title.
    *
    * @param title the title
    */
@@ -147,6 +182,11 @@ interface Response {
  * @interface Server
  */
 export interface Server {
+  /**
+   * The site object.
+   */
+  site: Site;
+
   /**
    * The handler object.
    */
