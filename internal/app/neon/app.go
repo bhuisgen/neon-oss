@@ -593,7 +593,7 @@ func (a *app) child(key string) error {
 		switch string(cmd) {
 		case childCommandHello:
 			request, err := json.Marshal(childReloadRequest{
-				Key: os.Getenv(childEnvKey),
+				Key: key,
 			})
 			if err != nil {
 				return errors.New("encode reload request")
