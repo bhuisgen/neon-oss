@@ -414,6 +414,11 @@ func (m *serverSiteMediator) Server() core.Server {
 	return m.site.state.server
 }
 
+// IsDefault return the site default flag.
+func (m *serverSiteMediator) IsDefault() bool {
+	return m.site.state.defaultSite
+}
+
 // RegisterMiddleware registers a middleware.
 func (m *serverSiteMediator) RegisterMiddleware(middleware func(next http.Handler) http.Handler) error {
 	m.mu.Lock()

@@ -190,7 +190,7 @@ func (l *tlsListener) Init(config map[string]interface{}) error {
 				errConfig = true
 				continue
 			}
-			if err == nil && fi.IsDir() {
+			if fi.IsDir() {
 				l.logger.Error("File is a directory", "option", "CAFiles", "value", item)
 				errConfig = true
 				continue
@@ -220,7 +220,7 @@ func (l *tlsListener) Init(config map[string]interface{}) error {
 			errConfig = true
 			continue
 		}
-		if err == nil && fi.IsDir() {
+		if fi.IsDir() {
 			l.logger.Error("File is a directory", "option", "CertFiles", "value", item)
 			errConfig = true
 			continue
@@ -249,7 +249,7 @@ func (l *tlsListener) Init(config map[string]interface{}) error {
 			errConfig = true
 			continue
 		}
-		if err == nil && fi.IsDir() {
+		if fi.IsDir() {
 			l.logger.Error("File is a directory", "option", "KeyFiles", "value", item)
 			errConfig = true
 			continue

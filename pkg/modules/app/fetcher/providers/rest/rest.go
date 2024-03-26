@@ -189,7 +189,7 @@ func (p *restProvider) Init(config map[string]interface{}) error {
 				errConfig = true
 				continue
 			}
-			if err == nil && fi.IsDir() {
+			if fi.IsDir() {
 				p.logger.Error("File is a directory", "option", "TLSCAFiles", "value", item)
 				errConfig = true
 				continue
@@ -216,7 +216,7 @@ func (p *restProvider) Init(config map[string]interface{}) error {
 				errConfig = true
 				continue
 			}
-			if err == nil && fi.IsDir() {
+			if fi.IsDir() {
 				p.logger.Error("File is a directory", "option", "TLSCertFiles", "value", item)
 				errConfig = true
 				continue
@@ -247,7 +247,7 @@ func (p *restProvider) Init(config map[string]interface{}) error {
 				errConfig = true
 				continue
 			}
-			if err == nil && fi.IsDir() {
+			if fi.IsDir() {
 				p.logger.Error("File is a directory", "option", "TLSKeyFiles", "value", item)
 				errConfig = true
 				continue
