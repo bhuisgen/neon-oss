@@ -4,7 +4,7 @@ go 1.21.7
 
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
-	github.com/bhuisgen/gomonkey v0.0.0-20240323094722-2c26ff2d9271
+	github.com/bhuisgen/gomonkey v0.1.0
 	github.com/google/uuid v1.6.0
 	github.com/mitchellh/mapstructure v1.5.0
 	golang.org/x/net v0.21.0
