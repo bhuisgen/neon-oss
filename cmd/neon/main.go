@@ -30,6 +30,7 @@ func run() error {
 		NewInitCommand(),
 		NewCheckCommand(),
 		NewServeCommand(),
+		NewVersionCommand(),
 	}
 
 	var version bool
