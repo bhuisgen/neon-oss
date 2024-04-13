@@ -1,6 +1,6 @@
 module github.com/bhuisgen/neon
 
-go 1.22.1
+go 1.22.2
 
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
