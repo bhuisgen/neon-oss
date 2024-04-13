@@ -191,11 +191,7 @@ func (l *loader) Start() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.logger.Info("Starting loader")
-
-	if len(l.config.Rules) == 0 {
-		l.logger.Warn("Execution disabled, no rules defined")
-	} else {
+	if len(l.config.Rules) > 0 {
 		if *l.config.ExecStartup == 0 && *l.config.ExecInterval == 0 {
 			l.logger.Warn("Periodic execution disabled")
 		}
@@ -205,10 +201,12 @@ func (l *loader) Start() error {
 		if (*l.config.ExecStartup > 0 || *l.config.ExecInterval > 0) && *l.config.ExecFailsafeInterval == 0 {
 			l.logger.Warn("Failsafe execution disabled")
 		}
-	}
 
-	if len(l.config.Rules) > 0 && *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
-		l.execute(l.stop)
+		if *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
+			l.logger.Info("Starting loader")
+
+			l.execute(l.stop)
+		}
 	}
 
 	return nil
@@ -219,9 +217,9 @@ func (l *loader) Stop() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.logger.Info("Stopping loader")
-
 	if len(l.config.Rules) > 0 && (*l.config.ExecStartup > 0 || *l.config.ExecInterval > 0) {
+		l.logger.Info("Stopping loader")
+
 		l.stop <- struct{}{}
 	}
 
