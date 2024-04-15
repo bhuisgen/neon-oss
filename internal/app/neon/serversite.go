@@ -217,7 +217,7 @@ func (s *serverSite) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.logger.Info("Starting site")
+	s.logger.Debug("Starting site")
 
 	for _, route := range s.state.routes {
 		for _, middleware := range s.state.routesMap[route].middlewares {
@@ -240,7 +240,7 @@ func (s *serverSite) Stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.logger.Info("Stopping site")
+	s.logger.Debug("Stopping site")
 
 	for _, route := range s.state.routes {
 		for _, middleware := range s.state.routesMap[route].middlewares {
