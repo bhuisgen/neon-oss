@@ -43,7 +43,7 @@ func TestCreateLogFileWriter(t *testing.T) {
 func TestLogFileWriterClose(t *testing.T) {
 	f, err := os.Create(path.Join(t.TempDir(), "test"))
 	if err != nil {
-		t.Error("failed to create file")
+		t.Error("create file")
 	}
 	defer f.Close()
 
@@ -96,7 +96,7 @@ func TestLogFileWriterClose(t *testing.T) {
 func TestLogFileWriterReopen(t *testing.T) {
 	f, err := os.Create(path.Join(t.TempDir(), "test"))
 	if err != nil {
-		t.Error("failed to create file")
+		t.Error("create file")
 	}
 	defer f.Close()
 
@@ -149,7 +149,7 @@ func TestLogFileWriterReopen(t *testing.T) {
 func TestLogFileWriterWrite(t *testing.T) {
 	f, err := os.Create(path.Join(t.TempDir(), "test"))
 	if err != nil {
-		t.Error("failed to create file")
+		t.Error("create file")
 	}
 	defer f.Close()
 
@@ -199,7 +199,7 @@ func TestLogFileWriterWrite(t *testing.T) {
 func TestLogFileWriterSync(t *testing.T) {
 	f, err := os.Create(path.Join(t.TempDir(), "test"))
 	if err != nil {
-		t.Error("failed to create file")
+		t.Error("create file")
 	}
 	defer f.Close()
 

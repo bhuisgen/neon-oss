@@ -38,7 +38,7 @@ func parseLogEntries(t *testing.T, data []byte) []map[string]any {
 		for _, field := range splitFields(line) {
 			key, value, found := bytes.Cut(field, []byte{'='})
 			if !found || len(key) == 0 || len(value) == 0 {
-				t.Fatal(fmt.Errorf("failed to parse field '%s' for line '%s'", string(field), string(line)))
+				t.Fatal(fmt.Errorf("parse field '%s' for line '%s'", string(field), string(line)))
 			}
 			keyItems := bytes.Split(key, []byte{'.'})
 

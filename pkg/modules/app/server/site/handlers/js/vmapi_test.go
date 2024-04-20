@@ -53,7 +53,7 @@ var _ core.ServerSite = (*testVMAPIServerSite)(nil)
 func TestVMAPIServerSite(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://localhost", nil)
 	if err != nil {
-		t.Errorf("failed to create request: %s", err)
+		t.Errorf("create request: %s", err)
 	}
 
 	type args struct {
@@ -175,7 +175,7 @@ func TestVMAPIServerSite(t *testing.T) {
 func TestVMAPIServerHandler(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://localhost", nil)
 	if err != nil {
-		t.Errorf("failed to create request: %s", err)
+		t.Errorf("create request: %s", err)
 	}
 
 	type args struct {
@@ -226,7 +226,7 @@ func TestVMAPIServerHandler(t *testing.T) {
 func TestVMAPIServerRequest(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://localhost", nil)
 	if err != nil {
-		t.Errorf("failed to create request: %s", err)
+		t.Errorf("create request: %s", err)
 	}
 
 	type args struct {
@@ -389,7 +389,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 func TestVMAPIServerResponse(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://localhost", nil)
 	if err != nil {
-		t.Errorf("failed to create request: %s", err)
+		t.Errorf("create request: %s", err)
 	}
 
 	meta := newDOMElement("test")

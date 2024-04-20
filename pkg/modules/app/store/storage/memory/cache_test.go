@@ -31,7 +31,7 @@ func TestCacheGet(t *testing.T) {
 	cache.Set(key, value)
 
 	if v := cache.Get(key); v != value {
-		t.Errorf("failed to get key: got %v, want %v", v, value)
+		t.Errorf("c.Get() got %v, want %v", v, value)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestCacheSet(t *testing.T) {
 	cache.Set(key, value)
 
 	if v := cache.Get(key); v != value {
-		t.Errorf("failed to get key: got %v, want %v", v, value)
+		t.Errorf("c.Get() got %v, want %v", v, value)
 	}
 }
 
@@ -57,7 +57,7 @@ func TestCacheSet_UpdateValue(t *testing.T) {
 	cache.Set(key, value2)
 
 	if v := cache.Get(key); v != value2 {
-		t.Errorf("failed to get key: got %v, want %v", v, value2)
+		t.Errorf("c.Get() got %v, want %v", v, value2)
 	}
 }
 
@@ -70,7 +70,7 @@ func TestCacheRemove(t *testing.T) {
 	cache.Remove(key)
 
 	if v := cache.Get(key); v != nil {
-		t.Error("failed to remove key")
+		t.Errorf("c.Get() got %v, want %v", v, nil)
 	}
 }
 
@@ -83,7 +83,7 @@ func TestCacheClear(t *testing.T) {
 	cache.Clear()
 
 	if v := cache.Get(key); v != nil {
-		t.Error("failed to clear cache")
+		t.Errorf("c.Get() got %v, want %v", v, nil)
 	}
 }
 
