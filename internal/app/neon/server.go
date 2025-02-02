@@ -154,7 +154,7 @@ func (s *server) Register(app core.App) error {
 }
 
 // Start starts the server.
-func (s *server) Start() error {
+func (s *server) Start(ctx context.Context) error {
 	s.logger.Info("Starting server")
 
 	for _, site := range s.state.sitesMap {
@@ -173,7 +173,7 @@ func (s *server) Start() error {
 	}
 
 	for _, site := range s.state.sitesMap {
-		if err := site.Start(); err != nil {
+		if err := site.Start(ctx); err != nil {
 			return fmt.Errorf("start site: %w", err)
 		}
 	}

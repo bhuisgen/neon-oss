@@ -8,6 +8,12 @@ import (
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
+var (
+	DEBUG bool = false
+
+	CHILD_SOCKET string = "neon.sock"
+)
+
 // init initializes the package.
 func init() {
 	module.Register(app{})

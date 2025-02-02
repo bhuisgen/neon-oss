@@ -14,19 +14,19 @@ import (
 	"github.com/bhuisgen/neon/pkg/module"
 )
 
-// store implements the store
+// store implements the store.
 type store struct {
 	config *storeConfig
 	logger *slog.Logger
 	state  *storeState
 }
 
-// storeConfig implements the store configuration
+// storeConfig implements the store configuration.
 type storeConfig struct {
 	Storage map[string]map[string]interface{} `mapstructure:"storage"`
 }
 
-// storeState implements the store state
+// storeState implements the store state.
 type storeState struct {
 	storage  core.StoreStorageModule
 	mediator *storeMediator

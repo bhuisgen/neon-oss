@@ -7,8 +7,6 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
-
-	"github.com/bhuisgen/neon/internal/app/neon"
 )
 
 // versionCommand implements the version command.
@@ -16,6 +14,13 @@ type versionCommand struct {
 	flagset *flag.FlagSet
 	verbose bool
 }
+
+var (
+	Name    string = "Neon"
+	Version string = "dev"
+	Commit  string = "-"
+	Date    string = "-"
+)
 
 // NewVersionCommand creates a new version command.
 func NewVersionCommand() *versionCommand {
@@ -58,14 +63,13 @@ func (c *versionCommand) Parse(args []string) error {
 
 // Execute executes the command.
 func (c *versionCommand) Execute() error {
-	fmt.Printf("%s\n", neon.Name)
-	fmt.Printf("%s:\t\t%s\n", "Version", neon.Version)
-	fmt.Printf("%s:\t\t\t%s\n", "Commit", neon.Commit)
-	fmt.Printf("%s:\t\t\t%s\n", "Built", neon.Date)
-	fmt.Printf("%s:\t\t%s\n", "OS/Arch", strings.Join([]string{runtime.GOOS, runtime.GOARCH}, "/"))
-
+	fmt.Printf("%s\n", Name)
+	fmt.Printf(" %-19s%s\n", "Version:", Version)
+	fmt.Printf(" %-19s%s\n", "Commit:", Commit)
+	fmt.Printf(" %-19s%s\n", "Built:", Date)
+	fmt.Printf(" %-19s%s\n", "OS/Arch:", strings.Join([]string{runtime.GOOS, runtime.GOARCH}, "/"))
 	if buildInfo, ok := debug.ReadBuildInfo(); ok {
-		fmt.Printf("%s:\t\t%s\n", "Go version", buildInfo.GoVersion)
+		fmt.Printf(" %-19s%s\n", "Go version:", buildInfo.GoVersion)
 	}
 
 	return nil

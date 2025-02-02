@@ -187,7 +187,7 @@ func (l *loader) Register(app core.App) error {
 }
 
 // Start starts the loader.
-func (l *loader) Start() error {
+func (l *loader) Start(ctx context.Context) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -205,7 +205,7 @@ func (l *loader) Start() error {
 		if *l.config.ExecStartup > 0 || *l.config.ExecInterval > 0 {
 			l.logger.Info("Starting loader")
 
-			l.execute(l.stop)
+			l.execute(ctx, l.stop)
 		}
 	}
 
@@ -227,7 +227,7 @@ func (l *loader) Stop() error {
 }
 
 // execute loads all resources data.
-func (l *loader) execute(stop <-chan struct{}) {
+func (l *loader) execute(ctx context.Context, stop <-chan struct{}) {
 	startup := true
 	var delay time.Duration
 	if *l.config.ExecStartup > 0 {
@@ -238,9 +238,6 @@ func (l *loader) execute(stop <-chan struct{}) {
 	ticker := time.NewTicker(delay)
 
 	go func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		worker := func(ctx context.Context, jobs <-chan string, results chan<- error) {
 			for ruleName := range jobs {
 				parser, ok := l.state.parsers[ruleName]

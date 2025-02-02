@@ -1,6 +1,7 @@
 package neon
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"testing"
@@ -131,9 +132,13 @@ func TestLoaderStart(t *testing.T) {
 		mu     *sync.RWMutex
 		stop   chan struct{}
 	}
+	type args struct {
+		ctx context.Context
+	}
 	tests := []struct {
 		name    string
 		fields  fields
+		args    args
 		wantErr bool
 	}{
 		{
@@ -148,6 +153,9 @@ func TestLoaderStart(t *testing.T) {
 				state:  &loaderState{},
 				mu:     &sync.RWMutex{},
 				stop:   make(chan struct{}, 1),
+			},
+			args: args{
+				ctx: context.Background(),
 			},
 		},
 		{
@@ -174,7 +182,7 @@ func TestLoaderStart(t *testing.T) {
 				mu:     tt.fields.mu,
 				stop:   tt.fields.stop,
 			}
-			if err := l.Start(); (err != nil) != tt.wantErr {
+			if err := l.Start(tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("loader.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

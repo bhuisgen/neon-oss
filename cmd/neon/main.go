@@ -5,8 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-
-	"github.com/bhuisgen/neon/internal/app/neon"
 )
 
 // command
@@ -52,7 +50,7 @@ func run() error {
 	flag.Parse()
 
 	if version {
-		fmt.Printf("%s version %s\n", neon.Name, neon.Version)
+		fmt.Printf("%s version %s\n", Name, Version)
 		return nil
 	}
 

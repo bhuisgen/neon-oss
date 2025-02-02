@@ -56,6 +56,12 @@ func (c *serveCommand) Parse(args []string) error {
 
 // Execute executes the command.
 func (c *serveCommand) Execute() error {
+	fmt.Println()
+	fmt.Println(Name, Version)
+	fmt.Println("Copyright (C) 2022-2025 Boris HUISGEN")
+	fmt.Println("All rights reserved.")
+	fmt.Println()
+
 	config, err := neon.LoadConfig()
 	if err != nil {
 		fmt.Printf("Failed to load configuration: %v\n", err)

@@ -31,14 +31,14 @@ type Fetcher interface {
 // Loader
 type Loader interface {
 	core.AppModule
-	Start() error
+	Start(ctx context.Context) error
 	Stop() error
 }
 
 // Server
 type Server interface {
 	core.AppModule
-	Start() error
+	Start(ctx context.Context) error
 	Stop() error
 	Shutdown(ctx context.Context) error
 	Listeners() (map[string][]net.Listener, error)
@@ -67,7 +67,7 @@ type ServerListenerRouter interface {
 type ServerSite interface {
 	Init(config map[string]interface{}) error
 	Register(core.App) error
-	Start() error
+	Start(ctx context.Context) error
 	Stop() error
 	Name() string
 	Listeners() []string

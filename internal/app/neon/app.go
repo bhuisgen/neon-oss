@@ -159,9 +159,6 @@ func (a *app) Check() error {
 
 // Serve executes the instance.
 func (a *app) Serve(ctx context.Context) error {
-	a.logger.Info(fmt.Sprintf("%s version %s, commit %s", Name, Version, Commit))
-
-	a.logger.Info("Starting instance")
 
 	module.Load()
 
@@ -176,6 +173,64 @@ func (a *app) Serve(ctx context.Context) error {
 		}
 	}
 
+	a.logger.Info("Starting instance")
+
+	if err := a.start(ctx); err != nil {
+		a.logger.Error("Failed to start instance", "err", err)
+		return fmt.Errorf("start instance: %v", err)
+	}
+
+	a.logger.Info("Instance ready")
+
+	exit := make(chan os.Signal, 1)
+	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGQUIT)
+	reload := make(chan os.Signal, 1)
+	signal.Notify(reload, syscall.SIGHUP)
+
+	for {
+		select {
+		case <-ctx.Done():
+			if err := ctx.Err(); err != nil {
+				a.logger.Error("Context error", "err", err)
+				return fmt.Errorf("context: %v", err)
+			}
+		case <-exit:
+			a.logger.Info("Signal SIGINT/SIGTERM received, stopping instance")
+			if err := a.stop(); err != nil {
+				a.logger.Error("Failed to stop instance", "err", err)
+				continue
+			}
+		case <-shutdown:
+			a.logger.Info("Signal SIGQUIT received, shutting down instance gracefully")
+			if err := a.shutdown(ctx); err != nil {
+				a.logger.Error("Failed to shutdown instance", "err", err)
+				continue
+			}
+		case <-reload:
+			a.logger.Info("Signal SIGHUP received, reloading instance")
+			if err := a.reload(ctx); err != nil {
+				a.logger.Error("Failed to reload instance", "err", err)
+				continue
+			}
+		}
+		break
+	}
+
+	signal.Stop(exit)
+	signal.Stop(shutdown)
+	signal.Stop(reload)
+
+	module.Unload()
+
+	a.logger.Info("Instance terminated")
+
+	return nil
+}
+
+// start starts the instance.
+func (a *app) start(ctx context.Context) error {
 	if err := a.state.store.Init(a.config.Store); err != nil {
 		a.logger.Error("Failed to init store", "err", err)
 		return fmt.Errorf("init store: %v", err)
@@ -201,7 +256,7 @@ func (a *app) Serve(ctx context.Context) error {
 		a.logger.Error("Failed to register loader", "err", err)
 		return fmt.Errorf("register loader: %v", err)
 	}
-	if err := a.state.loader.Start(); err != nil {
+	if err := a.state.loader.Start(ctx); err != nil {
 		a.logger.Error("Failed to start loader", "err", err)
 		return fmt.Errorf("start loader: %v", err)
 	}
@@ -214,61 +269,10 @@ func (a *app) Serve(ctx context.Context) error {
 		a.logger.Error("Failed to register server", "err", err)
 		return fmt.Errorf("register server: %v", err)
 	}
-	if err := a.state.server.Start(); err != nil {
+	if err := a.state.server.Start(ctx); err != nil {
 		a.logger.Error("Failed to start server", "err", err)
 		return fmt.Errorf("start server: %v", err)
 	}
-
-	a.logger.Info("Instance ready")
-
-	exit := make(chan os.Signal, 1)
-	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, syscall.SIGQUIT)
-	reload := make(chan os.Signal, 1)
-	signal.Notify(reload, syscall.SIGHUP)
-
-	for {
-		select {
-		case <-ctx.Done():
-			if err := ctx.Err(); err != nil {
-				a.logger.Error("context error", "err", err)
-				return fmt.Errorf("context: %v", err)
-			}
-			break
-
-		case <-exit:
-			a.logger.Info("Signal SIGINT/SIGTERM received, stopping instance")
-			if err := a.stop(); err != nil {
-				a.logger.Error("stop instance", "err", err)
-				continue
-			}
-
-		case <-shutdown:
-			a.logger.Info("Signal SIGQUIT received, shutting down instance gracefully")
-			if err := a.shutdown(); err != nil {
-				a.logger.Error("shutdown instance", "err", err)
-				continue
-			}
-
-		case <-reload:
-			a.logger.Info("Signal SIGHUP received, reloading instance")
-			if err := a.reload(); err != nil {
-				a.logger.Error("reload instance", "err", err)
-				continue
-			}
-		}
-
-		break
-	}
-
-	signal.Stop(exit)
-	signal.Stop(shutdown)
-	signal.Stop(reload)
-
-	module.Unload()
-
-	a.logger.Info("Instance terminated")
 
 	return nil
 }
@@ -290,8 +294,8 @@ func (a *app) stop() error {
 }
 
 // shutdown stops the instance gracefully.
-func (a *app) shutdown() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+func (a *app) shutdown(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	if err := a.state.server.Shutdown(ctx); err != nil {
@@ -309,7 +313,7 @@ func (a *app) shutdown() error {
 }
 
 // reload reloads the instance.
-func (a *app) reload() error {
+func (a *app) reload(ctx context.Context) error {
 	ch := make(chan string)
 	errCh := make(chan error)
 	stop := make(chan struct{})
@@ -327,6 +331,11 @@ func (a *app) reload() error {
 	go a.listenChild(key, ch, errCh, stop)
 	for {
 		select {
+		case <-ctx.Done():
+			if err := ctx.Err(); err != nil {
+				a.logger.Error("Context error", "err", err)
+				return fmt.Errorf("context: %v", err)
+			}
 		case event := <-ch:
 			switch event {
 			case "init":
@@ -353,22 +362,11 @@ func (a *app) reload() error {
 				}
 				for _, listener := range listeners {
 					for _, l := range listener {
-						switch v := l.(type) {
-						case *net.TCPListener:
-							file, err := v.File()
-							if err != nil {
-								return fmt.Errorf("get listener file: %w", err)
-							}
-							files = append(files, file)
-						case *net.UnixListener:
-							file, err := v.File()
-							if err != nil {
-								return fmt.Errorf("get listener file: %w", err)
-							}
-							files = append(files, file)
-						default:
-							return errors.New("invalid listener type")
+						file, err := getListenerFile(l)
+						if err != nil {
+							return fmt.Errorf("get listener file: %w", err)
 						}
+						files = append(files, file)
 					}
 				}
 
@@ -380,15 +378,13 @@ func (a *app) reload() error {
 				}); err != nil {
 					return fmt.Errorf("start process: %w", err)
 				}
-
 				a.logger.Info("Child process started, waiting for connection")
 
 			case "done":
 				stop <- struct{}{}
-
 				a.logger.Info("Child process ready, stopping instance")
 
-				if err := a.shutdown(); err != nil {
+				if err := a.shutdown(ctx); err != nil {
 					a.logger.Error("Shutdown error", "err", err)
 					return fmt.Errorf("shutdown: %w", err)
 				}
@@ -403,6 +399,18 @@ func (a *app) reload() error {
 	}
 }
 
+const (
+	childTimeout int    = 5
+	childEnvKey  string = "CHILD"
+
+	childCommandHello  string = "HELLO"
+	childCommandReload string = "RELOAD"
+	childCommandReady  string = "READY"
+
+	childResultOK    string = "OK"
+	childResultError string = "ERROR"
+)
+
 // childReloadRequest implements the reload request message.
 type childReloadRequest struct {
 	Key string `json:"key"`
@@ -415,18 +423,6 @@ type childReloadResponse struct {
 		Files []string `json:"files"`
 	} `json:"listeners"`
 }
-
-const (
-	childTimeout int    = 5
-	childEnvKey  string = "CHILD"
-
-	childCommandHello  string = "HELLO"
-	childCommandReload string = "RELOAD"
-	childCommandReady  string = "READY"
-
-	childResultOK    string = "OK"
-	childResultError string = "ERROR"
-)
 
 // listenChild listens for child connections.
 func (a *app) listenChild(key string, ch chan<- string, errCh chan<- error, stop <-chan struct{}) {
@@ -508,31 +504,20 @@ func (a *app) handleChild(conn net.Conn, key string, ch chan<- string, errorCh c
 				return
 			}
 			for name, listener := range listeners {
-				helloListener := struct {
+				childListener := struct {
 					Name  string   `json:"name"`
 					Files []string `json:"files"`
 				}{
 					Name: name,
 				}
 				for _, l := range listener {
-					switch v := l.(type) {
-					case *net.TCPListener:
-						file, err := v.File()
-						if err != nil {
-							errorCh <- fmt.Errorf("get listener file: %w", err)
-						}
-						helloListener.Files = append(helloListener.Files, file.Name())
-					case *net.UnixListener:
-						file, err := v.File()
-						if err != nil {
-							errorCh <- fmt.Errorf("get listener file: %w", err)
-						}
-						helloListener.Files = append(helloListener.Files, file.Name())
-					default:
-						errorCh <- errors.New("invalid listener type")
+					file, err := getListenerFile(l)
+					if err != nil {
+						errorCh <- fmt.Errorf("get listener file: %w", err)
 					}
+					childListener.Files = append(childListener.Files, file.Name())
 				}
-				response.Listeners = append(response.Listeners, helloListener)
+				response.Listeners = append(response.Listeners, childListener)
 			}
 			data, err := json.Marshal(response)
 			if err != nil {
@@ -662,6 +647,26 @@ func generateKey() (string, error) {
 		return "", fmt.Errorf("rand: %w", err)
 	}
 	return base64.StdEncoding.EncodeToString([]byte(b)), nil
+}
+
+// getListenerFile returns the file of a listener.
+func getListenerFile(listener net.Listener) (*os.File, error) {
+	switch v := listener.(type) {
+	case *net.TCPListener:
+		file, err := v.File()
+		if err != nil {
+			return nil, fmt.Errorf("get file descriptor: %w", err)
+		}
+		return file, nil
+	case *net.UnixListener:
+		file, err := v.File()
+		if err != nil {
+			return nil, fmt.Errorf("get file descriptor: %w", err)
+		}
+		return file, nil
+	default:
+		return nil, errors.New("invalid listener type")
+	}
 }
 
 var _ App = (*app)(nil)

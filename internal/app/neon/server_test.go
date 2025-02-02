@@ -107,7 +107,7 @@ func (s testServerServerSite) Register(app core.App) error {
 	return nil
 }
 
-func (s testServerServerSite) Start() error {
+func (s testServerServerSite) Start(ctx context.Context) error {
 	if s.errStart {
 		return errors.New("test error")
 	}
@@ -433,9 +433,13 @@ func TestServerStart(t *testing.T) {
 		logger *slog.Logger
 		state  *serverState
 	}
+	type args struct {
+		ctx context.Context
+	}
 	tests := []struct {
 		name    string
 		fields  fields
+		args    args
 		wantErr bool
 	}{
 		{
@@ -475,6 +479,9 @@ func TestServerStart(t *testing.T) {
 						"main": {&testServerServerListener{}},
 					},
 				},
+			},
+			args: args{
+				ctx: context.Background(),
 			},
 		},
 		{
@@ -516,6 +523,9 @@ func TestServerStart(t *testing.T) {
 						"main": {&testServerServerListener{}},
 					},
 				},
+			},
+			args: args{
+				ctx: context.Background(),
 			},
 			wantErr: true,
 		},
@@ -559,6 +569,9 @@ func TestServerStart(t *testing.T) {
 					},
 				},
 			},
+			args: args{
+				ctx: context.Background(),
+			},
 			wantErr: true,
 		},
 	}
@@ -569,7 +582,7 @@ func TestServerStart(t *testing.T) {
 				logger: tt.fields.logger,
 				state:  tt.fields.state,
 			}
-			if err := s.Start(); (err != nil) != tt.wantErr {
+			if err := s.Start(tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("server.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

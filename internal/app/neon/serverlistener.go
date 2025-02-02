@@ -183,9 +183,9 @@ func (l *serverListener) Link(site ServerSite) error {
 	l.logger.Debug("Linking site", "site", site.Name())
 	l.state.sites[site.Name()] = site
 
-	errChan := make(chan error)
-	l.update <- errChan
-	err := <-errChan
+	errCh := make(chan error)
+	l.update <- errCh
+	err := <-errCh
 	if err != nil {
 		l.logger.Error("Failed to link site", "err", err)
 
@@ -203,9 +203,9 @@ func (l *serverListener) Unlink(site ServerSite) error {
 	l.logger.Debug("Unlinking site", "site", site.Name())
 	delete(l.state.sites, site.Name())
 
-	errChan := make(chan error)
-	l.update <- errChan
-	err := <-errChan
+	errCh := make(chan error)
+	l.update <- errCh
+	err := <-errCh
 	if err != nil {
 		l.logger.Error("Failed to unlink site", "err", err)
 
@@ -222,15 +222,15 @@ func (l *serverListener) waitForEvents() {
 		case <-l.quit:
 			return
 
-		case errChan := <-l.update:
+		case errCh := <-l.update:
 			l.logger.Debug("New update event received, updating router")
 
 			if err := l.updateRouter(); err != nil {
-				errChan <- fmt.Errorf("update router: %w", err)
+				errCh <- fmt.Errorf("update router: %w", err)
 			} else {
-				errChan <- nil
+				errCh <- nil
 			}
-			close(errChan)
+			close(errCh)
 		}
 	}
 }

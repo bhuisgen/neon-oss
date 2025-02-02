@@ -265,9 +265,13 @@ func TestServerSiteStart(t *testing.T) {
 		state  *serverSiteState
 		server Server
 	}
+	type args struct {
+		ctx context.Context
+	}
 	tests := []struct {
 		name    string
 		fields  fields
+		args    args
 		wantErr bool
 	}{
 		{
@@ -275,6 +279,9 @@ func TestServerSiteStart(t *testing.T) {
 			fields: fields{
 				logger: slog.Default(),
 				state:  &serverSiteState{},
+			},
+			args: args{
+				ctx: context.Background(),
 			},
 		},
 		{
@@ -292,6 +299,9 @@ func TestServerSiteStart(t *testing.T) {
 						},
 					},
 				},
+			},
+			args: args{
+				ctx: context.Background(),
 			},
 		},
 		{
@@ -312,6 +322,9 @@ func TestServerSiteStart(t *testing.T) {
 					},
 				},
 			},
+			args: args{
+				ctx: context.Background(),
+			},
 			wantErr: true,
 		},
 		{
@@ -329,6 +342,9 @@ func TestServerSiteStart(t *testing.T) {
 					},
 				},
 			},
+			args: args{
+				ctx: context.Background(),
+			},
 			wantErr: true,
 		},
 	}
@@ -341,7 +357,7 @@ func TestServerSiteStart(t *testing.T) {
 				state:  tt.fields.state,
 				server: tt.fields.server,
 			}
-			if err := s.Start(); (err != nil) != tt.wantErr {
+			if err := s.Start(tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("serverSite.Start() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

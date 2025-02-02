@@ -1,6 +1,7 @@
 package neon
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -213,7 +214,7 @@ func (s *serverSite) Register(app core.App) error {
 }
 
 // Start starts the site.
-func (s *serverSite) Start() error {
+func (s *serverSite) Start(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

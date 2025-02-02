@@ -446,19 +446,19 @@ func TestServerListenerName(t *testing.T) {
 }
 
 func TestServerListenerLink(t *testing.T) {
-	createUpdateChan := func(errUpdate bool) chan chan error {
-		updateChan := make(chan chan error)
+	createUpdateCh := func(errUpdate bool) chan chan error {
+		updateCh := make(chan chan error)
 		go func() {
 			for {
-				errChan := <-updateChan
+				errCh := <-updateCh
 				if errUpdate {
-					errChan <- errors.New("test error")
+					errCh <- errors.New("test error")
 				} else {
-					errChan <- nil
+					errCh <- nil
 				}
 			}
 		}()
-		return updateChan
+		return updateCh
 	}
 
 	type fields struct {
@@ -486,7 +486,7 @@ func TestServerListenerLink(t *testing.T) {
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
-				update: createUpdateChan(false),
+				update: createUpdateCh(false),
 			},
 			args: args{
 				site: &serverSite{
@@ -501,7 +501,7 @@ func TestServerListenerLink(t *testing.T) {
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
-				update: createUpdateChan(true),
+				update: createUpdateCh(true),
 			},
 			args: args{
 				site: &serverSite{
@@ -530,19 +530,19 @@ func TestServerListenerLink(t *testing.T) {
 }
 
 func TestServerListenerUnlink(t *testing.T) {
-	createUpdateChan := func(errUpdate bool) chan chan error {
-		updateChan := make(chan chan error)
+	createUpdateCh := func(errUpdate bool) chan chan error {
+		updateCh := make(chan chan error)
 		go func() {
 			for {
-				errChan := <-updateChan
+				errCh := <-updateCh
 				if errUpdate {
-					errChan <- errors.New("test error")
+					errCh <- errors.New("test error")
 				} else {
-					errChan <- nil
+					errCh <- nil
 				}
 			}
 		}()
-		return updateChan
+		return updateCh
 	}
 
 	type fields struct {
@@ -570,7 +570,7 @@ func TestServerListenerUnlink(t *testing.T) {
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
-				update: createUpdateChan(false),
+				update: createUpdateCh(false),
 			},
 			args: args{
 				site: &serverSite{
@@ -585,7 +585,7 @@ func TestServerListenerUnlink(t *testing.T) {
 				state: &serverListenerState{
 					sites: map[string]ServerSite{},
 				},
-				update: createUpdateChan(true),
+				update: createUpdateCh(true),
 			},
 			args: args{
 				site: &serverSite{
