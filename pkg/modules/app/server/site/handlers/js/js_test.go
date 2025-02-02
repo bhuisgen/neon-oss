@@ -25,10 +25,6 @@ func intPtr(i int) *int {
 	return &i
 }
 
-func bytePtr(b []byte) *[]byte {
-	return &b
-}
-
 func stringPtr(s string) *string {
 	return &s
 }

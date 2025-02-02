@@ -70,7 +70,7 @@ type ServerSiteHandlerModule interface {
 	Stop() error
 }
 
-// ServerSiteMiddlewareModule is the interface of a middleware module
+// ServerSiteMiddlewareModule is the interface of a middleware module.
 type ServerSiteMiddlewareModule interface {
 	// Module is the interface of a module.
 	Module

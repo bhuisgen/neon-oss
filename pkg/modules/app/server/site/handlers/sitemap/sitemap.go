@@ -502,7 +502,7 @@ func (h *sitemapHandler) sitemap(s []SitemapEntry, w io.Writer, _ *http.Request)
 	return nil
 }
 
-// sitemapTemplateStaticItem returns a sitemap template static item
+// sitemapTemplateStaticItem returns a sitemap template static item.
 func (h *sitemapHandler) sitemapTemplateStaticItem(entry SitemapEntry) (sitemapTemplateSitemapItem, error) {
 	item := sitemapTemplateSitemapItem{
 		Loc: h.absURL(entry.Static.Loc, h.config.Root),
@@ -520,7 +520,7 @@ func (h *sitemapHandler) sitemapTemplateStaticItem(entry SitemapEntry) (sitemapT
 	return item, nil
 }
 
-// sitemapTemplateListItems returns the sitemap template list items
+// sitemapTemplateListItems returns the sitemap template list items.
 func (h *sitemapHandler) sitemapTemplateListItems(entry SitemapEntry) ([]sitemapTemplateSitemapItem, error) {
 	var items []sitemapTemplateSitemapItem
 

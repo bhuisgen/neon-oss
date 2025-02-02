@@ -75,7 +75,7 @@ func TestVMAPIServerSite(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 					Site: &testVMAPIServerSite{
 						name: "test",
 					},
@@ -92,7 +92,7 @@ func TestVMAPIServerSite(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 					Site: &testVMAPIServerSite{
 						listeners: []string{"listener1", "listener2"},
 					},
@@ -115,7 +115,7 @@ func TestVMAPIServerSite(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 					Site: &testVMAPIServerSite{
 						hosts: []string{"host1", "host2"},
 					},
@@ -138,7 +138,7 @@ func TestVMAPIServerSite(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 					Site: &testVMAPIServerSite{
 						isDefault: true,
 					},
@@ -197,7 +197,7 @@ func TestVMAPIServerHandler(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{"test":"value"}`)),
+					State:   []byte(`{"test":"value"}`),
 				},
 				code:    []byte(`(() => { if (server.handler.state().test !== "value") throw Error(); })();`),
 				timeout: 4 * time.Second,
@@ -248,7 +248,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.method(); })();`),
 				timeout: 4 * time.Second,
@@ -262,7 +262,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.proto(); })();`),
 				timeout: 4 * time.Second,
@@ -276,7 +276,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.protoMajor(); })();`),
 				timeout: 4 * time.Second,
@@ -290,7 +290,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.protoMinor(); })();`),
 				timeout: 4 * time.Second,
@@ -304,7 +304,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.remoteAddr(); })();`),
 				timeout: 4 * time.Second,
@@ -318,7 +318,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.host(); })();`),
 				timeout: 4 * time.Second,
@@ -332,7 +332,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.path(); })();`),
 				timeout: 4 * time.Second,
@@ -346,7 +346,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.query(); })();`),
 				timeout: 4 * time.Second,
@@ -360,7 +360,7 @@ func TestVMAPIServerRequest(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.request.headers(); })();`),
 				timeout: 4 * time.Second,
@@ -432,14 +432,14 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.render("test"); })();`),
 				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
-				Render: bytePtr([]byte("test")),
-				Status: intPtr(http.StatusOK),
+				Render: []byte("test"),
+				Status: http.StatusOK,
 			},
 		},
 		{
@@ -449,14 +449,14 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.render("test", 200); })();`),
 				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
-				Render: bytePtr([]byte("test")),
-				Status: intPtr(http.StatusOK),
+				Render: []byte("test"),
+				Status: http.StatusOK,
 			},
 		},
 		{
@@ -466,7 +466,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.render("test", 9999); })();`),
 				timeout: 4 * time.Second,
@@ -480,15 +480,15 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.redirect("http://test"); })();`),
 				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
-				Redirect:       boolPtr(true),
-				RedirectURL:    stringPtr("http://test"),
-				RedirectStatus: intPtr(http.StatusFound),
+				Redirect:       true,
+				RedirectURL:    "http://test",
+				RedirectStatus: http.StatusFound,
 			},
 		},
 		{
@@ -498,15 +498,15 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.redirect("http://test", 303); })();`),
 				timeout: 4 * time.Second,
 			},
 			want: &vmResult{
-				Redirect:       boolPtr(true),
-				RedirectURL:    stringPtr("http://test"),
-				RedirectStatus: intPtr(http.StatusSeeOther),
+				Redirect:       true,
+				RedirectURL:    "http://test",
+				RedirectStatus: http.StatusSeeOther,
 			},
 		},
 		{
@@ -516,7 +516,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.redirect("http://test", 999); })();`),
 				timeout: 4 * time.Second,
@@ -530,7 +530,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.setHeader("key", "value"); })();`),
 				timeout: 4 * time.Second,
@@ -548,7 +548,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.setTitle("test"); })();`),
 				timeout: 4 * time.Second,
@@ -564,7 +564,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.setMeta("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`),
 				timeout: 4 * time.Second,
@@ -580,7 +580,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.setLink("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`),
 				timeout: 4 * time.Second,
@@ -596,7 +596,7 @@ func TestVMAPIServerResponse(t *testing.T) {
 				config: vmConfig{
 					Env:     "test",
 					Request: req,
-					State:   bytePtr([]byte(`{}`)),
+					State:   []byte(`{}`),
 				},
 				code:    []byte(`(() => { server.response.setScript("test", new Map([["k1", "v1"],["k2", "v2"],["k3", "v3"]])); })();`),
 				timeout: 4 * time.Second,

@@ -390,7 +390,7 @@ func (l *tlsListener) Serve(handler http.Handler) error {
 
 		if err := l.httpServerServeTLS(l.server, l.listener, "", ""); err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {
-				l.logger.Error("Service error", "err", err)
+				l.logger.Error("Serve error", "err", err)
 			}
 		}
 	}()

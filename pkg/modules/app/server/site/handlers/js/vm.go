@@ -40,18 +40,18 @@ type vmOptionFunc func(v *vm) error
 // vmConfig implements the VM execution configuration.
 type vmConfig struct {
 	Env     string
-	State   *[]byte
+	State   []byte
 	Request *http.Request
 	Site    core.ServerSite
 }
 
 // vmData implements the VM execution data.
 type vmData struct {
-	render         *[]byte
-	status         *int
-	redirect       *bool
-	redirectURL    *string
-	redirectStatus *int
+	render         []byte
+	status         int
+	redirect       bool
+	redirectURL    string
+	redirectStatus int
 	headers        map[string][]string
 	title          *string
 	metas          *domElementList
@@ -218,7 +218,7 @@ func (v *vm) Execute(config vmConfig, name string, code []byte, timeout time.Dur
 	}
 }
 
-// timeTrack outputs the execution time of a function or code block
+// timeTrack outputs the execution time of a function or code block.
 func (v *vm) timeTrack(label string, start time.Time) {
 	elapsed := time.Since(start)
 	v.logger.Debug(fmt.Sprintf("Execution of %s took %dms", label, elapsed.Milliseconds()))
@@ -228,11 +228,11 @@ var _ VM = (*vm)(nil)
 
 // vmResult implements the results of a VM.
 type vmResult struct {
-	Render         *[]byte
-	Status         *int
-	Redirect       *bool
-	RedirectURL    *string
-	RedirectStatus *int
+	Render         []byte
+	Status         int
+	Redirect       bool
+	RedirectURL    string
+	RedirectStatus int
 	Headers        map[string][]string
 	Title          *string
 	Metas          *domElementList
@@ -274,7 +274,6 @@ func (e vmError) Error() string {
 }
 
 var (
-	errVMBuild          = newVMError("build error")
 	errVMExecute        = newVMError("execution error")
 	errVMExecuteTimeout = newVMError("execution timeout")
 )

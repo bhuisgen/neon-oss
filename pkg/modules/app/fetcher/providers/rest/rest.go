@@ -432,7 +432,7 @@ fetch:
 	}, nil
 }
 
-// parseLinkNextFromHeader parses the next link from the resource headers
+// parseLinkNextFromHeader parses the next link from the resource headers.
 func parseLinkNextFromHeader(headers http.Header) string {
 	for _, header := range headers["Link"] {
 		links := strings.Split(header, ",")
@@ -451,7 +451,7 @@ func parseLinkNextFromHeader(headers http.Header) string {
 	return ""
 }
 
-// parseLinkNextFromBody parses the next link from the resource body
+// parseLinkNextFromBody parses the next link from the resource body.
 func parseLinkNextFromBody(body []byte, filter string) string {
 	var jsonData interface{}
 	if err := json.Unmarshal(body, &jsonData); err != nil {
@@ -467,7 +467,7 @@ func parseLinkNextFromBody(body []byte, filter string) string {
 	return ""
 }
 
-// fetchResource fetches the resource
+// fetchResource fetches the resource.
 func (p *restProvider) fetchResource(ctx context.Context, config *restResourceConfig) ([]byte, http.Header, error) {
 	req, err := p.httpNewRequestWithContext(ctx, *config.Method, config.URL, nil)
 	if err != nil {

@@ -507,9 +507,9 @@ func (h *jsHandler) render(r *http.Request) (render.Render, error) {
 
 	var valid bool = true
 	var mServerState map[string]jsResource
-	var serverState *[]byte
+	var serverState []byte
 	var mClientState map[string]jsResource
-	var clientState *[]byte
+	var clientState []byte
 	var vmResult *vmResult
 
 	for index, rule := range h.config.Rules {
@@ -573,7 +573,7 @@ func (h *jsHandler) render(r *http.Request) (render.Render, error) {
 				return nil, fmt.Errorf("marshal server state: %v", err)
 			}
 
-			serverState = &buf
+			serverState = buf
 		}
 
 		if mClientState != nil {
@@ -582,7 +582,7 @@ func (h *jsHandler) render(r *http.Request) (render.Render, error) {
 				return nil, fmt.Errorf("marshal client state: %v", err)
 			}
 
-			clientState = &buf
+			clientState = buf
 		}
 
 		if h.config.Rules[index].Last {
@@ -616,8 +616,8 @@ func (h *jsHandler) render(r *http.Request) (render.Render, error) {
 		return nil, fmt.Errorf("execute VM: %v", err)
 	}
 
-	if vmResult.Redirect != nil && *vmResult.Redirect && vmResult.RedirectURL != nil && vmResult.RedirectStatus != nil {
-		rw.WriteRedirect(*vmResult.RedirectURL, *vmResult.RedirectStatus)
+	if vmResult.Redirect {
+		rw.WriteRedirect(vmResult.RedirectURL, vmResult.RedirectStatus)
 
 		return rw.Render(), nil
 	}
@@ -629,7 +629,7 @@ func (h *jsHandler) render(r *http.Request) (render.Render, error) {
 		}
 	}
 	if valid {
-		rw.WriteHeader(*vmResult.Status)
+		rw.WriteHeader(vmResult.Status)
 	} else {
 		rw.WriteHeader(http.StatusServiceUnavailable)
 	}
@@ -650,7 +650,7 @@ func (h *jsHandler) render(r *http.Request) (render.Render, error) {
 }
 
 // doc writes the final index.
-func (h *jsHandler) doc(w render.RenderWriter, _ *http.Request, b io.Reader, state *[]byte, result *vmResult) error {
+func (h *jsHandler) doc(w render.RenderWriter, _ *http.Request, b io.Reader, state []byte, result *vmResult) error {
 	doc, err := html.Parse(b)
 	if err != nil {
 		return fmt.Errorf("parse html: %v", err)
@@ -664,7 +664,7 @@ func (h *jsHandler) doc(w render.RenderWriter, _ *http.Request, b io.Reader, sta
 					if d.Key == "id" && d.Val == *h.config.Container {
 						n.AppendChild(&html.Node{
 							Type: html.RawNode,
-							Data: string(*result.Render),
+							Data: string(result.Render),
 						})
 						return true
 					}
@@ -701,7 +701,7 @@ func (h *jsHandler) doc(w render.RenderWriter, _ *http.Request, b io.Reader, sta
 					},
 					FirstChild: &html.Node{
 						Type: html.RawNode,
-						Data: string(*state),
+						Data: string(state),
 					},
 				})
 				return true

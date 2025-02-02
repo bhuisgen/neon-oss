@@ -90,7 +90,7 @@ func (v *vm) apiHandler(ctx *gomonkey.Context, server *gomonkey.Object) error {
 	defer handler.Release()
 
 	state := func(args []*gomonkey.Value) (*gomonkey.Value, error) {
-		o, err := gomonkey.JSONParse(ctx, string(*v.config.State))
+		o, err := gomonkey.JSONParse(ctx, string(v.config.State))
 		if err != nil {
 			return nil, err
 		}
@@ -212,8 +212,8 @@ func (v *vm) apiResponse(ctx *gomonkey.Context, server *gomonkey.Object) error {
 			status = int(code)
 		}
 
-		v.data.render = &content
-		v.data.status = &status
+		v.data.render = content
+		v.data.status = status
 
 		return nil, nil
 	}
@@ -239,9 +239,9 @@ func (v *vm) apiResponse(ctx *gomonkey.Context, server *gomonkey.Object) error {
 			redirectStatus = int(code)
 		}
 
-		v.data.redirect = &redirect
-		v.data.redirectURL = &redirectURL
-		v.data.redirectStatus = &redirectStatus
+		v.data.redirect = redirect
+		v.data.redirectURL = redirectURL
+		v.data.redirectStatus = redirectStatus
 
 		return nil, nil
 	}
